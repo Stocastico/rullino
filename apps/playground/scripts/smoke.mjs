@@ -184,6 +184,10 @@ try {
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
+  // Transparency at full strength (its default) would hide everything after it; the checks below
+  // need to see a drawn image.
+  await after(() => page.click('#chain button[data-action=select][aria-label="Edit Transparency"]'));
+  await after(() => slider('amount', 0));
   check((await status()).includes(`${ids.length + 2} steps`), `expected ${ids.length + 2} steps, status: ${await status()}`);
 
   for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {

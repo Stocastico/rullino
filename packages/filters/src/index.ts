@@ -21,6 +21,7 @@ import { saturation } from './saturation';
 import { shadowsHighlights } from './shadowsHighlights';
 import { sharpen } from './sharpen';
 import { threshold } from './threshold';
+import { transparency } from './transparency';
 import { unsharpMask } from './unsharpMask';
 import { vibrance } from './vibrance';
 import { vignette } from './vignette';
@@ -49,6 +50,7 @@ export {
   shadowsHighlights,
   sharpen,
   threshold,
+  transparency,
   unsharpMask,
   vibrance,
   vignette,
@@ -68,6 +70,7 @@ export const filters: readonly Filter<any>[] = [
   saturation,
   vibrance,
   whiteBalance,
+  transparency,
   grayscale,
   invert,
   threshold,
