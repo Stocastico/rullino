@@ -1,4 +1,4 @@
-import type { LinearMask, Mask, RadialMask, Vec2 } from '@rullino/core';
+import { paintStroke, type BrushOptions, type LinearMask, type Mask, type RadialMask, type RasterMask, type Vec2 } from '@rullino/core';
 
 // On-image handles for gradient masks, drawn in an SVG laid over the canvases. The SVG uses the
 // display image's pixel coordinates (viewBox = image size), so ellipses and the gradient's
@@ -27,7 +27,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  * `onChange` receives every edited mask while dragging; `onDragStart` lets the caller switch to
  * preview rendering (the drag ends with the window's pointerup).
  */
-export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => void, onDragStart: () => void): MaskOverlay {
+export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => void, onDragStart: () => void, brush: () => BrushOptions): MaskOverlay {
   let mask: Mask | undefined;
   let size: Vec2 = [1, 1];
   // Elements are rebuilt only when the mask kind changes: replacing a handle while it is being
@@ -115,6 +115,38 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
     };
   }
 
+  // Brush: the whole overlay takes pointer input; each move paints the segment since the last one.
+  function buildBrush() {
+    svg.classList.add('painting');
+    const cursor = el('circle', { class: 'brush-cursor' });
+    svg.append(cursor);
+    const toUv = (e: PointerEvent): Vec2 => {
+      const r = svg.getBoundingClientRect();
+      return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+    };
+    let last: Vec2 | undefined;
+    const paint = (to: Vec2) => {
+      const m = mask as RasterMask;
+      mask = { ...m, raster: paintStroke(m.raster, last ? [last, to] : [to], brush()) };
+      last = to;
+      onChange(mask);
+    };
+    svg.onpointermove = (e) => {
+      const [u, v] = toUv(e);
+      set(cursor, { cx: u * size[0], cy: v * size[1], r: brush().radius * Math.max(...size) });
+      if (last) paint([u, v]);
+    };
+    svg.onpointerdown = (e) => {
+      e.preventDefault();
+      svg.setPointerCapture(e.pointerId);
+      onDragStart();
+      last = undefined;
+      paint(toUv(e));
+    };
+    svg.onpointerup = svg.onpointercancel = () => (last = undefined);
+    svg.onpointerleave = () => set(cursor, { r: 0 });
+  }
+
   return {
     show(next, w, h) {
       mask = next;
@@ -122,12 +154,15 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
       // Handles keep a constant on-screen size whatever the display scale.
       svg.style.setProperty('--px', String(w / Math.max(1, svg.getBoundingClientRect().width || w)));
-      const kind = next && next.kind !== 'raster' ? next.kind : undefined;
+      const kind = next?.kind;
       if (kind !== builtFor) {
         svg.replaceChildren();
+        svg.classList.remove('painting');
+        svg.onpointermove = svg.onpointerdown = svg.onpointerup = svg.onpointercancel = svg.onpointerleave = null;
         update = () => {};
         if (kind === 'linear') buildLinear();
         if (kind === 'radial') buildRadial();
+        if (kind === 'raster') buildBrush();
         builtFor = kind;
       }
       update();

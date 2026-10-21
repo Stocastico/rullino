@@ -87,6 +87,29 @@ try {
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
   check((await page.$$('#overlay [data-handle]')).length === 0, 'mask handles should disappear with the mask');
 
+  // Brush: an empty mask changes nothing; a stroke across the middle changes only that band.
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'brush'));
+  check((await differs()) < 0.01, 'an empty brush mask should leave the image unchanged');
+  const midRows = () =>
+    page.evaluate(() => {
+      const px = (id) => { const c = document.getElementById(id); return [c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height]; };
+      const [[a, w, h], [b]] = [px('before'), px('after')];
+      const row = (y) => { let n = 0; for (let x = Math.floor(w * 0.6); x < Math.floor(w * 0.9); x++) for (let c = 0; c < 3; c++) n += Math.abs(a[(y * w + x) * 4 + c] - b[(y * w + x) * 4 + c]); return n / (Math.floor(w * 0.3) * 3); };
+      return [row(Math.floor(h / 2)), row(2)];
+    });
+  await after(async () => {
+    const box = await page.locator('#after').boundingBox();
+    await page.mouse.move(box.x + box.width * 0.05, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.95, box.y + box.height / 2, { steps: 12 });
+    await page.mouse.up();
+  });
+  const [mid, edge] = await midRows();
+  check(mid > 10 && edge < 1, `brush stroke: middle row differs by ${mid.toFixed(1)}, top row by ${edge.toFixed(1)}`);
+  await after(() => page.click('#chain button[data-action=mask-clear]'));
+  check((await differs()) < 0.01, 'clearing the brush mask should restore the image');
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
+
   // Disabling the step brings the original back.
   await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
   check((await differs()) < 0.01, 'disabled step should leave the image unchanged');

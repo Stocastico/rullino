@@ -20,6 +20,7 @@ import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createMaskOverlay } from './mask-overlay';
+import { brush, setImageSize } from './mask-ui';
 import { samples } from './samples';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
@@ -224,6 +225,7 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
       const image = await createImageBitmap(source);
       const [w, h] = await renderer.load(image);
       displaySize = [w, h];
+      setImageSize(w, h);
       showOverlay();
       imageName = name.replace(/\.[^.]+$/, '') || 'image';
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
@@ -285,6 +287,7 @@ const overlay = createMaskOverlay(
     void render();
   },
   () => (dragging = true),
+  () => brush,
 );
 const showOverlay = () => overlay.show(selectedMask(), displaySize[0], displaySize[1]);
 

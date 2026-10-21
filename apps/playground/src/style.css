@@ -97,3 +97,7 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 .mask-handle:active { cursor: grabbing; }
 .mask-guide, .mask-edge { fill: none; stroke: rgb(255 255 255 / 0.85); stroke-width: calc(1.5px * var(--px, 1)); filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.8)); }
 .mask-guide, .mask-inner { stroke-dasharray: calc(6px * var(--px, 1)) calc(4px * var(--px, 1)); }
+#overlay.painting { pointer-events: all; cursor: none; touch-action: none; }
+.brush-cursor { fill: none; stroke: rgb(255 255 255 / 0.9); stroke-width: calc(1.5px * var(--px, 1)); filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9)); pointer-events: none; }
+.brush-mode { display: flex; gap: 6px; }
+.brush-mode button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
