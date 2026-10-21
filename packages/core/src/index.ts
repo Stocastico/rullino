@@ -31,7 +31,7 @@ export { createImage, type LinearImage } from './image';
 export { applyLutCpu, createLut, identityLut, lutFromFunction, lutSamplerWgsl, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { lutTexture } from './gpu/lut';
 export { blendMask } from './gpu/mask';
-export { blendMasked, createRasterMask, maskValue, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
+export { blendMasked, createRasterMask, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
 export { paintStroke, type BrushOptions } from './paint';
 export { magicWand, type WandOptions } from './wand';
 export { refineMask, type RefineOptions } from './refine';

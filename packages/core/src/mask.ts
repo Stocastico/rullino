@@ -147,3 +147,11 @@ export function blendMasked(input: LinearImage, filtered: LinearImage, m: Mask):
   }
   return out;
 }
+
+/** The raster at another size (bilinear, like mask sampling); the same object if the size matches. */
+export function resampleRaster(r: RasterMaskData, width: number, height: number): RasterMaskData {
+  if (r.width === width && r.height === height) return r;
+  const out = createRasterMask(width, height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) out.data[y * width + x] = rasterAt(r, (x + 0.5) / width, (y + 0.5) / height);
+  return out;
+}
