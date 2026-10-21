@@ -42,6 +42,10 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
     if (p.type === 'float' || p.type === 'int') out.push([`${k}=${p.min}`, { [k]: p.min }], [`${k}=${p.max}`, { [k]: p.max }]);
     if (p.type === 'bool') out.push([`${k}=${!p.default}`, { [k]: !p.default }]);
     if (p.type === 'enum') for (const o of Object.keys(p.options)) if (o !== p.default) out.push([`${k}=${o}`, { [k]: o }]);
+    if (p.type === 'curve') {
+      // A strong S-curve: steep in the middle, flat near the ends, so LUT indexing errors show.
+      out.push([`${k}=S`, { [k]: [[0, 0], [0.3, 0.08], [0.6, 0.85], [1, 1]] }]);
+    }
     if (p.type === 'kernel') {
       // A non-symmetric kernel catches transposed or mirrored indexing.
       const n = p.size * p.size;

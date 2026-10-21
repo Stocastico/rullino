@@ -20,14 +20,15 @@ npx vitest run path/to/file.test.ts   # single file
 ## Layout
 
 - `packages/core`
-  - `params.ts` parameter schema (float/int/bool/enum/kernel, optional `unit: 'px'`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
+  - `params.ts` parameter schema (float/int/bool/enum/kernel/curve, optional `unit: 'px'`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
   - `filter.ts` / `define.ts` filter contracts and `defineFilter()`: `pointwise` (CPU reference derived from `pixel()`) and `multipass` (fixed list of passes + whole-image CPU reference).
+  - `curve.ts` monotone tone curves sampled to a 256-entry LUT, CPU sampler and WGSL sampler generator.
   - `color.ts`, `oklab.ts` CPU colour maths; `wgsl.ts` the `rl_*` WGSL twins prepended to every shader.
   - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runMultipass`, `runFilter` (any kind).
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema; `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
@@ -39,6 +40,7 @@ npx vitest run path/to/file.test.ts   # single file
 - **Multipass pass WGSL** defines `fn run(xy: vec2i, p: Params) -> vec4f` and reads inputs only through the generated `load_<input>(xy)` (clamp to edge). Pass lists are static: anything that varies with params goes in uniforms, so the shader cache keys stay `filter:pass`. Iteration goes through `repeat: '<int param>'` (ping-pong on `inputs[0]`), never through a params-dependent pass list.
 - **Reductions** (histograms, global statistics) use filter `buffers` (zeroed `array<atomic<u32>, N>`) and `kind: 'compute'` passes (`dispatch: 'pixels'` or `'single'`); store floats with `bitcast<u32>`.
 - **Filters with hard decisions** (thresholds, comparisons) mirror the GPU's f16 intermediates in their CPU reference (round each intermediate image) and may declare a small `tolerance.outliers` fraction. Measure the actual outliers before choosing it.
+- **Curve params are read in WGSL only through the generated `curve_<name>(x)`** (never index the LUT yourself): it handles the fused-stage namespacing and linear extrapolation outside [0, 1].
 - **Lengths in pixels are `unit: 'px'` params**, defined at the original image's resolution; chains scale them (`setSource({ scale })`, `runChainCpu({ scale })`).
 - **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
 - **Zero runtime dependencies** in `packages/*`.
@@ -91,6 +93,11 @@ npx vitest run path/to/file.test.ts   # single file
 | Texture pool (`createWorkingTexture` / `releaseTexture`) | New textures are lazily zero-filled; with one per pass, allocation dominated long filters (Canny hysteresis 5.8 s -> 2.5 s on SwiftShader with ping-pong alone). Reuse is safe because the queue runs in order and every pass overwrites every pixel. Capped at 16 free textures per device. |
 | Gaussian weights by recurrence, taps summed in symmetric pairs | One `exp()` per tap was a large share of blur cost (~-20 to -25%); f32 drift over 150 taps stays far inside the parity tolerance. |
 | Benchmarks are a separate Vitest project (`pnpm bench`), not tests | Timing assertions would be flaky on shared runners; results are written to `packages/filters/bench/results.txt` because browser console output is not forwarded. |
+| Curves = Fritsch-Carlson monotone cubic sampled to 256 f32 values, linear interpolation, linear extrapolation outside [0, 1] | No overshoot between points; CPU and GPU read the very same LUT; identity curves keep HDR. 1 KB of uniforms per curve. |
+| Generated `curve_<name>()` samplers read the global uniform | Pointwise `apply()` gets `Params` by value, which WGSL cannot index dynamically; the sampler is emitted with the filter's code so fusion namespaces it. |
+| Curves filter in sRGB-encoded units, RGB curve then channel curves | Matches how photo editors present curves. |
+| Levels clip to the output range, HDR included | Classic levels semantics; an unclipped top made narrow input ranges overflow float16. Minimum input range is one 8-bit step. |
+| Black point and shadows/highlights on OKLab lightness, global | Hue/chroma stay put. Local (detail-preserving) shadows/highlights is tier B "brilliance". |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -120,6 +127,8 @@ Things that already bit us. Add new ones as they come up.
 - **Integer-like object keys are reordered by JS** (`{ '5': …, '3': … }` iterates '3' first), so enum option keys must not be integer-like.
 - **Allocating textures is expensive** (lazy zero-fill): get working textures from `createWorkingTexture` and give intermediates back with `releaseTexture`, never create one per iteration.
 - **Browser-mode `console.log` does not reach the terminal** here; use `commands.writeFile` from `vitest/browser` (paths are relative to the repo root).
+- **`sampleCurve` caches its LUT per points array**: never mutate a points array after sampling it (the curve editor samples a copy).
+- **The registry parity test varies one param at a time**: interactions between params (curve order, combined settings) need a dedicated GPU test.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.

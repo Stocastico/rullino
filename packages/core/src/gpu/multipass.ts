@@ -1,5 +1,5 @@
 import type { MultipassFilter, PassDef } from '../filter';
-import { packParams, paramsStructWgsl, resolveParams } from '../params';
+import { curveSamplersWgsl, packParams, paramsStructWgsl, resolveParams } from '../params';
 import { colorWgsl } from '../wgsl';
 import type { GpuContext } from './context';
 import { cachedPipeline, objectKey } from './readback';
@@ -35,6 +35,7 @@ ${inputs.join('\n')}
 ${buffers.join('\n')}
 
 fn size() -> vec2i { return rl_max_xy + 1; }
+${curveSamplersWgsl(filter.params, 'params')}
 
 ${colorWgsl}
 

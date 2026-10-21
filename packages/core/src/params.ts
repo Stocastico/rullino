@@ -1,3 +1,5 @@
+import { CURVE_SAMPLES, curveLut, curveSamplerWgsl, type CurvePoints } from './curve';
+
 // Parameter schema: the contract between a filter, its UI, validation and serialisation.
 // Scalars are one 4-byte uniform field (f32 / i32 / u32); kernels are a 16-byte aligned
 // array<vec4f, N>. Fields follow declaration order with WGSL uniform layout rules.
@@ -45,7 +47,16 @@ export interface EnumParam<O extends Readonly<Record<string, string>> = Readonly
   readonly default: keyof O & string;
 }
 
-export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam;
+/**
+ * A tone curve: 2..16 control points in [0, 1]², x strictly increasing. Sampled to a 256-entry
+ * LUT (`curve.ts`); WGSL code reads it with the generated `curve_<name>(x)` sampler.
+ */
+export interface CurveParam extends ParamBase {
+  readonly type: 'curve';
+  readonly default: CurvePoints;
+}
+
+export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam;
 export type ParamSchema = Readonly<Record<string, Param>>;
 
 export type ParamValue<P extends Param> = P extends { readonly type: 'float' | 'int' }
@@ -56,11 +67,24 @@ export type ParamValue<P extends Param> = P extends { readonly type: 'float' | '
       ? keyof O & string
       : P extends { readonly type: 'kernel' }
         ? readonly number[]
-        : never;
+        : P extends { readonly type: 'curve' }
+          ? CurvePoints
+          : never;
 
 export type ParamValues<S extends ParamSchema> = { readonly [K in keyof S]: ParamValue<S[K]> };
 
 const IDENTIFIER = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+/** Why `v` is not a valid curve, or undefined if it is. */
+function curveProblem(v: unknown): string | undefined {
+  if (!Array.isArray(v) || v.length < 2 || v.length > 16) return 'a curve needs 2 to 16 points';
+  for (const p of v) {
+    if (!Array.isArray(p) || p.length !== 2 || !p.every((c) => typeof c === 'number' && Number.isFinite(c))) return 'points are [x, y] number pairs';
+    if (p[0] < 0 || p[0] > 1 || p[1] < 0 || p[1] > 1) return 'points must lie in [0, 1]';
+  }
+  for (let i = 1; i < v.length; i++) if (!(v[i][0] > v[i - 1][0])) return 'point x must be strictly increasing';
+  return undefined;
+}
 
 export function validateSchema(schema: ParamSchema): void {
   for (const [key, p] of Object.entries(schema)) {
@@ -87,6 +111,11 @@ export function validateSchema(schema: ParamSchema): void {
       case 'kernel':
         if (p.default.length !== p.size * p.size) fail(`kernel default needs ${p.size * p.size} values`);
         break;
+      case 'curve': {
+        const problem = curveProblem(p.default);
+        if (problem) fail(`curve default: ${problem}`);
+        break;
+      }
     }
   }
 }
@@ -124,6 +153,10 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
         if (!Array.isArray(v) || v.length !== p.size * p.size || !v.every((x) => typeof x === 'number' && Number.isFinite(x))) throw bad();
         out[key] = [...v];
         break;
+      case 'curve':
+        if (curveProblem(v)) throw bad();
+        out[key] = (v as CurvePoints).map(([x, y]) => [x, y]) as never;
+        break;
     }
   }
   return out as unknown as ParamValues<S>;
@@ -155,13 +188,13 @@ export function paramsLayout(schema: ParamSchema): { fields: Field[]; size: numb
   const fields: Field[] = [];
   let offset = 0;
   for (const [key, p] of Object.entries(schema)) {
-    if (p.type === 'kernel') {
-      const n = Math.ceil((p.size * p.size) / 4);
+    if (p.type === 'kernel' || p.type === 'curve') {
+      const n = Math.ceil((p.type === 'kernel' ? p.size * p.size : CURVE_SAMPLES) / 4);
       offset = roundUp(offset, 16);
       fields.push({ key, param: p, offset, wgsl: `@align(16) ${key}: array<vec4f, ${n}>` });
       offset += 16 * n;
     } else {
-      fields.push({ key, param: p, offset, wgsl: `${key}: ${{ float: 'f32', int: 'i32', bool: 'u32', enum: 'u32' }[p.type]}` });
+      fields.push({ key, param: p, offset, wgsl: `${key}: ${{ float: 'f32', int: 'i32', bool: 'u32', enum: 'u32' }[p.type as 'float' | 'int' | 'bool' | 'enum']}` });
       offset += 4;
     }
   }
@@ -198,7 +231,18 @@ export function packParams<S extends ParamSchema>(schema: S, values: ParamValues
       case 'kernel':
         (v as number[]).forEach((x, i) => view.setFloat32(offset + i * 4, x, true));
         break;
+      case 'curve':
+        curveLut(v as CurvePoints).forEach((x, i) => view.setFloat32(offset + i * 4, x, true));
+        break;
     }
   }
   return buf;
+}
+
+/** `curve_<name>(x)` samplers for a schema's curve params, reading `<access>.<name>`. */
+export function curveSamplersWgsl(schema: ParamSchema, access: string): string {
+  return Object.entries(schema)
+    .filter(([, p]) => p.type === 'curve')
+    .map(([key]) => curveSamplerWgsl(`curve_${key}`, `${access}.${key}`))
+    .join('\n');
 }

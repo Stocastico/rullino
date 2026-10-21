@@ -108,5 +108,22 @@ describe('parameter schema', () => {
     expect(scaleParams(s, defaultParams(s), 0.25)).toEqual({ sigma: 0.5, radius: 1, amount: 1 });
     expect(scaleParams(s, defaultParams(s), 1)).toEqual(defaultParams(s));
   });
+
+  it('validates curves and packs them as a 256-sample LUT', () => {
+    const c = { tone: { type: 'curve', default: [[0, 0], [1, 1]], label: 'Tone' }, k: { type: 'float', min: 0, max: 1, step: 0.1, default: 0.5, label: 'K' } } as const;
+    expect(() => validateSchema(c)).not.toThrow();
+    expect(() => validateSchema({ c: { type: 'curve', default: [[0, 0]], label: 'C' } })).toThrow(/2 to 16/);
+    expect(() => validateSchema({ c: { type: 'curve', default: [[0.5, 0], [0.4, 1]], label: 'C' } })).toThrow(/increasing/);
+    expect(() => validateSchema({ c: { type: 'curve', default: [[0, 0], [1, 1.2]], label: 'C' } })).toThrow(/\[0, 1\]/);
+    expect(() => resolveParams(c, { tone: [[0, 0], [0, 1]] })).toThrow(/tone/);
+    expectTypeOf<ParamValues<typeof c>['tone']>().toEqualTypeOf<readonly (readonly [number, number])[]>();
+
+    expect(paramsStructWgsl('P', c)).toBe('struct P {\n  @align(16) tone: array<vec4f, 64>,\n  k: f32,\n}');
+    const view = new DataView(packParams(c, defaultParams(c)));
+    expect(view.getFloat32(0, true)).toBe(0);
+    expect(view.getFloat32(255 * 4, true)).toBeCloseTo(1, 6);
+    expect(view.getFloat32(128 * 4, true)).toBeCloseTo(128 / 255, 6);
+    expect(view.getFloat32(1024, true)).toBe(0.5);
+  });
 });
 
