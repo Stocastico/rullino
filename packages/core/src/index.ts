@@ -28,3 +28,5 @@ export {
 export { colorWgsl } from './wgsl';
 export { activeSteps, runChainCpu, type Step } from './pipeline/chain';
 export { Pipeline, type PipelineOptions } from './pipeline/pipeline';
+export { downscale } from './gpu/resize';
+export { downscaleCpu, fitWithin } from './resize';
