@@ -42,7 +42,22 @@ npx vitest run path/to/file.test.ts   # single file
 | WGSL kept in TS template strings (`/* wgsl */`), not `.wgsl?raw` | Works in any bundler and in Node without a plugin; the library must not depend on Vite. |
 | Own float16 conversion (`half.ts`) | `Float16Array` is not available everywhere yet (Node 22). Round-to-nearest-even, tested against known bit patterns. |
 | Package `exports` point at `src/*.ts` | Packages are private until M5; no build step to keep in sync. Revisit when publishing (emit `dist/`, keep `src` for the workspace). |
-| npm scope `@rullino/*` | Planned name; the npm org still has to be registered before publishing. |
-| License: MIT | Chosen; LICENSE file to be added. |
+| npm scope `@rullino/*`, `publishConfig.access: public` | The npm org exists (Free plan); scoped packages default to private, which Free cannot publish. |
+| Library packages keep `"private": true` until M5 | `exports` points at `.ts` sources, so an accidental publish would ship unusable packages. Remove it together with adding a real build. The playground stays private forever. |
+| Publishing via npm trusted publishing (OIDC) from Actions | No long-lived token. Never add an `NPM_TOKEN` secret. Set up in M5. |
+| GPU tests never skip when WebGPU is missing | A skipped parity test looks green and is indistinguishable from a deleted one. `adapter.browser.test.ts` runs first in CI and fails if `requestAdapter()` is null. |
+| License: MIT | Permissive and conventional for a JS library; see `LICENSE`. |
 | `noUncheckedIndexedAccess` on | Catches out-of-range reads elsewhere; in pixel loops, where the bounds are obvious, write `data[i]!`. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
+
+## Traps
+
+Things that already bit us. Add new ones as they come up.
+
+- **`navigator.gpu` needs a secure context.** In Chromium, `about:blank` and plain-HTTP non-localhost pages have no `navigator.gpu` even with `--enable-unsafe-webgpu`. Vitest serves from localhost, which counts as secure.
+- **Headless Chromium needs `--enable-unsafe-webgpu`** to expose WebGPU; without it `requestAdapter()` returns null. Set in `vitest.config.ts`.
+- **`copyTextureToBuffer` needs `bytesPerRow` to be a multiple of 256**; `writeTexture` does not. `readImage` pads and un-pads rows; test with odd widths.
+- **Compute dispatch rounds up to whole workgroups**, so shaders must bounds-check `global_invocation_id` against `textureDimensions`. Test with sizes that are not multiples of 8.
+- **Parity tests must quantise the input to float16 first**, otherwise the tolerance has to absorb input rounding too and stops catching real bugs.
+- **Check that a parity test can fail**: break the shader slightly (e.g. scale by 1.002) and confirm it goes red before trusting it.
+- **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.

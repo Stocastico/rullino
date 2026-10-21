@@ -27,5 +27,8 @@ jobs:
       - run: pnpm test
       # No GPU on hosted runners: Chromium runs WebGPU on SwiftShader.
       - run: pnpm exec playwright install --with-deps chromium
+      # Fail fast, with a clear message, if Chromium cannot get a WebGPU adapter.
+      - name: WebGPU adapter available
+        run: pnpm exec vitest run --project browser packages/core/src/gpu/adapter.browser.test.ts
       - run: pnpm test:browser
       - run: pnpm build

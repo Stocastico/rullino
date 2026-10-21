@@ -2,6 +2,9 @@
   "name": "@rullino/filters",
   "version": "0.0.0",
   "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
