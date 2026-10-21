@@ -65,8 +65,8 @@ export interface EncodeOptions {
 }
 
 /**
- * Encodes a working texture to 8-bit sRGB into `dst` (rgba8unorm with STORAGE_BINDING, e.g. a canvas
- * texture from {@link configureCanvas}). Colour is clamped to [0, 1] in linear light before encoding.
+ * Encodes a working texture to 8-bit sRGB into `dst` (rgba8unorm with STORAGE_BINDING).
+ * Colour is clamped to [0, 1] in linear light before encoding.
  */
 export function encodeToTexture(ctx: GpuContext, src: GPUTexture, dst: GPUTexture, { alpha }: EncodeOptions): void {
   const premultiply = alpha === 'premultiplied';
@@ -101,17 +101,4 @@ export async function readSrgb8(ctx: GpuContext, tex: GPUTexture): Promise<Uint8
   const bytes = await readTextureBytes(ctx, tmp, 4);
   tmp.destroy();
   return new Uint8ClampedArray(bytes);
-}
-
-/** Configures a canvas so {@link encodeToTexture} can write straight into its current texture. */
-export function configureCanvas(ctx: GpuContext, canvas: HTMLCanvasElement | OffscreenCanvas): GPUCanvasContext {
-  const context = canvas.getContext('webgpu');
-  if (!context) throw new Error('could not get a webgpu canvas context');
-  context.configure({
-    device: ctx.device,
-    format: 'rgba8unorm',
-    alphaMode: 'premultiplied',
-    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
-  });
-  return context;
 }

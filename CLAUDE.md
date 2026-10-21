@@ -11,20 +11,26 @@ pnpm test             # unit tests (Node): CPU references, color, float16, compa
 pnpm test:browser     # GPU tests in headless Chromium (WebGPU), incl. GPU<->CPU parity
 pnpm test:all         # both
 pnpm build            # builds the playground (Vite)
+pnpm test:e2e         # smoke-tests the built playground in headless Chromium (run after build)
 pnpm dev              # playground dev server
 npx vitest run path/to/file.test.ts   # single file
 ```
 
 ## Layout
 
-- `packages/core` — `LinearImage`, sRGB <-> linear, float16, `compareImages`, WebGPU context, rgba16float upload/readback, pointwise runner, filter contract (`filter.ts`).
-- `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU), `*.test.ts` (CPU, Node), `*.browser.test.ts` (parity, browser).
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only.
+- `packages/core`
+  - `params.ts` parameter schema (float/int/bool/enum): types, validation, defaults, uniform packing, generated WGSL `Params` struct.
+  - `filter.ts` / `define.ts` filter contract and `defineFilter()`, which derives the whole-image CPU reference from `pixel()`.
+  - `color.ts`, `oklab.ts` CPU colour maths; `wgsl.ts` the `rl_*` WGSL twins prepended to every shader.
+  - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), pointwise runner.
+- `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + `pixel()`) and `*.test.ts` (CPU semantics). `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
 - **Red/green.** Write the test first, run it, see it fail, then implement. For GPU code, also check that the parity test catches a deliberately broken shader before trusting it.
-- **Every filter ships with both implementations and a parity test.** The CPU version is the specification: obvious, unoptimised, never mutates its input.
+- **Every filter ships with both implementations, CPU semantics tests, and is registered** in `packages/filters/src/index.ts` (which gives it the parity test). The CPU version is the specification: obvious, unoptimised, never mutates its input.
+- **Every parameter has a `label`** (the registry test enforces it); the UI is generated from the schema.
 - **Working space is linear, premultiplied RGBA, `rgba16float` on GPU / `Float32Array` on CPU.** sRGB exists only at the I/O edges. Filters that need straight alpha (LUTs, curves, OKLab) must un-premultiply internally.
 - **Pointwise WGSL is a pure function** `fn apply(c: vec4f, p: Params) -> vec4f`; no bindings, no globals, no `Params` declaration (it is generated from the schema). This is what lets M2 fuse consecutive pointwise filters into one shader.
 - **Zero runtime dependencies** in `packages/*`.
@@ -49,6 +55,15 @@ npx vitest run path/to/file.test.ts   # single file
 | GPU tests never skip when WebGPU is missing | A skipped parity test looks green and is indistinguishable from a deleted one. `adapter.browser.test.ts` runs first in CI and fails if `requestAdapter()` is null. |
 | License: MIT | Permissive and conventional for a JS library; see `LICENSE`. |
 | `noUncheckedIndexedAccess` on | Catches out-of-range reads elsewhere; in pixel loops, where the bounds are obvious, write `data[i]!`. |
+| Pointwise filters declare `alpha: 'straight' \| 'premultiplied'`; core does the (un)premultiply on both CPU and GPU | One place for the alpha rules instead of every filter re-implementing them; parity tests cover both wrappers. Linear-in-colour ops (exposure, white balance, grayscale) stay premultiplied. |
+| Perceptual adjustments (contrast, brightness, saturation, vibrance) in OKLab | Hue-stable and perceptually even; plan §2.3. Contrast pivots on 18% grey (L = cbrt 0.18). |
+| Perceptual "levels" (invert, threshold level, posterize) in sRGB-encoded units | That is what people mean by "50%" or "invert"; mid grey stays mid grey. |
+| Brightness = power curve on OKLab L, gamma = per-channel power on linear RGB | Two different tools: brightness keeps hue/chroma, gamma is the classic channel operation. |
+| White balance = luminance-normalised RGB gains | Simple creative control; a proper chromatic adaptation (Bradford / CCT) can come with auto WB in tier B. |
+| Enum values are passed to WGSL as the option's index (u32) | Uniforms stay 4 bytes per param; WGSL `switch` on `0u, 1u, ...` in option declaration order. |
+| Playground output via `readSrgb8` + `putImageData` on a 2D canvas, not a WebGPU canvas | A WebGPU canvas loses the device in headless Chromium/SwiftShader, so direct presentation could not be tested in CI. Costs one readback per frame; revisit with M2's reduced preview. |
+| Playground scales images to <= 2048 px on load | Keeps CPU fallback and readback responsive until M2's preview/export split. The resize happens in `createImageBitmap` (sRGB space, so slightly wrong); fine for a preview. |
+| Sample images generated in code | No image assets to license. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -61,4 +76,8 @@ Things that already bit us. Add new ones as they come up.
 - **Compute dispatch rounds up to whole workgroups**, so shaders must bounds-check `global_invocation_id` against `textureDimensions`. Test with sizes that are not multiples of 8.
 - **Parity tests must quantise the input to float16 first**, otherwise the tolerance has to absorb input rounding too and stops catching real bugs.
 - **Check that a parity test can fail**: break the shader slightly (e.g. scale by 1.002) and confirm it goes red before trusting it.
+- **Configuring a WebGPU canvas in headless Chromium (SwiftShader) loses the device** ("A valid external Instance reference no longer exists"), with or without `STORAGE_BINDING`, old or new headless. Anything a test must check goes through textures and readback.
+- **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
+- **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
+- **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.

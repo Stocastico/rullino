@@ -4,7 +4,7 @@ GPU-first image processing for the web, built on **WebGPU** and written in **Typ
 
 rullino spans the whole arc from classic computer-vision operations (thresholds, convolutions, edge detection, morphology, Canny, Hough) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain). A companion **playground** lets you load a photo, chain filters and tweak their parameters live.
 
-> **Status:** pre-alpha. Milestone M0 (skeleton, CI, exposure on GPU + CPU with parity test) is in place. See [PLAN.md](./PLAN.md) for the design and roadmap.
+> **Status:** pre-alpha. M0 (skeleton, CI, GPU/CPU parity) and M1 (parameter schema, `defineFilter()`, eleven pointwise filters, playground with generated UI and before/after) are done. See [PLAN.md](./PLAN.md) for the design and roadmap.
 
 ## Why
 
@@ -47,6 +47,7 @@ pnpm typecheck
 pnpm test             # unit tests (Node)
 pnpm test:browser     # GPU tests in headless Chromium, incl. GPU <-> CPU parity
 pnpm build
+pnpm test:e2e         # smoke test of the built playground
 ```
 
 Browser tests need Playwright's Chromium (`pnpm exec playwright install chromium`). WebGPU runs on SwiftShader when no GPU is present, so they also work in CI.

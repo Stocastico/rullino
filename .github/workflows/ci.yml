@@ -32,3 +32,5 @@ jobs:
         run: pnpm exec vitest run --project browser packages/core/src/gpu/adapter.browser.test.ts
       - run: pnpm test:browser
       - run: pnpm build
+      # Built playground in headless Chromium: WebGPU renderer, every filter, pixels actually change.
+      - run: pnpm test:e2e
