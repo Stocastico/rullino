@@ -27,6 +27,7 @@ npx vitest run path/to/file.test.ts   # single file
   - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runMultipass`, `runFilter` (any kind).
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
+  - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
 
@@ -98,6 +99,9 @@ npx vitest run path/to/file.test.ts   # single file
 | Curves filter in sRGB-encoded units, RGB curve then channel curves | Matches how photo editors present curves. |
 | Levels clip to the output range, HDR included | Classic levels semantics; an unclipped top made narrow input ranges overflow float16. Minimum input range is one 8-bit step. |
 | Black point and shadows/highlights on OKLab lightness, global | Hue/chroma stay put. Local (detail-preserving) shadows/highlights is tier B "brilliance". |
+| `lut` param: domain (32 B) in the uniform block, table in an `rgba32float` 3D texture cached per `Lut` object and device | Uniforms stay small; one upload per LUT. Stage keys use the LUT's identity (`objectKey`), never its data, so LUTs must be treated as immutable. Multipass filters only (pointwise fusion has no bindings). |
+| Manual trilinear LUT interpolation with `textureLoad`, not a hardware sampler | `rgba32float` is not filterable without the optional `float32-filterable` feature, and hardware filtering uses low-precision weights; the manual version matches `applyLutCpu` step for step. |
+| `applyLut` works on straight sRGB-encoded colour; intensity blends in the same units | That is what `.cube` / Hald LUTs are authored for; intensity 0 is an exact no-op even for HDR values the LUT would clamp. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
