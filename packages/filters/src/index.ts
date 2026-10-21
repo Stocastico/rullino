@@ -22,6 +22,7 @@ import { sharpen } from './sharpen';
 import { threshold } from './threshold';
 import { unsharpMask } from './unsharpMask';
 import { vibrance } from './vibrance';
+import { vignette } from './vignette';
 import { whiteBalance } from './whiteBalance';
 
 export {
@@ -48,6 +49,7 @@ export {
   threshold,
   unsharpMask,
   vibrance,
+  vignette,
   whiteBalance,
 };
 
@@ -71,6 +73,7 @@ export const filters: readonly Filter<any>[] = [
   adaptiveThreshold,
   posterize,
   applyLut,
+  vignette,
   gaussianBlur,
   boxBlur,
   sharpen,
