@@ -8,9 +8,9 @@ describe('filter registry', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('contains the M1 pointwise set', () => {
+  it('contains the expected filters', () => {
     expect(filters.map((f) => f.id).sort()).toEqual(
-      ['brightness', 'contrast', 'exposure', 'gamma', 'grayscale', 'invert', 'posterize', 'saturation', 'threshold', 'vibrance', 'whiteBalance'].sort(),
+      ['boxBlur', 'brightness', 'contrast', 'convolve', 'exposure', 'gamma', 'gaussianBlur', 'grayscale', 'invert', 'posterize', 'saturation', 'sharpen', 'threshold', 'unsharpMask', 'vibrance', 'whiteBalance'].sort(),
     );
   });
 

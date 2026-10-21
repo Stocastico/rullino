@@ -37,4 +37,43 @@ export interface PointwiseFilter<S extends ParamSchema = ParamSchema> extends Po
   cpu(src: LinearImage, params?: Partial<ParamValues<S>>): LinearImage;
 }
 
-export type Filter = PointwiseFilter;
+/**
+ * One compute pass of a multipass filter. `wgsl` defines `fn run(xy: vec2i, p: Params) -> vec4f`
+ * returning the output pixel at `xy`. In scope: `load_<input>(xy: vec2i) -> vec4f` for each name in
+ * `inputs` (clamped to the edge), `size() -> vec2i`, the generated `Params` and the rl_* library.
+ */
+export interface PassDef {
+  /** WGSL identifier; later passes read this pass's output as `load_<name>`. */
+  readonly name: string;
+  /** 'input' (the filter's input) and/or names of earlier passes. */
+  readonly inputs: readonly string[];
+  readonly wgsl: string;
+}
+
+interface FilterBase<S extends ParamSchema> {
+  readonly id: string;
+  readonly label: string;
+  readonly description?: string;
+  readonly category: FilterCategory;
+  readonly params: S;
+  readonly tolerance: Tolerance;
+}
+
+/**
+ * A filter made of a fixed sequence of passes (the last one is the output), for anything that
+ * reads neighbours: convolutions, edges, morphology. Works on premultiplied linear values.
+ */
+export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends FilterBase<S> {
+  readonly kind: 'multipass';
+  readonly passes: readonly PassDef[];
+  /** Whole-image CPU reference: obvious, not fast. Must not mutate `src`. */
+  readonly cpu: (src: LinearImage, p: ParamValues<S>) => LinearImage;
+}
+
+export interface MultipassFilter<S extends ParamSchema = ParamSchema> extends Omit<MultipassFilterDef<S>, 'cpu'> {
+  /** Whole-image CPU reference. Missing params take their defaults. Never mutates `src`. */
+  cpu(src: LinearImage, params?: Partial<ParamValues<S>>): LinearImage;
+}
+
+export type Filter<S extends ParamSchema = ParamSchema> = PointwiseFilter<S> | MultipassFilter<S>;
+export type FilterDef<S extends ParamSchema = ParamSchema> = PointwiseFilterDef<S> | MultipassFilterDef<S>;

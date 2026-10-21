@@ -19,13 +19,13 @@ npx vitest run path/to/file.test.ts   # single file
 ## Layout
 
 - `packages/core`
-  - `params.ts` parameter schema (float/int/bool/enum): types, validation, defaults, uniform packing, generated WGSL `Params` struct.
-  - `filter.ts` / `define.ts` filter contract and `defineFilter()`, which derives the whole-image CPU reference from `pixel()`.
+  - `params.ts` parameter schema (float/int/bool/enum/kernel, optional `unit: 'px'`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
+  - `filter.ts` / `define.ts` filter contracts and `defineFilter()`: `pointwise` (CPU reference derived from `pixel()`) and `multipass` (fixed list of passes + whole-image CPU reference).
   - `color.ts`, `oklab.ts` CPU colour maths; `wgsl.ts` the `rl_*` WGSL twins prepended to every shader.
-  - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runPointwise`.
+  - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runMultipass`, `runFilter` (any kind).
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
-- `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + `pixel()`) and `*.test.ts` (CPU semantics). `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
+- `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema; `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
@@ -35,6 +35,8 @@ npx vitest run path/to/file.test.ts   # single file
 - **Every parameter has a `label`** (the registry test enforces it); the UI is generated from the schema.
 - **Working space is linear, premultiplied RGBA, `rgba16float` on GPU / `Float32Array` on CPU.** sRGB exists only at the I/O edges. Filters that need straight alpha (LUTs, curves, OKLab) must un-premultiply internally.
 - **Pointwise WGSL is a pure function** `fn apply(c: vec4f, p: Params) -> vec4f`; no bindings, no globals, no `Params` declaration (it is generated from the schema). This is what lets consecutive pointwise filters fuse into one shader.
+- **Multipass pass WGSL** defines `fn run(xy: vec2i, p: Params) -> vec4f` and reads inputs only through the generated `load_<input>(xy)` (clamp to edge). Pass lists are static: anything that varies with params goes in uniforms, so the shader cache keys stay `filter:pass`.
+- **Lengths in pixels are `unit: 'px'` params**, defined at the original image's resolution; chains scale them (`setSource({ scale })`, `runChainCpu({ scale })`).
 - **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
 - **Zero runtime dependencies** in `packages/*`.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
@@ -71,6 +73,10 @@ npx vitest run path/to/file.test.ts   # single file
 | Pipeline caches each stage's output keyed on everything upstream | Changing a step recomputes from that stage on; with neighbourhood filters (next) the stages before a blur are reused. Fused GPU chains keep f32 between filters, so they are slightly *more* precise than the CPU reference applied in f16 steps would be; chain parity uses summed tolerances. |
 | Linear-light area downscale for display and preview | Box filtering premultiplied linear values is the correct way to shrink; `createImageBitmap` / canvas resizes work in sRGB. Only images beyond the device's texture limit get a browser resize first. |
 | Playground: display ≤ 2048 px, preview ≤ 768 px while dragging | Two Pipelines with their own caches; release re-renders at display size. Full-resolution export is M3. |
+| `multipass` filter kind = static list of named passes over textures | Covers convolutions, edges, morphology without a general graph language; each multipass filter is its own Pipeline stage, so the stages before it are reused when something after it changes. Workgroup-memory tiling is a later optimisation; correctness first. |
+| Convolutions work on premultiplied linear values with clamp-to-edge | Blurring premultiplied light is physically right and avoids dark fringes at alpha edges. Sharpening touches colour only (alpha kept) and floors colour at 0. |
+| Unsharp mask has no threshold (yet) | A hard threshold makes GPU (f16 intermediates) and CPU (f64) disagree on pixels near it; add a soft one later. |
+| Custom kernel is always 5×5 | One shape in the schema and UI; a 3×3 kernel is the centre of the grid. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -85,6 +91,9 @@ Things that already bit us. Add new ones as they come up.
 - **Check that a parity test can fail**: break the shader slightly (e.g. scale by 1.002) and confirm it goes red before trusting it.
 - **Configuring a WebGPU canvas in headless Chromium (SwiftShader) loses the device** ("A valid external Instance reference no longer exists"), with or without `STORAGE_BINDING`, old or new headless. Anything a test must check goes through textures and readback.
 - **Integer downscale ratios hide weighting bugs** (every coverage weight is 1). Test resizes with fractional ratios.
+- **WGSL cannot dynamically index an array held by value** (e.g. the `p` parameter). Index through the global `params` uniform instead (`params.kernel[n / 4][n % 4]`).
+- **Multi-pass GPU filters round intermediates to f16**; anything that amplifies a difference (unsharp `amount`) amplifies that rounding, so its tolerance must grow with the gain.
+- **Symmetric test kernels hide transposed indexing**: parity tests use an asymmetric kernel.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.

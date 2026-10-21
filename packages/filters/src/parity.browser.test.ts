@@ -5,17 +5,18 @@ import {
   defaultParams,
   fromFloat16Array,
   readImage,
-  runPointwise,
+  runFilter,
   toFloat16Array,
   uploadImage,
   type ParamSchema,
-  type PointwiseFilter,
+  type Filter,
 } from '@rullino/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { filters } from './index';
 
 // Every registered filter is checked GPU <-> CPU at its defaults and at the extremes of each
-// parameter (every option for enums, both values for bools). New filters get this for free.
+// parameter (every option for enums, both values for bools, an asymmetric kernel). New filters get
+// this for free.
 
 const ctx = await createGpuContext();
 afterAll(() => ctx.device.destroy());
@@ -41,6 +42,11 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
     if (p.type === 'float' || p.type === 'int') out.push([`${k}=${p.min}`, { [k]: p.min }], [`${k}=${p.max}`, { [k]: p.max }]);
     if (p.type === 'bool') out.push([`${k}=${!p.default}`, { [k]: !p.default }]);
     if (p.type === 'enum') for (const o of Object.keys(p.options)) if (o !== p.default) out.push([`${k}=${o}`, { [k]: o }]);
+    if (p.type === 'kernel') {
+      // A non-symmetric kernel catches transposed or mirrored indexing.
+      const n = p.size * p.size;
+      out.push([`${k}=ramp`, { [k]: Array.from({ length: n }, (_, i) => (i % 3) - 1 + (i === (n - 1) / 2 ? 2 : 0) + i / n) }]);
+    }
   }
   return out;
 }
@@ -48,10 +54,10 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
 // Non-multiple-of-8 size exercises the workgroup bounds check.
 const src = testImage(67, 45);
 
-describe.each(filters.map((f) => [f.id, f as PointwiseFilter] as const))('%s GPU <-> CPU parity', (_, f) => {
+describe.each(filters.map((f) => [f.id, f as Filter] as const))('%s GPU <-> CPU parity', (_, f) => {
   it.each(cases(f.params))('%s', async (_, params) => {
     const full = { ...defaultParams(f.params), ...params } as never;
-    const out = await readImage(ctx, runPointwise(ctx, f, uploadImage(ctx, src), full));
+    const out = await readImage(ctx, runFilter(ctx, f, uploadImage(ctx, src), full));
     const result = compareImages(out, f.cpu(src, full), f.tolerance);
     expect(result.worst ?? null, JSON.stringify(result.worst)).toBeNull();
   });

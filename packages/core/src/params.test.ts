@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { defaultParams, packParams, paramsStructWgsl, resolveParams, validateSchema, type ParamValues } from './params';
+import { defaultParams, packParams, paramsStructWgsl, resolveParams, scaleParams, validateSchema, type ParamValues } from './params';
 
 const schema = {
   amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0.25 },
@@ -69,4 +69,42 @@ describe('parameter schema', () => {
     expect(() => validateSchema({ 'bad-name': { type: 'bool', default: true } })).toThrow(/identifier/);
     expect(() => validateSchema({ _x: { type: 'bool', default: true } })).toThrow(/identifier/);
   });
+
+  it('lays out kernels as 16-byte aligned vec4 arrays after the scalars', () => {
+    const k = {
+      size: { type: 'int', min: 3, max: 5, default: 3, label: 'Size' },
+      kernel: { type: 'kernel', size: 5, default: Array.from({ length: 25 }, (_, i) => (i === 12 ? 1 : 0)), label: 'Kernel' },
+      gain: { type: 'float', min: 0, max: 2, step: 0.1, default: 1, label: 'Gain' },
+    } as const;
+    expect(paramsStructWgsl('P', k)).toBe('struct P {\n  size: i32,\n  @align(16) kernel: array<vec4f, 7>,\n  gain: f32,\n}');
+    const values = { ...defaultParams(k), gain: 0.5 };
+    const buf = packParams(k, values);
+    // size @0, kernel @16 (112 bytes), gain @128 -> padded to 144.
+    expect(buf.byteLength).toBe(144);
+    const view = new DataView(buf);
+    expect(view.getInt32(0, true)).toBe(3);
+    expect(view.getFloat32(16 + 12 * 4, true)).toBe(1);
+    expect(view.getFloat32(128, true)).toBe(0.5);
+  });
+
+  it('validates and resolves kernels', () => {
+    const k = { kernel: { type: 'kernel', size: 3, default: [0, 0, 0, 0, 1, 0, 0, 0, 0], label: 'K' } } as const;
+    expect(() => validateSchema(k)).not.toThrow();
+    expect(() => validateSchema({ kernel: { type: 'kernel', size: 3, default: [1, 2], label: 'K' } })).toThrow(/9/);
+    expect(resolveParams(k, { kernel: [1, 1, 1, 1, 1, 1, 1, 1, 1] }).kernel).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(() => resolveParams(k, { kernel: [1, 2, 3] })).toThrow(/kernel/);
+    expect(() => resolveParams(k, { kernel: [NaN, 0, 0, 0, 0, 0, 0, 0, 0] })).toThrow(/kernel/);
+    expectTypeOf<ParamValues<typeof k>['kernel']>().toEqualTypeOf<readonly number[]>();
+  });
+
+  it('scales pixel-unit params for reduced resolutions', () => {
+    const s = {
+      sigma: { type: 'float', min: 0, max: 50, step: 0.1, default: 2, unit: 'px', label: 'Sigma' },
+      radius: { type: 'int', min: 0, max: 20, default: 4, unit: 'px', label: 'Radius' },
+      amount: { type: 'float', min: 0, max: 2, step: 0.1, default: 1, label: 'Amount' },
+    } as const;
+    expect(scaleParams(s, defaultParams(s), 0.25)).toEqual({ sigma: 0.5, radius: 1, amount: 1 });
+    expect(scaleParams(s, defaultParams(s), 1)).toEqual(defaultParams(s));
+  });
 });
+
