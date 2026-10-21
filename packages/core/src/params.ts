@@ -1,5 +1,6 @@
 // Parameter schema: the contract between a filter, its UI, validation and serialisation.
-// Every parameter is one 4-byte uniform field (f32 / i32 / u32), in declaration order.
+// Scalars are one 4-byte uniform field (f32 / i32 / u32); kernels are a 16-byte aligned
+// array<vec4f, N>. Fields follow declaration order with WGSL uniform layout rules.
 
 interface ParamBase {
   readonly label?: string;
@@ -12,6 +13,8 @@ export interface FloatParam extends ParamBase {
   readonly max: number;
   readonly step: number;
   readonly default: number;
+  /** 'px': a length in full-resolution pixels, scaled down with the image for previews. */
+  readonly unit?: 'px';
 }
 
 export interface IntParam extends ParamBase {
@@ -19,6 +22,14 @@ export interface IntParam extends ParamBase {
   readonly min: number;
   readonly max: number;
   readonly default: number;
+  readonly unit?: 'px';
+}
+
+/** A square convolution kernel, row-major. In WGSL: array<vec4f, ceil(size² / 4)>; read k[i / 4][i % 4]. */
+export interface KernelParam extends ParamBase {
+  readonly type: 'kernel';
+  readonly size: 3 | 5;
+  readonly default: readonly number[];
 }
 
 export interface BoolParam extends ParamBase {
@@ -34,7 +45,7 @@ export interface EnumParam<O extends Readonly<Record<string, string>> = Readonly
   readonly default: keyof O & string;
 }
 
-export type Param = FloatParam | IntParam | BoolParam | EnumParam;
+export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam;
 export type ParamSchema = Readonly<Record<string, Param>>;
 
 export type ParamValue<P extends Param> = P extends { readonly type: 'float' | 'int' }
@@ -43,7 +54,9 @@ export type ParamValue<P extends Param> = P extends { readonly type: 'float' | '
     ? boolean
     : P extends { readonly type: 'enum'; readonly options: infer O }
       ? keyof O & string
-      : never;
+      : P extends { readonly type: 'kernel' }
+        ? readonly number[]
+        : never;
 
 export type ParamValues<S extends ParamSchema> = { readonly [K in keyof S]: ParamValue<S[K]> };
 
@@ -69,6 +82,9 @@ export function validateSchema(schema: ParamSchema): void {
         if (Object.keys(p.options).length === 0) fail('enum needs at least one option');
         if (!Object.hasOwn(p.options, p.default)) fail(`default "${p.default}" is not an option`);
         break;
+      case 'kernel':
+        if (p.default.length !== p.size * p.size) fail(`kernel default needs ${p.size * p.size} values`);
+        break;
     }
   }
 }
@@ -82,7 +98,7 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
   for (const key of Object.keys(values)) {
     if (!Object.hasOwn(schema, key)) throw new Error(`unknown parameter "${key}"`);
   }
-  const out: Record<string, number | boolean | string> = {};
+  const out: Record<string, number | boolean | string | number[]> = {};
   for (const [key, p] of Object.entries(schema)) {
     const v: unknown = (values as Record<string, unknown>)[key] ?? p.default;
     const bad = () => new TypeError(`parameter "${key}" (${p.type}): invalid value ${JSON.stringify(v)}`);
@@ -102,15 +118,56 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
         if (typeof v !== 'string' || !Object.hasOwn(p.options, v)) throw bad();
         out[key] = v;
         break;
+      case 'kernel':
+        if (!Array.isArray(v) || v.length !== p.size * p.size || !v.every((x) => typeof x === 'number' && Number.isFinite(x))) throw bad();
+        out[key] = [...v];
+        break;
     }
+  }
+  return out as unknown as ParamValues<S>;
+}
+
+/** Multiplies pixel-unit params by `scale` (output / full resolution), rounding ints, clamped to range. */
+export function scaleParams<S extends ParamSchema>(schema: S, values: ParamValues<S>, scale: number): ParamValues<S> {
+  if (scale === 1) return values;
+  const out: Record<string, unknown> = { ...values };
+  for (const [key, p] of Object.entries(schema)) {
+    if ((p.type !== 'float' && p.type !== 'int') || p.unit !== 'px') continue;
+    const v = (values as Record<string, number>)[key]! * scale;
+    out[key] = Math.min(p.max, Math.max(p.min, p.type === 'int' ? Math.round(v) : v));
   }
   return out as ParamValues<S>;
 }
 
-const WGSL_TYPE = { float: 'f32', int: 'i32', bool: 'u32', enum: 'u32' } as const;
+interface Field {
+  readonly key: string;
+  readonly param: Param;
+  readonly offset: number;
+  readonly wgsl: string;
+}
+
+const roundUp = (n: number, k: number) => Math.ceil(n / k) * k;
+
+/** Uniform layout of a schema: field offsets and the padded buffer size (WGSL uniform rules). */
+export function paramsLayout(schema: ParamSchema): { fields: Field[]; size: number } {
+  const fields: Field[] = [];
+  let offset = 0;
+  for (const [key, p] of Object.entries(schema)) {
+    if (p.type === 'kernel') {
+      const n = Math.ceil((p.size * p.size) / 4);
+      offset = roundUp(offset, 16);
+      fields.push({ key, param: p, offset, wgsl: `@align(16) ${key}: array<vec4f, ${n}>` });
+      offset += 16 * n;
+    } else {
+      fields.push({ key, param: p, offset, wgsl: `${key}: ${{ float: 'f32', int: 'i32', bool: 'u32', enum: 'u32' }[p.type]}` });
+      offset += 4;
+    }
+  }
+  return { fields, size: Math.max(16, roundUp(offset, 16)) };
+}
 
 export function paramsStructWgsl(name: string, schema: ParamSchema): string {
-  const fields = Object.entries(schema).map(([k, p]) => `  ${k}: ${WGSL_TYPE[p.type]},`);
+  const fields = paramsLayout(schema).fields.map((f) => `  ${f.wgsl},`);
   // WGSL forbids empty structs.
   if (fields.length === 0) fields.push('  _unused: u32,');
   return `struct ${name} {\n${fields.join('\n')}\n}`;
@@ -118,25 +175,28 @@ export function paramsStructWgsl(name: string, schema: ParamSchema): string {
 
 /** Packs resolved values into a uniform buffer laid out like {@link paramsStructWgsl}. */
 export function packParams<S extends ParamSchema>(schema: S, values: ParamValues<S>): ArrayBuffer {
-  const entries = Object.entries(schema);
-  const buf = new ArrayBuffer(Math.max(16, Math.ceil((entries.length * 4) / 16) * 16));
+  const { fields, size } = paramsLayout(schema);
+  const buf = new ArrayBuffer(size);
   const view = new DataView(buf);
-  entries.forEach(([key, p], i) => {
+  for (const { key, param: p, offset } of fields) {
     const v = (values as Record<string, unknown>)[key];
     switch (p.type) {
       case 'float':
-        view.setFloat32(i * 4, v as number, true);
+        view.setFloat32(offset, v as number, true);
         break;
       case 'int':
-        view.setInt32(i * 4, v as number, true);
+        view.setInt32(offset, v as number, true);
         break;
       case 'bool':
-        view.setUint32(i * 4, v ? 1 : 0, true);
+        view.setUint32(offset, v ? 1 : 0, true);
         break;
       case 'enum':
-        view.setUint32(i * 4, Object.keys(p.options).indexOf(v as string), true);
+        view.setUint32(offset, Object.keys(p.options).indexOf(v as string), true);
+        break;
+      case 'kernel':
+        (v as number[]).forEach((x, i) => view.setFloat32(offset + i * 4, x, true));
         break;
     }
-  });
+  }
   return buf;
 }
