@@ -14,6 +14,7 @@ import {
   type Step,
 } from '@rullino/core';
 import { filters } from '@rullino/filters';
+import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, type ChainState } from './chain-ui';
 import { samples } from './samples';
 
@@ -206,10 +207,16 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 // UI wiring.
 
-renderChain(ui.chain, filters, chain, (next) => {
-  chain = next;
-  void render();
-});
+renderChain(
+  ui.chain,
+  filters,
+  chain,
+  (next) => {
+    chain = next;
+    void render();
+  },
+  looks.map((l) => ({ id: l.id, label: l.label, steps: () => lookSteps(l) })),
+);
 ui.chain.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
 });

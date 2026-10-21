@@ -161,7 +161,7 @@ export const looks: readonly Look[] = [
       { filter: saturation, params: { amount: -0.1 } },
     ],
     vignette: { amount: -0.35 },
-    grain: { amount: 0.25 },
+    grain: { amount: 0.2 },
   },
 ];
 

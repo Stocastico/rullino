@@ -15,6 +15,7 @@ pnpm test:e2e         # smoke-tests the built playground in headless Chromium (r
 pnpm bench            # GPU timings per filter + a chain at 1024x768 (SwiftShader numbers: compare runs, not machines)
 pnpm dev              # playground dev server
 npx vitest run path/to/file.test.ts   # single file
+npx vitest run packages/presets -u    # rewrite golden look snapshots after a deliberate recipe change
 ```
 
 ## Layout
@@ -29,6 +30,7 @@ npx vitest run path/to/file.test.ts   # single file
   - `resize.ts` CPU area downscale and `fitWithin`.
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
+- `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
 - `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
@@ -104,6 +106,9 @@ npx vitest run path/to/file.test.ts   # single file
 | `applyLut` works on straight sRGB-encoded colour; intensity blends in the same units | That is what `.cube` / Hald LUTs are authored for; intensity 0 is an exact no-op even for HDR values the LUT would clamp. |
 | Vignette darkens by multiplying linear light, lightens towards white; smoothstep on a corner-normalised distance | Multiplying light is what lens falloff does; normalising so corners are 1 keeps `midpoint` meaningful at any aspect ratio and roundness. |
 | Grain = PCG-hashed value noise (cells of `size` px) added to sRGB-encoded colour with a midtone-weighted response | Deterministic and identical on CPU/GPU (integer hash, 24-bit floats); film grain is most visible in the midtones, not uniform white noise. The noise pattern differs between preview and full resolution (only its statistics match). |
+| Looks are recipes of ordinary pointwise filters, baked once into a 33³ LUT (`bakeLut`), plus vignette and grain steps | Readable, tweakable, no third-party LUT licences (PLAN §7), and one LUT lookup per pixel at run time. A baked grade clamps HDR to [0, 1] and differs from the live chain by < 1/255 on average (up to ~0.02 for saturated colours at the gamut edge). |
+| `lookSteps(look, { intensity })` returns plain chain steps | A look is not a new concept for the Pipeline; the playground expands it into editable steps. Intensity scales the LUT blend, vignette and grain together. |
+| Golden look charts are Vitest snapshots of a 12-colour chart rounded to 1e-3 | Catches unintended recipe or filter changes; regenerate with `-u` only for deliberate ones. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -138,4 +143,5 @@ Things that already bit us. Add new ones as they come up.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
+- **A LUT cannot follow the sRGB curve's kink at 0**: grades that push colours out of gamut (saturation boosts) interpolate poorly next to the gamut edge. Compare baked vs live chains as displayed (clipped) and on average, not by the worst pixel alone.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.
