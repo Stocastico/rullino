@@ -105,7 +105,7 @@ export class Pipeline {
     let key = `src${this.#sourceVersion}`;
     return groups.map((g) => {
       const params = g.map((s) => effectiveParams(s, this.#scale));
-      key = `${key}|${g.map((s, i) => `${s.filter.id}#${objectKey(s.filter)}${JSON.stringify(params[i])}`).join('+')}`;
+      key = `${key}|${g.map((s, i) => `${s.filter.id}#${objectKey(s.filter)}${JSON.stringify(params[i], lutAsIdentity)}`).join('+')}`;
       return { steps: g, params, key };
     });
   }
@@ -113,4 +113,9 @@ export class Pipeline {
   #evict(from: number): void {
     for (const c of this.#cache.splice(from)) releaseTexture(this.#ctx, c.output);
   }
+}
+
+/** In stage keys a LUT stands for itself (its texture is cached per object), not for its data. */
+function lutAsIdentity(this: unknown, _key: string, v: unknown): unknown {
+  return v !== null && typeof v === 'object' && (v as { data?: unknown }).data instanceof Float32Array ? `lut#${objectKey(v as object)}` : v;
 }

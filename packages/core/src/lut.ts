@@ -111,3 +111,34 @@ export function parseHald(pixels: Uint8ClampedArray, width: number, height: numb
   for (let i = 0; i < size ** 3; i++) for (let c = 0; c < 3; c++) data[i * 3 + c] = pixels[i * 4 + c]! / 255;
   return createLut(size, data);
 }
+
+/**
+ * WGSL for `fn <fnName>(rgb: vec3f) -> vec3f`, sampling the 3D texture `tex` (N³, RGB in .rgb) with
+ * the domain in `<domain>[0].xyz` / `<domain>[1].xyz`. Same arithmetic as {@link applyLutCpu}.
+ */
+export function lutSamplerWgsl(fnName: string, tex: string, domain: string): string {
+  return /* wgsl */ `
+fn ${fnName}(rgb: vec3f) -> vec3f {
+  let n = f32(textureDimensions(${tex}).x - 1u);
+  let lo = ${domain}[0].xyz;
+  let p = clamp((rgb - lo) / (${domain}[1].xyz - lo), vec3f(0.0), vec3f(1.0)) * n;
+  let i0 = min(floor(p), vec3f(n - 1.0));
+  let f = p - i0;
+  let i = vec3i(i0);
+  let c000 = textureLoad(${tex}, i, 0).rgb;
+  let c100 = textureLoad(${tex}, i + vec3i(1, 0, 0), 0).rgb;
+  let c010 = textureLoad(${tex}, i + vec3i(0, 1, 0), 0).rgb;
+  let c110 = textureLoad(${tex}, i + vec3i(1, 1, 0), 0).rgb;
+  let c001 = textureLoad(${tex}, i + vec3i(0, 0, 1), 0).rgb;
+  let c101 = textureLoad(${tex}, i + vec3i(1, 0, 1), 0).rgb;
+  let c011 = textureLoad(${tex}, i + vec3i(0, 1, 1), 0).rgb;
+  let c111 = textureLoad(${tex}, i + vec3i(1, 1, 1), 0).rgb;
+  let c00 = c000 + (c100 - c000) * f.x;
+  let c10 = c010 + (c110 - c010) * f.x;
+  let c01 = c001 + (c101 - c001) * f.x;
+  let c11 = c011 + (c111 - c011) * f.x;
+  let c0 = c00 + (c10 - c00) * f.y;
+  let c1 = c01 + (c11 - c01) * f.y;
+  return c0 + (c1 - c0) * f.z;
+}`;
+}

@@ -1,4 +1,5 @@
 import { CURVE_SAMPLES, curveLut, curveSamplerWgsl, type CurvePoints } from './curve';
+import { MAX_LUT_SIZE, type Lut } from './lut';
 
 // Parameter schema: the contract between a filter, its UI, validation and serialisation.
 // Scalars are one 4-byte uniform field (f32 / i32 / u32); kernels are a 16-byte aligned
@@ -56,7 +57,17 @@ export interface CurveParam extends ParamBase {
   readonly default: CurvePoints;
 }
 
-export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam;
+/**
+ * A 3D colour LUT (`lut.ts`). Only its domain goes into the uniform block (array<vec4f, 2>: min, max);
+ * the table itself is a 3D texture bound by multipass filters, read through the generated
+ * `lut_<name>(rgb)` sampler. Values are kept by identity, so GPU textures can be cached per Lut object.
+ */
+export interface LutParam extends ParamBase {
+  readonly type: 'lut';
+  readonly default: Lut;
+}
+
+export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam | LutParam;
 export type ParamSchema = Readonly<Record<string, Param>>;
 
 export type ParamValue<P extends Param> = P extends { readonly type: 'float' | 'int' }
@@ -69,7 +80,9 @@ export type ParamValue<P extends Param> = P extends { readonly type: 'float' | '
         ? readonly number[]
         : P extends { readonly type: 'curve' }
           ? CurvePoints
-          : never;
+          : P extends { readonly type: 'lut' }
+            ? Lut
+            : never;
 
 export type ParamValues<S extends ParamSchema> = { readonly [K in keyof S]: ParamValue<S[K]> };
 
@@ -83,6 +96,18 @@ function curveProblem(v: unknown): string | undefined {
     if (p[0] < 0 || p[0] > 1 || p[1] < 0 || p[1] > 1) return 'points must lie in [0, 1]';
   }
   for (let i = 1; i < v.length; i++) if (!(v[i][0] > v[i - 1][0])) return 'point x must be strictly increasing';
+  return undefined;
+}
+
+/** Why `v` is not a usable LUT, or undefined if it is. */
+function lutProblem(v: unknown): string | undefined {
+  if (typeof v !== 'object' || v === null) return 'not a LUT object';
+  const l = v as Partial<Lut>;
+  if (!Number.isInteger(l.size) || l.size! < 2 || l.size! > MAX_LUT_SIZE) return `size must be an integer in [2, ${MAX_LUT_SIZE}]`;
+  if (!(l.data instanceof Float32Array) || l.data.length !== l.size! ** 3 * 3) return 'data must be a Float32Array of size³ RGB triples';
+  const ok = (d: unknown) => Array.isArray(d) && d.length === 3 && d.every((x) => typeof x === 'number' && Number.isFinite(x));
+  if (!ok(l.domainMin) || !ok(l.domainMax)) return 'domain must be two [r, g, b] number triples';
+  if (!l.domainMin!.every((m, i) => l.domainMax![i]! > m)) return 'domain max must exceed min';
   return undefined;
 }
 
@@ -116,6 +141,11 @@ export function validateSchema(schema: ParamSchema): void {
         if (problem) fail(`curve default: ${problem}`);
         break;
       }
+      case 'lut': {
+        const problem = lutProblem(p.default);
+        if (problem) fail(`lut default: ${problem}`);
+        break;
+      }
     }
   }
 }
@@ -129,7 +159,7 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
   for (const key of Object.keys(values)) {
     if (!Object.hasOwn(schema, key)) throw new Error(`unknown parameter "${key}"`);
   }
-  const out: Record<string, number | boolean | string | number[]> = {};
+  const out: Record<string, unknown> = {};
   for (const [key, p] of Object.entries(schema)) {
     const v: unknown = (values as Record<string, unknown>)[key] ?? p.default;
     const bad = () => new TypeError(`parameter "${key}" (${p.type}): invalid value ${JSON.stringify(v)}`);
@@ -156,6 +186,10 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
       case 'curve':
         if (curveProblem(v)) throw bad();
         out[key] = (v as CurvePoints).map(([x, y]) => [x, y]) as never;
+        break;
+      case 'lut':
+        if (lutProblem(v)) throw new TypeError(`parameter "${key}" (lut): ${lutProblem(v)}`);
+        out[key] = v; // not copied: GPU textures are cached by object identity
         break;
     }
   }
@@ -188,8 +222,8 @@ export function paramsLayout(schema: ParamSchema): { fields: Field[]; size: numb
   const fields: Field[] = [];
   let offset = 0;
   for (const [key, p] of Object.entries(schema)) {
-    if (p.type === 'kernel' || p.type === 'curve') {
-      const n = Math.ceil((p.type === 'kernel' ? p.size * p.size : CURVE_SAMPLES) / 4);
+    if (p.type === 'kernel' || p.type === 'curve' || p.type === 'lut') {
+      const n = p.type === 'lut' ? 2 : Math.ceil((p.type === 'kernel' ? p.size * p.size : CURVE_SAMPLES) / 4);
       offset = roundUp(offset, 16);
       fields.push({ key, param: p, offset, wgsl: `@align(16) ${key}: array<vec4f, ${n}>` });
       offset += 16 * n;
@@ -233,6 +267,12 @@ export function packParams<S extends ParamSchema>(schema: S, values: ParamValues
         break;
       case 'curve':
         curveLut(v as CurvePoints).forEach((x, i) => view.setFloat32(offset + i * 4, x, true));
+        break;
+      case 'lut':
+        for (let i = 0; i < 3; i++) {
+          view.setFloat32(offset + i * 4, (v as Lut).domainMin[i]!, true);
+          view.setFloat32(offset + 16 + i * 4, (v as Lut).domainMax[i]!, true);
+        }
         break;
     }
   }

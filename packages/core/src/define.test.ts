@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defineFilter } from './define';
 import { createImage } from './image';
+import { identityLut } from './lut';
 
 const halve = () =>
   defineFilter({
@@ -116,6 +117,12 @@ describe('defineFilter', () => {
     expect(() => defineFilter({ ...base, passes: [comp] })).toThrow(/last pass/);
     expect(() => defineFilter({ ...base, passes: [comp, { ...tex, inputs: ['c'] }] })).toThrow(/compute pass "c"/);
     expect(() => defineFilter({ ...base, buffers: { b: 0 } })).toThrow(/size/);
+  });
+
+  it('only allows lut params in multipass filters (they need a texture binding)', () => {
+    expect(() =>
+      defineFilter({ ...halve(), id: 'lutPw', params: { look: { type: 'lut', default: identityLut(2), label: 'Look' } } } as never),
+    ).toThrow(/lut/);
   });
 });
 

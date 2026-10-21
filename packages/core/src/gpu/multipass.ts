@@ -1,16 +1,20 @@
 import type { MultipassFilter, PassDef } from '../filter';
-import { curveSamplersWgsl, packParams, paramsStructWgsl, resolveParams } from '../params';
+import { lutSamplerWgsl, type Lut } from '../lut';
+import { curveSamplersWgsl, packParams, paramsStructWgsl, resolveParams, type ParamSchema } from '../params';
 import { colorWgsl } from '../wgsl';
 import type { GpuContext } from './context';
+import { lutTexture } from './lut';
 import { cachedPipeline, objectKey } from './readback';
 import { releaseTexture } from './pool';
 import { createWorkingTexture, WORKING_FORMAT } from './texture';
 
 const WORKGROUP = 8;
 
+const lutKeys = (schema: ParamSchema) => Object.keys(schema).filter((k) => schema[k]!.type === 'lut');
+
 export function passShader(filter: Pick<MultipassFilter<any>, 'params' | 'buffers'>, pass: PassDef): string {
   const compute = pass.kind === 'compute';
-  // Bindings: [dst], params, inputs..., buffers...
+  // Bindings: [dst], params, inputs..., buffers..., luts...
   let binding = compute ? 0 : 1;
   const params = `@group(0) @binding(${binding++}) var<uniform> params: Params;`;
   const inputs = pass.inputs.map(
@@ -23,6 +27,9 @@ fn load_${name}(xy: vec2i) -> vec4f {
   const buffers = (pass.buffers ?? []).map(
     (name) => `@group(0) @binding(${binding++}) var<storage, read_write> buf_${name}: array<atomic<u32>, ${filter.buffers![name]}>;`,
   );
+  const luts = lutKeys(filter.params).map(
+    (name) => `@group(0) @binding(${binding++}) var lutTex_${name}: texture_3d<f32>;${lutSamplerWgsl(`lut_${name}`, `lutTex_${name}`, `params.${name}`)}`,
+  );
   // All textures of a filter run share one size; it is read once per invocation into rl_max_xy
   // instead of calling textureDimensions() on every load.
   const sizeSource = compute ? `tex_${pass.inputs[0]}` : 'dst';
@@ -33,6 +40,7 @@ ${compute ? '' : `@group(0) @binding(0) var dst: texture_storage_2d<${WORKING_FO
 ${params}
 ${inputs.join('\n')}
 ${buffers.join('\n')}
+${luts.join('\n')}
 
 fn size() -> vec2i { return rl_max_xy + 1; }
 ${curveSamplersWgsl(filter.params, 'params')}
@@ -71,8 +79,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 `;
 }
 
-/** Bind group layout matching {@link passShader}: [dst], params, inputs..., buffers... */
-function passLayout(pass: PassDef): GPUBindGroupLayoutEntry[] {
+/** Bind group layout matching {@link passShader}: [dst], params, inputs..., buffers..., luts... */
+function passLayout(filter: Pick<MultipassFilter<any>, 'params'>, pass: PassDef): GPUBindGroupLayoutEntry[] {
   const visibility = GPUShaderStage.COMPUTE;
   const entries: GPUBindGroupLayoutEntry[] = [];
   if (pass.kind !== 'compute') {
@@ -81,6 +89,8 @@ function passLayout(pass: PassDef): GPUBindGroupLayoutEntry[] {
   entries.push({ binding: entries.length, visibility, buffer: { type: 'uniform' } });
   for (const _ of pass.inputs) entries.push({ binding: entries.length, visibility, texture: { sampleType: 'unfilterable-float' } });
   for (const _ of pass.buffers ?? []) entries.push({ binding: entries.length, visibility, buffer: { type: 'storage' } });
+  for (const _ of lutKeys(filter.params))
+    entries.push({ binding: entries.length, visibility, texture: { sampleType: 'unfilterable-float', viewDimension: '3d' } });
   return entries;
 }
 
@@ -93,7 +103,8 @@ export interface FilterRun {
 /** Runs a multipass filter. `params` are used as given after resolving (scale them beforehand if needed). */
 export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, input: GPUTexture, params: Record<string, unknown>): FilterRun {
   const { device } = ctx;
-  const values = packParams(filter.params, resolveParams(filter.params, params as never));
+  const resolved = resolveParams(filter.params, params as never) as Record<string, unknown>;
+  const values = packParams(filter.params, resolved as never);
   const uniforms = device.createBuffer({ size: values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(uniforms, 0, values);
 
@@ -103,7 +114,7 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
   const buffers = new Map(
     Object.entries(filter.buffers ?? {}).map(([name, n]) => [name, device.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE })]),
   );
-  const resolved = resolveParams(filter.params, params as never) as Record<string, unknown>;
+  const lutViews = lutKeys(filter.params).map((k) => lutTexture(ctx, resolved[k] as Lut).createView());
   let compiled = 0;
   let passes = 0;
   const enc = device.createCommandEncoder();
@@ -123,10 +134,13 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
         compiled++;
         return passShader(filter, pass);
       },
-      () => passLayout(pass),
+      () => passLayout(filter, pass),
     );
-    const bufferEntries = (first: number) =>
-      (pass.buffers ?? []).map((name, i) => ({ binding: first + i, resource: { buffer: buffers.get(name)! } }));
+    // Buffers, then LUT textures, after the inputs.
+    const bufferEntries = (first: number): GPUBindGroupEntry[] => [
+      ...(pass.buffers ?? []).map((name, i) => ({ binding: first + i, resource: { buffer: buffers.get(name)! } })),
+      ...lutViews.map((view, i) => ({ binding: first + (pass.buffers ?? []).length + i, resource: view })),
+    ];
 
     if (pass.kind === 'compute') {
       const inputs = pass.inputs.map((name, i) => ({ binding: 1 + i, resource: textures.get(name)!.createView() }));
