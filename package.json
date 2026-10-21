@@ -11,9 +11,10 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run",
+    "test:all": "vitest run --project unit --project browser",
     "dev": "pnpm --filter @rullino/playground dev",
-    "test:e2e": "pnpm --filter @rullino/playground smoke"
+    "test:e2e": "pnpm --filter @rullino/playground smoke",
+    "bench": "vitest run --project bench && cat packages/filters/bench/results.txt"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
