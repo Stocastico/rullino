@@ -1,4 +1,5 @@
 export { decodeSrgb8, encodeSrgb8, linearToSrgb, srgbToLinear } from './color';
+export { CURVE_SAMPLES, curveLut, curveSamplerWgsl, sampleCurve, sampleCurveLut, type CurvePoints } from './curve';
 export { compareImages, type Comparison, type Mismatch, type Tolerance } from './compare';
 export { defineFilter } from './define';
 export type {
@@ -27,6 +28,7 @@ export { createImage, type LinearImage } from './image';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {
   defaultParams,
+  curveSamplersWgsl,
   packParams,
   paramsLayout,
   paramsStructWgsl,
@@ -34,6 +36,7 @@ export {
   scaleParams,
   validateSchema,
   type BoolParam,
+  type CurveParam,
   type EnumParam,
   type FloatParam,
   type IntParam,

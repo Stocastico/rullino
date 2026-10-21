@@ -6,7 +6,7 @@ import type { PointwiseFilter } from '../filter';
 import { cachedPipeline, objectKey } from '../gpu/readback';
 import type { GpuContext } from '../gpu/context';
 import { createWorkingTexture, WORKING_FORMAT } from '../gpu/texture';
-import { packParams, paramsStructWgsl, resolveParams } from '../params';
+import { curveSamplersWgsl, packParams, paramsStructWgsl, resolveParams } from '../params';
 import { colorWgsl } from '../wgsl';
 
 const WORKGROUP = 8;
@@ -30,7 +30,10 @@ export function fusedShader(filters: readonly PointwiseFilter<any>[]): string {
   const calls: string[] = [];
   filters.forEach((f, i) => {
     const ns = `s${i}_`;
-    decls.push(`// ${f.id}\n${paramsStructWgsl(`${ns}Params`, f.params)}\n${namespaceWgsl(f.wgsl, ns)}`);
+    // Curve samplers read this filter's block of the stage uniforms; namespacing renames them
+    // together with the filter's own code.
+    const code = `${curveSamplersWgsl(f.params, `params.p${i}`)}\n${f.wgsl}`;
+    decls.push(`// ${f.id}\n${paramsStructWgsl(`${ns}Params`, f.params)}\n${namespaceWgsl(code, ns)}`);
     fields.push(`  @align(16) p${i}: ${ns}Params,`);
     calls.push(
       f.alpha === 'straight'

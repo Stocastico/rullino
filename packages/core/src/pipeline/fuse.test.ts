@@ -51,4 +51,23 @@ describe('fusedShader', () => {
     expect(code).toMatch(/c = rl_premultiply\(s1_apply\(rl_unpremultiply\(c\), params\.p1\)\);/);
     expect(code).toMatch(/@align\(16\) p2: s2_Params,/);
   });
+
+  it('generates a namespaced sampler for each curve param, reading the stage uniforms', () => {
+    const f = defineFilter({
+      id: 'tone',
+      label: 'Tone',
+      category: 'adjust',
+      kind: 'pointwise',
+      alpha: 'straight',
+      params: { shape: { type: 'curve', default: [[0, 0], [1, 1]], label: 'Shape' } },
+      wgsl: 'fn apply(c: vec4f, p: Params) -> vec4f { return vec4f(curve_shape(c.r), c.gba); }',
+      pixel: (c) => c,
+      tolerance: { abs: 0, rel: 0 },
+    });
+    const code = fusedShader([mk('a', 'premultiplied', 'return c;'), f]);
+    expect(code).toContain('fn s1_curve_shape(x: f32) -> f32');
+    expect(code).toContain('params.p1.shape[');
+    expect(code).toContain('s1_curve_shape(c.r)');
+  });
 });
+
