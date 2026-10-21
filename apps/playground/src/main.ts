@@ -49,9 +49,15 @@ let chain: ChainState = (() => {
 const toSteps = (s: ChainState): Step[] =>
   s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled }));
 
+/** Size of the after canvas for the current image; applied when a frame is ready, not on load. */
+let displaySize: [number, number] = [0, 0];
+
 /** Draws straight-alpha sRGB bytes onto the after canvas, scaling up if they are a preview. */
 async function present(bytes: Uint8ClampedArray<ArrayBuffer>, w: number, h: number) {
   const data = new ImageData(bytes, w, h);
+  // Resizing clears a canvas, so it happens here, together with the new frame: the previous
+  // image stays visible while a new one is loading.
+  if (ui.after.width !== displaySize[0] || ui.after.height !== displaySize[1]) [ui.after.width, ui.after.height] = displaySize;
   afterCtx.clearRect(0, 0, ui.after.width, ui.after.height);
   if (w === ui.after.width && h === ui.after.height) afterCtx.putImageData(data, 0, 0);
   else afterCtx.drawImage(await createImageBitmap(data), 0, 0, ui.after.width, ui.after.height);
@@ -171,8 +177,7 @@ async function render() {
 async function loadImage(source: ImageBitmapSource, name: string) {
   const image = await createImageBitmap(source);
   const [w, h] = await renderer.load(image);
-  ui.after.width = w;
-  ui.after.height = h;
+  displaySize = [w, h];
   imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
   image.close();
   loaded = true;

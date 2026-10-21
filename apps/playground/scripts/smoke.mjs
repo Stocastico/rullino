@@ -77,6 +77,22 @@ try {
   for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {
     await after(() => page.selectOption('#sample', s));
   }
+
+  // Loading an image while a frame is in flight must still end with the new image fully drawn.
+  await page.selectOption('#sample', 'ramps');
+  await page.waitForTimeout(500);
+  await page.selectOption('#sample', 'chart');
+  await page.selectOption('#chain select[data-action=add]', 'canny');
+  await page.waitForFunction(() => /Colour chart .* 19 steps/.test(document.getElementById('status').textContent), null, { timeout: 20000 }).catch(() => {});
+  check(/Colour chart .* 19 steps/.test(await status()), `renderer stuck after racing a load with a render, status: ${await status()}`);
+  const opaque = await page.evaluate(() => {
+    const c = document.getElementById('after');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4) n += d[i] > 0 ? 1 : 0;
+    return n / (d.length / 4);
+  });
+  check(opaque > 0.9, `after canvas is ${(100 - opaque * 100).toFixed(0)}% transparent after the race`);
   console.log(`smoke: ${ids.length} filters chained, status "${await status()}"`);
 } finally {
   await browser.close();

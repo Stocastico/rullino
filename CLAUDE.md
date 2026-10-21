@@ -35,7 +35,8 @@ npx vitest run path/to/file.test.ts   # single file
 - **Every parameter has a `label`** (the registry test enforces it); the UI is generated from the schema.
 - **Working space is linear, premultiplied RGBA, `rgba16float` on GPU / `Float32Array` on CPU.** sRGB exists only at the I/O edges. Filters that need straight alpha (LUTs, curves, OKLab) must un-premultiply internally.
 - **Pointwise WGSL is a pure function** `fn apply(c: vec4f, p: Params) -> vec4f`; no bindings, no globals, no `Params` declaration (it is generated from the schema). This is what lets consecutive pointwise filters fuse into one shader.
-- **Multipass pass WGSL** defines `fn run(xy: vec2i, p: Params) -> vec4f` and reads inputs only through the generated `load_<input>(xy)` (clamp to edge). Pass lists are static: anything that varies with params goes in uniforms, so the shader cache keys stay `filter:pass`.
+- **Multipass pass WGSL** defines `fn run(xy: vec2i, p: Params) -> vec4f` and reads inputs only through the generated `load_<input>(xy)` (clamp to edge). Pass lists are static: anything that varies with params goes in uniforms, so the shader cache keys stay `filter:pass`. Iteration goes through `repeat: '<int param>'` (ping-pong on `inputs[0]`), never through a params-dependent pass list.
+- **Filters with hard decisions** (thresholds, comparisons) mirror the GPU's f16 intermediates in their CPU reference (round each intermediate image) and may declare a small `tolerance.outliers` fraction. Measure the actual outliers before choosing it.
 - **Lengths in pixels are `unit: 'px'` params**, defined at the original image's resolution; chains scale them (`setSource({ scale })`, `runChainCpu({ scale })`).
 - **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
 - **Zero runtime dependencies** in `packages/*`.
@@ -77,6 +78,9 @@ npx vitest run path/to/file.test.ts   # single file
 | Convolutions work on premultiplied linear values with clamp-to-edge | Blurring premultiplied light is physically right and avoids dark fringes at alpha edges. Sharpening touches colour only (alpha kept) and floors colour at 0. |
 | Unsharp mask has no threshold (yet) | A hard threshold makes GPU (f16 intermediates) and CPU (f64) disagree on pixels near it; add a soft one later. |
 | Custom kernel is always 5×5 | One shape in the schema and UI; a 3×3 kernel is the centre of the grid. |
+| Canny hysteresis = fixed number of 8-connected propagation rounds (`iterations` param) | Exact GPU/CPU parity and a static pass list; enough rounds equal full hysteresis. A convergence check (atomics) can cut the passes later. |
+| Canny thresholds on |∇|/4 of sRGB-encoded luminance, 45° directions without atan2 | Perceptual edges; comparing |gy| with tan(22.5°)|gx| gives identical sectors on CPU and GPU. NMS uses `>=` on one side and `>` on the other so a symmetric ridge stays one pixel wide. |
+| Parity suite runs every filter on random noise *and* a ring image with fading contrast | Noise never produces connected weak edges or smooth gradients; a "hysteresis runs once" mutation passed on noise alone. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -94,6 +98,9 @@ Things that already bit us. Add new ones as they come up.
 - **WGSL cannot dynamically index an array held by value** (e.g. the `p` parameter). Index through the global `params` uniform instead (`params.kernel[n / 4][n % 4]`).
 - **Multi-pass GPU filters round intermediates to f16**; anything that amplifies a difference (unsharp `amount`) amplifies that rounding, so its tolerance must grow with the gain.
 - **Symmetric test kernels hide transposed indexing**: parity tests use an asymmetric kernel.
+- **Random-noise test images miss structure-dependent bugs** (hysteresis, gradient direction). Mutation-check new filters against the ring image too.
+- **Do not judge the playground from a screenshot taken after a fixed timeout**: first-use shader compilation on SwiftShader takes seconds. Wait for `#status[data-frame]` to advance, as `scripts/smoke.mjs` does.
+- **Resizing a canvas clears it.** The after canvas is resized only when a new frame is drawn, so the previous image stays up while a new one loads.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
