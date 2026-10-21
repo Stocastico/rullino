@@ -1,6 +1,7 @@
 import type { PointwiseFilter } from '../filter';
 import type { GpuContext } from '../gpu/context';
 import { runMultipass } from '../gpu/multipass';
+import { releaseTexture } from '../gpu/pool';
 import { objectKey } from '../gpu/readback';
 import { activeSteps, effectiveParams, type ChainOptions, type Step } from './chain';
 import { runFused } from './fuse';
@@ -110,6 +111,6 @@ export class Pipeline {
   }
 
   #evict(from: number): void {
-    for (const c of this.#cache.splice(from)) c.output.destroy();
+    for (const c of this.#cache.splice(from)) releaseTexture(this.#ctx, c.output);
   }
 }

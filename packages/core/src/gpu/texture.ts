@@ -1,13 +1,17 @@
 import { fromFloat16Array, toFloat16Array } from '../half';
 import { createImage, type LinearImage } from '../image';
 import type { GpuContext } from './context';
+import { acquireTexture } from './pool';
 import { readTextureBytes } from './readback';
 
 /** Internal working format: linear, premultiplied, half float. */
 export const WORKING_FORMAT = 'rgba16float' satisfies GPUTextureFormat;
 const BYTES_PER_PIXEL = 8;
 
+/** A working texture of this size, recycled from the pool when possible (contents undefined). */
 export function createWorkingTexture(ctx: GpuContext, width: number, height: number): GPUTexture {
+  const recycled = acquireTexture(ctx, width, height, WORKING_FORMAT);
+  if (recycled) return recycled;
   return ctx.device.createTexture({
     size: { width, height },
     format: WORKING_FORMAT,
