@@ -83,8 +83,10 @@ try {
   await page.waitForTimeout(500);
   await page.selectOption('#sample', 'chart');
   await page.selectOption('#chain select[data-action=add]', 'canny');
-  await page.waitForFunction(() => /Colour chart .* 19 steps/.test(document.getElementById('status').textContent), null, { timeout: 20000 }).catch(() => {});
-  check(/Colour chart .* 19 steps/.test(await status()), `renderer stuck after racing a load with a render, status: ${await status()}`);
+  // Initial exposure + every filter + the canny just added.
+  const expected = new RegExp(`Colour chart .* ${ids.length + 2} steps`);
+  await page.waitForFunction((re) => new RegExp(re).test(document.getElementById('status').textContent), expected.source, { timeout: 20000 }).catch(() => {});
+  check(expected.test(await status()), `renderer stuck after racing a load with a render, status: ${await status()}`);
   const opaque = await page.evaluate(() => {
     const c = document.getElementById('after');
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;

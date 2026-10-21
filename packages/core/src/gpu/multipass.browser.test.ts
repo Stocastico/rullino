@@ -143,3 +143,70 @@ it.each([0, 1, 4, 9])('repeated pass runs %i times (ping-pong)', async (steps) =
   const res = compareImages(out, grow.cpu(dot, { steps }), grow.tolerance);
   expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
 });
+
+// Reductions: a compute pass counts pixels with atomics, a single-invocation pass derives a
+// value from the count, and a texture pass reads it back from the buffer.
+const coverage = defineFilter({
+  id: 'coverage',
+  label: 'Coverage',
+  category: 'classic',
+  kind: 'multipass',
+  params: { level: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.5, label: 'Level' } },
+  buffers: { count: 1, ratio: 1 },
+  passes: [
+    {
+      kind: 'compute',
+      name: 'countBright',
+      inputs: ['input'],
+      buffers: ['count'],
+      dispatch: 'pixels',
+      wgsl: /* wgsl */ `
+fn run(xy: vec2i, p: Params) {
+  if (load_input(xy).r > p.level) { atomicAdd(&buf_count[0], 1u); }
+}`,
+    },
+    {
+      kind: 'compute',
+      name: 'toRatio',
+      inputs: ['input'],
+      buffers: ['count', 'ratio'],
+      dispatch: 'single',
+      wgsl: /* wgsl */ `
+fn run(xy: vec2i, p: Params) {
+  let n = f32(size().x * size().y);
+  atomicStore(&buf_ratio[0], bitcast<u32>(f32(atomicLoad(&buf_count[0])) / n));
+}`,
+    },
+    {
+      name: 'out',
+      inputs: ['input'],
+      buffers: ['ratio'],
+      wgsl: /* wgsl */ `
+fn run(xy: vec2i, p: Params) -> vec4f {
+  let r = bitcast<f32>(atomicLoad(&buf_ratio[0]));
+  return vec4f(vec3f(r), 1.0);
+}`,
+    },
+  ],
+  cpu: (img, { level }) => {
+    let n = 0;
+    for (let i = 0; i < img.data.length; i += 4) if (img.data[i]! > level) n++;
+    const r = n / (img.width * img.height);
+    const out = createImage(img.width, img.height);
+    for (let i = 0; i < out.data.length; i += 4) out.data.set([r, r, r, 1], i);
+    return out;
+  },
+  tolerance: { abs: 0, rel: 2 ** -10 },
+});
+
+it.each([0.1, 0.5, 0.9])('atomic reduction + single pass + buffer read (level %d)', async (level) => {
+  const out = await readImage(ctx, runFilter(ctx, coverage, uploadImage(ctx, src), { level }));
+  const res = compareImages(out, coverage.cpu(src, { level }), coverage.tolerance);
+  expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+});
+
+it('buffers start from zero on every run', async () => {
+  const a = await readImage(ctx, runFilter(ctx, coverage, uploadImage(ctx, src), { level: 0.5 }));
+  const b = await readImage(ctx, runFilter(ctx, coverage, uploadImage(ctx, src), { level: 0.5 }));
+  expect(Array.from(b.data)).toEqual(Array.from(a.data));
+});

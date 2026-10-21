@@ -22,19 +22,35 @@ export function defineFilter<const S extends ParamSchema>(
 
 function defineMultipass<S extends ParamSchema>(def: MultipassFilterDef<S>, where: string): MultipassFilter<S> {
   if (def.passes.length === 0) throw new Error(`${where}: needs at least one pass`);
-  const known = new Set(['input']);
+  const buffers = def.buffers ?? {};
+  for (const [name, n] of Object.entries(buffers)) {
+    if (!IDENTIFIER.test(name)) throw new Error(`${where}: buffer name "${name}" must be a WGSL identifier`);
+    if (!Number.isInteger(n) || n < 1) throw new Error(`${where}: buffer "${name}" size must be a positive integer`);
+  }
+  const textures = new Set(['input']);
+  const computes = new Set<string>();
   for (const pass of def.passes) {
     if (!IDENTIFIER.test(pass.name) || pass.name === 'input') throw new Error(`${where}: pass name "${pass.name}" must be a WGSL identifier other than "input"`);
-    if (known.has(pass.name)) throw new Error(`${where}: duplicate pass name "${pass.name}"`);
-    for (const i of pass.inputs) if (!known.has(i)) throw new Error(`${where}: pass "${pass.name}" has unknown input "${i}"`);
-    if (!/\bfn\s+run\s*\(/.test(pass.wgsl)) throw new Error(`${where}: pass "${pass.name}" must define fn run(xy: vec2i, p: Params) -> vec4f`);
+    if (textures.has(pass.name) || computes.has(pass.name)) throw new Error(`${where}: duplicate pass name "${pass.name}"`);
+    for (const i of pass.inputs) {
+      if (computes.has(i)) throw new Error(`${where}: pass "${pass.name}" reads compute pass "${i}", which has no texture output`);
+      if (!textures.has(i)) throw new Error(`${where}: pass "${pass.name}" has unknown input "${i}"`);
+    }
+    for (const b of pass.buffers ?? []) if (!Object.hasOwn(buffers, b)) throw new Error(`${where}: pass "${pass.name}" uses unknown buffer "${b}"`);
+    if (!/\bfn\s+run\s*\(/.test(pass.wgsl)) throw new Error(`${where}: pass "${pass.name}" must define fn run(xy: vec2i, p: Params)`);
     if (/\bstruct\s+Params\b/.test(pass.wgsl)) throw new Error(`${where}: wgsl must not declare struct Params (it is generated)`);
+    if (pass.kind === 'compute') {
+      if (pass.inputs.length === 0) throw new Error(`${where}: compute pass "${pass.name}" needs an input (it sets the dispatch size)`);
+      computes.add(pass.name);
+      continue;
+    }
     if (pass.repeat !== undefined) {
       if (def.params[pass.repeat]?.type !== 'int') throw new Error(`${where}: pass "${pass.name}" repeat must name an int param`);
       if (pass.inputs.length === 0) throw new Error(`${where}: repeated pass "${pass.name}" needs an input to iterate on`);
     }
-    known.add(pass.name);
+    textures.add(pass.name);
   }
+  if (def.passes.at(-1)!.kind === 'compute') throw new Error(`${where}: the last pass must write a texture (it is the output)`);
   const cpu = def.cpu;
   return { ...def, cpu: (src, params) => cpu(src, resolveParams(def.params, params)) };
 }

@@ -36,12 +36,13 @@ npx vitest run path/to/file.test.ts   # single file
 - **Working space is linear, premultiplied RGBA, `rgba16float` on GPU / `Float32Array` on CPU.** sRGB exists only at the I/O edges. Filters that need straight alpha (LUTs, curves, OKLab) must un-premultiply internally.
 - **Pointwise WGSL is a pure function** `fn apply(c: vec4f, p: Params) -> vec4f`; no bindings, no globals, no `Params` declaration (it is generated from the schema). This is what lets consecutive pointwise filters fuse into one shader.
 - **Multipass pass WGSL** defines `fn run(xy: vec2i, p: Params) -> vec4f` and reads inputs only through the generated `load_<input>(xy)` (clamp to edge). Pass lists are static: anything that varies with params goes in uniforms, so the shader cache keys stay `filter:pass`. Iteration goes through `repeat: '<int param>'` (ping-pong on `inputs[0]`), never through a params-dependent pass list.
+- **Reductions** (histograms, global statistics) use filter `buffers` (zeroed `array<atomic<u32>, N>`) and `kind: 'compute'` passes (`dispatch: 'pixels'` or `'single'`); store floats with `bitcast<u32>`.
 - **Filters with hard decisions** (thresholds, comparisons) mirror the GPU's f16 intermediates in their CPU reference (round each intermediate image) and may declare a small `tolerance.outliers` fraction. Measure the actual outliers before choosing it.
 - **Lengths in pixels are `unit: 'px'` params**, defined at the original image's resolution; chains scale them (`setSource({ scale })`, `runChainCpu({ scale })`).
 - **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
 - **Zero runtime dependencies** in `packages/*`.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
-- Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing.
+- Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing (and `pnpm build && pnpm test:e2e` when the playground or filter list changes). When piping their output (`| tail`), use `set -o pipefail`, or a failure slips through to the commit.
 - **Workflow**: one branch and one PR per milestone step, based on `main`. Claude may merge its own PR once CI is green and no review thread is open; afterwards delete the branch and start the next one from `main`.
 
 ## Decisions
@@ -81,6 +82,10 @@ npx vitest run path/to/file.test.ts   # single file
 | Canny hysteresis = fixed number of 8-connected propagation rounds (`iterations` param) | Exact GPU/CPU parity and a static pass list; enough rounds equal full hysteresis. A convergence check (atomics) can cut the passes later. |
 | Canny thresholds on |∇|/4 of sRGB-encoded luminance, 45° directions without atan2 | Perceptual edges; comparing |gy| with tan(22.5°)|gx| gives identical sectors on CPU and GPU. NMS uses `>=` on one side and `>` on the other so a symmetric ridge stays one pixel wide. |
 | Parity suite runs every filter on random noise *and* a ring image with fading contrast | Noise never produces connected weak edges or smooth gradients; a "hysteresis runs once" mutation passed on noise alone. |
+| Reductions via storage buffers + compute passes inside the multipass model | Otsu needs histogram -> threshold -> apply; keeping it inside one filter means the Pipeline needs no new stage type. Buffers are recreated per run (WebGPU zero-fills new buffers). |
+| Explicit bind group layouts for multipass passes | `layout: 'auto'` drops bindings the shader never reads; an input declared but unused then made the bind group invalid. |
+| Otsu on a 256-bin histogram of perceptual luminance of the straight colour, transparent pixels skipped | Matches `threshold`'s units; transparent areas would otherwise drag the threshold to black. Ties keep the first maximum on both sides. |
+| Adaptive threshold = luminance > Gaussian local mean − C (OpenCV's ADAPTIVE_THRESH_GAUSSIAN_C) | Familiar semantics; σ is a px param so it scales with previews. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -95,6 +100,8 @@ Things that already bit us. Add new ones as they come up.
 - **Check that a parity test can fail**: break the shader slightly (e.g. scale by 1.002) and confirm it goes red before trusting it.
 - **Configuring a WebGPU canvas in headless Chromium (SwiftShader) loses the device** ("A valid external Instance reference no longer exists"), with or without `STORAGE_BINDING`, old or new headless. Anything a test must check goes through textures and readback.
 - **Integer downscale ratios hide weighting bugs** (every coverage weight is 1). Test resizes with fractional ratios.
+- **`layout: 'auto'` silently drops unused bindings**, so binding an unused input fails validation with an empty output and no exception. `cachedPipeline` takes explicit layout entries; multipass passes always use them.
+- **A failed pipeline/bind group shows up as an all-zero output** (alpha 0), not as an exception. When a GPU test gets zeros, suspect validation first.
 - **WGSL cannot dynamically index an array held by value** (e.g. the `p` parameter). Index through the global `params` uniform instead (`params.kernel[n / 4][n % 4]`).
 - **Multi-pass GPU filters round intermediates to f16**; anything that amplifies a difference (unsharp `amount`) amplifies that rounding, so its tolerance must grow with the gain.
 - **Symmetric test kernels hide transposed indexing**: parity tests use an asymmetric kernel.

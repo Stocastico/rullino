@@ -4,7 +4,12 @@ GPU-first image processing for the web, built on **WebGPU** and written in **Typ
 
 rullino spans the whole arc from classic computer-vision operations (thresholds, convolutions, edge detection, morphology, Canny, Hough) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain). A companion **playground** lets you load a photo, chain filters and tweak their parameters live.
 
-> **Status:** pre-alpha. M0 (skeleton, CI, GPU/CPU parity) and M1 (parameter schema, `defineFilter()`, eleven pointwise filters, playground with generated UI and before/after) are done. M2 is under way: filter chains with pointwise fusion, incremental recompute and reduced-resolution preview, plus convolutions (Gaussian, box, sharpen, unsharp mask, custom kernel) and Canny, are in. See [PLAN.md](./PLAN.md) for the design and roadmap.
+> **Status:** pre-alpha. Done so far:
+> - **M0**: skeleton, CI, GPU/CPU parity.
+> - **M1**: parameter schema, `defineFilter()`, eleven pointwise filters, playground with generated UI and before/after.
+> - **M2**: filter chains with pointwise fusion, incremental recompute and reduced-resolution preview; multipass filters with repeated passes and GPU reductions; convolutions (Gaussian, box, sharpen, unsharp mask, custom kernel), Canny, Otsu and adaptive threshold.
+>
+> Next is M3 (curves, levels, LUTs, looks, export). See [PLAN.md](./PLAN.md) for the design and roadmap.
 
 ## Why
 

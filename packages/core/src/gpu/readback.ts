@@ -29,14 +29,26 @@ export async function readTextureBytes(ctx: GpuContext, tex: GPUTexture, bytesPe
 
 const pipelines = new WeakMap<GPUDevice, Map<string, GPUComputePipeline>>();
 
-/** Compiles a compute pipeline once per device and key. */
-export function cachedPipeline(ctx: GpuContext, key: string, code: () => string): GPUComputePipeline {
+/**
+ * Compiles a compute pipeline once per device and key. With `layout: 'auto'` (the default)
+ * WebGPU drops bindings the shader never touches, so pass explicit layout entries whenever a
+ * shader may declare a binding it does not use.
+ */
+export function cachedPipeline(
+  ctx: GpuContext,
+  key: string,
+  code: () => string,
+  layout?: () => GPUBindGroupLayoutEntry[],
+): GPUComputePipeline {
   let cache = pipelines.get(ctx.device);
   if (!cache) pipelines.set(ctx.device, (cache = new Map()));
   let pipeline = cache.get(key);
   if (!pipeline) {
     const module = ctx.device.createShaderModule({ label: key, code: code() });
-    pipeline = ctx.device.createComputePipeline({ label: key, layout: 'auto', compute: { module } });
+    const explicit = layout
+      ? ctx.device.createPipelineLayout({ bindGroupLayouts: [ctx.device.createBindGroupLayout({ label: key, entries: layout() })] })
+      : 'auto';
+    pipeline = ctx.device.createComputePipeline({ label: key, layout: explicit, compute: { module } });
     cache.set(key, pipeline);
   }
   return pipeline;

@@ -1,7 +1,13 @@
 // Shared building blocks for convolution filters: CPU references and matching WGSL pass sources.
 // Everything runs on premultiplied linear values with clamp-to-edge, like the GPU passes.
 
-import { createImage, type LinearImage, type PassDef } from '@rullino/core';
+import { createImage, fromFloat16Array, toFloat16Array, type LinearImage, type PassDef } from '@rullino/core';
+
+/**
+ * Rounds every value to half precision, as storing an intermediate texture on the GPU does.
+ * CPU references of filters with hard decisions apply it where the GPU stores an intermediate.
+ */
+export const q16 = (img: LinearImage): LinearImage => createImage(img.width, img.height, fromFloat16Array(toFloat16Array(img.data)));
 
 export const clampLoad = (img: LinearImage, x: number, y: number, c: number) =>
   img.data[(Math.min(img.height - 1, Math.max(0, y)) * img.width + Math.min(img.width - 1, Math.max(0, x))) * 4 + c]!;

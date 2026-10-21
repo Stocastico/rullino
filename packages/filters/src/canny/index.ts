@@ -1,11 +1,8 @@
-import { createImage, defineFilter, fromFloat16Array, linearToSrgb, luminance, toFloat16Array, type LinearImage } from '@rullino/core';
-import { clampLoad, convolve1d, gaussianPass, gaussianWeights } from '../convolution';
+import { createImage, defineFilter, linearToSrgb, luminance, type LinearImage } from '@rullino/core';
+import { clampLoad, convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
 
 /** tan(22.5°): boundary between the four quantised gradient directions. */
 const TAN_22_5 = 0.41421356;
-
-/** Rounds every value to half precision, as storing an intermediate texture on the GPU does. */
-const q16 = (img: LinearImage): LinearImage => createImage(img.width, img.height, fromFloat16Array(toFloat16Array(img.data)));
 
 const map = (src: LinearImage, f: (x: number, y: number) => [number, number, number, number]): LinearImage => {
   const out = createImage(src.width, src.height);
