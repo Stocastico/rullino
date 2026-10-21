@@ -56,4 +56,17 @@ describe('canny', () => {
   it('measures sigma in pixels', () => {
     expect(canny.params.sigma.unit).toBe('px');
   });
+
+  it('propagates exactly one pixel per hysteresis iteration', () => {
+    // A vertical edge whose contrast fades (gradually, no T-junction) from strong to a long weak tail.
+    const img = imageOf(20, 80, (x, y) => enc(x < 10 ? 0.75 * Math.min(1, Math.max(0, (y - 5) / 20)) : 1));
+    const strongRows = (iterations: number) => {
+      const out = canny.cpu(img, { ...params, iterations });
+      return Array.from({ length: 80 }, (_, y) => y).filter((y) => edgesInRow(out, y).length > 0).length;
+    };
+    const r0 = strongRows(0);
+    expect(strongRows(8) - r0).toBe(8);
+    expect(strongRows(16) - r0).toBe(16);
+  });
 });
+

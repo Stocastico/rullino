@@ -81,6 +81,7 @@ npx vitest run path/to/file.test.ts   # single file
 | Unsharp mask has no threshold (yet) | A hard threshold makes GPU (f16 intermediates) and CPU (f64) disagree on pixels near it; add a soft one later. |
 | Custom kernel is always 5×5 | One shape in the schema and UI; a 3×3 kernel is the centre of the grid. |
 | Canny hysteresis = fixed number of 8-connected propagation rounds (`iterations` param) | Exact GPU/CPU parity and a static pass list; enough rounds equal full hysteresis. A convergence check (atomics) can cut the passes later. |
+| No ghost-zone (workgroup-memory) hysteresis | Tried: K steps per dispatch on a (16 + 2K)² block, exact parity. On SwiftShader Canny went from 2.4 s to 19.5 s (K=8) / 11.1 s (K=4): barriers and workgroup memory are very slow there and each block redoes ~4x the pixels. Kept on branch `claude/canny-ghost-zone-experiment` for a real-GPU comparison. |
 | Canny thresholds on |∇|/4 of sRGB-encoded luminance, 45° directions without atan2 | Perceptual edges; comparing |gy| with tan(22.5°)|gx| gives identical sectors on CPU and GPU. NMS uses `>=` on one side and `>` on the other so a symmetric ridge stays one pixel wide. |
 | Parity suite runs every filter on random noise *and* a ring image with fading contrast | Noise never produces connected weak edges or smooth gradients; a "hysteresis runs once" mutation passed on noise alone. |
 | Reductions via storage buffers + compute passes inside the multipass model | Otsu needs histogram -> threshold -> apply; keeping it inside one filter means the Pipeline needs no new stage type. Buffers are recreated per run (WebGPU zero-fills new buffers). |
@@ -109,6 +110,8 @@ Things that already bit us. Add new ones as they come up.
 - **WGSL cannot dynamically index an array held by value** (e.g. the `p` parameter). Index through the global `params` uniform instead (`params.kernel[n / 4][n % 4]`).
 - **Multi-pass GPU filters round intermediates to f16**; anything that amplifies a difference (unsharp `amount`) amplifies that rounding, so its tolerance must grow with the gain.
 - **Symmetric test kernels hide transposed indexing**: parity tests use an asymmetric kernel.
+- **Workgroup memory and barriers are very slow on SwiftShader**: an "optimisation" built on them can be a large regression in CI and cloud sessions. Measure with `pnpm bench` before keeping it.
+- **Hard contrast switches make T-junctions**, which non-maximum suppression breaks; Canny test images that need connected weak edges must fade contrast gradually.
 - **Random-noise test images miss structure-dependent bugs** (hysteresis, gradient direction). Mutation-check new filters against the ring image too.
 - **Do not judge the playground from a screenshot taken after a fixed timeout**: first-use shader compilation on SwiftShader takes seconds. Wait for `#status[data-frame]` to advance, as `scripts/smoke.mjs` does.
 - **Resizing a canvas clears it.** The after canvas is resized only when a new frame is drawn, so the previous image stays up while a new one loads.
