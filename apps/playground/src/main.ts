@@ -3,11 +3,14 @@ import {
   createGpuContext,
   decodeSrgb8,
   downscale,
+  downscaleCpu,
   encodeImage,
   encodeSrgb8,
   exportImage,
   fitWithin,
   importImage,
+  readImage,
+  releaseTexture,
   Pipeline,
   readSrgb8,
   runChainCpu,
@@ -20,7 +23,7 @@ import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createMaskOverlay } from './mask-overlay';
-import { brush, setImageSize } from './mask-ui';
+import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
 import { samples } from './samples';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
@@ -87,6 +90,8 @@ interface Renderer {
   render(steps: Step[], preview: boolean): Promise<void>;
   /** Runs the chain at the largest resolution available and encodes the result. */
   export(steps: Step[], options: ExportOptions): Promise<Blob>;
+  /** The original image at w x h on the CPU, for mask tools (wand, edge refinement). */
+  maskSource(w: number, h: number): Promise<LinearImage>;
 }
 
 // Output goes through readback + putImageData on a 2D canvas rather than a WebGPU canvas:
@@ -98,6 +103,8 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   let textures: GPUTexture[] = [];
   let original: GPUTexture | undefined;
   let originalScale = 1;
+  let displayTex: GPUTexture | undefined;
+  const maskSources = new Map<string, Promise<LinearImage>>();
   return {
     name: 'WebGPU',
     async load(image) {
@@ -123,6 +130,8 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       textures = [...new Set([fullRes, display, preview])];
       original = fullRes;
       originalScale = fullRes.width / image.width;
+      displayTex = display;
+      maskSources.clear();
       ui.before.width = dw;
       ui.before.height = dh;
       beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), dw, dh), 0, 0);
@@ -131,6 +140,19 @@ function gpuRenderer(gpu: GpuContext): Renderer {
     async render(steps, preview) {
       const out = (preview ? small : full).run(steps);
       await present(await readSrgb8(gpu, out), out.width, out.height);
+    },
+    maskSource(w, h) {
+      const key = `${w}x${h}`;
+      let p = maskSources.get(key);
+      if (!p) {
+        const src = displayTex;
+        if (!src) return Promise.reject(new Error('no image loaded'));
+        // Shrunk in linear light on the GPU, then read back once per image and size.
+        const small = w === src.width && h === src.height ? src : downscale(gpu, src, w, h);
+        p = readImage(gpu, small).finally(() => small !== src && releaseTexture(gpu, small));
+        maskSources.set(key, p);
+      }
+      return p;
     },
     async export(steps, options) {
       if (!original) throw new Error('no image loaded');
@@ -168,6 +190,10 @@ function cpuRenderer(): Renderer {
       if (!source) return;
       const out = runChainCpu(steps, source, { scale });
       await present(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
+    },
+    async maskSource(w, h) {
+      if (!source) throw new Error('no image loaded');
+      return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
     },
     async export(steps, options) {
       if (!source) throw new Error('no image loaded');
@@ -287,9 +313,11 @@ const overlay = createMaskOverlay(
     void render();
   },
   () => (dragging = true),
-  () => brush,
+  { tool: () => tools.tool, brush: brushOptions, wand: wandAt, fit: fitRaster },
 );
 const showOverlay = () => overlay.show(selectedMask(), displaySize[0], displaySize[1]);
+// After any queued load, so the textures it reads are the current image's.
+setMaskSource((w, h) => loads.then(() => renderer.maskSource(w, h)));
 
 const chainUi = renderChain(
   ui.chain,

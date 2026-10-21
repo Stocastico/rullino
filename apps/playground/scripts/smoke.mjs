@@ -108,6 +108,32 @@ try {
   check(mid > 10 && edge < 1, `brush stroke: middle row differs by ${mid.toFixed(1)}, top row by ${edge.toFixed(1)}`);
   await after(() => page.click('#chain button[data-action=mask-clear]'));
   check((await differs()) < 0.01, 'clearing the brush mask should restore the image');
+
+  // Magic wand on the colour chart: a click inside one patch selects that patch only;
+  // refining the edges keeps it; Alt+click on the same patch removes it again.
+  await after(() => page.selectOption('#sample', 'chart'));
+  await page.click('#chain button[data-action=tool-wand]');
+  const clickAt = async (fx, fy, alt = false) => {
+    const box = await page.locator('#after').boundingBox();
+    // mouse.click has no modifiers option: hold the key explicitly.
+    if (alt) await page.keyboard.down('Alt');
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    if (alt) await page.keyboard.up('Alt');
+  };
+  await after(() => clickAt(0.09, 0.12));
+  const patch = await differs();
+  check(patch > 0.01 && patch < 0.1, `wand on one chart patch changed ${(patch * 100).toFixed(1)}% of the image`);
+  await after(() => clickAt(0.09, 0.12, true));
+  check((await differs()) < 0.01, 'Alt+click with the wand should remove the selection');
+  // Refining a selection that already follows the patch edges keeps it about the same
+  // (the guided filter leaves a faint halo in the flat gap around it).
+  await after(() => clickAt(0.09, 0.12));
+  await after(() => page.click('#chain button[data-action=mask-refine]'));
+  const refined = await differs();
+  check(Math.abs(refined - patch) < 0.03, `refining a patch-aligned selection changed it from ${(patch * 100).toFixed(1)}% to ${(refined * 100).toFixed(1)}%`);
+  await after(() => page.click('#chain button[data-action=mask-clear]'));
+  await page.click('#chain button[data-action=tool-paint]');
+  await after(() => page.selectOption('#sample', 'ramps'));
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
 
   // Disabling the step brings the original back.
