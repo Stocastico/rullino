@@ -1,5 +1,6 @@
-import { defaultParams, resolveParams, type Param, type ParamSchema, type ParamValues } from '@rullino/core';
+import { defaultParams, resolveParams, type Lut, type Param, type ParamSchema, type ParamValues } from '@rullino/core';
 import { renderCurveEditor } from './curve-editor';
+import { describeLut, readLutFile } from './lut-file';
 
 // Builds the parameter UI for a filter straight from its schema: a new filter gets
 // sliders, checkboxes and menus without any playground code.
@@ -135,6 +136,27 @@ export function renderControls<S extends ParamSchema>(
         tabs.append(...buttons);
         for (const k of curveKeys) widgets.set(k, { write: () => k === active && editor.set(values[k] as [number, number][]) });
         row.append(curveKeys.length > 1 ? tabs : el('span', { className: 'label' }, label), host);
+        break;
+      }
+      case 'lut': {
+        const input = el('input', { type: 'file', name: key, id: `param-${key}`, accept: '.cube,image/png,image/*' });
+        const info = el('span', { className: 'lut-info' });
+        input.addEventListener('change', async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          try {
+            values[key] = await readLutFile(file);
+            info.classList.remove('error');
+            info.textContent = describeLut(values[key] as Lut);
+            emit();
+          } catch (e) {
+            info.classList.add('error');
+            info.textContent = `Could not read ${file.name}: ${(e as Error).message}`;
+          }
+          input.value = ''; // picking the same file again reloads it
+        });
+        widgets.set(key, { write: (v) => (info.textContent = v === p.default ? 'None (identity)' : describeLut(v as Lut)) });
+        row.append(el('label', { htmlFor: input.id }, label), input, info);
         break;
       }
       case 'enum': {

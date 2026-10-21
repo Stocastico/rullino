@@ -1,5 +1,6 @@
 import type { Filter } from '@rullino/core';
 import { adaptiveThreshold } from './adaptiveThreshold';
+import { applyLut } from './applyLut';
 import { blackPoint } from './blackPoint';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
@@ -25,6 +26,7 @@ import { whiteBalance } from './whiteBalance';
 
 export {
   adaptiveThreshold,
+  applyLut,
   blackPoint,
   boxBlur,
   brightness,
@@ -68,6 +70,7 @@ export const filters: readonly Filter<any>[] = [
   otsu,
   adaptiveThreshold,
   posterize,
+  applyLut,
   gaussianBlur,
   boxBlur,
   sharpen,

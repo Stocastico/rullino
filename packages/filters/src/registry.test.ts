@@ -10,7 +10,7 @@ describe('filter registry', () => {
 
   it('contains the expected filters', () => {
     expect(filters.map((f) => f.id).sort()).toEqual(
-      ['adaptiveThreshold', 'blackPoint', 'boxBlur', 'brightness', 'canny', 'contrast', 'convolve', 'curves', 'exposure', 'gamma', 'gaussianBlur', 'grayscale', 'invert', 'levels', 'otsu', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'threshold', 'unsharpMask', 'vibrance', 'whiteBalance'].sort(),
+      ['adaptiveThreshold', 'applyLut', 'blackPoint', 'boxBlur', 'brightness', 'canny', 'contrast', 'convolve', 'curves', 'exposure', 'gamma', 'gaussianBlur', 'grayscale', 'invert', 'levels', 'otsu', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'threshold', 'unsharpMask', 'vibrance', 'whiteBalance'].sort(),
     );
   });
 
