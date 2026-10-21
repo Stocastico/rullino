@@ -30,6 +30,7 @@ npx vitest run path/to/file.test.ts   # single file
 - **Zero runtime dependencies** in `packages/*`.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
 - Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing.
+- **Workflow**: one branch and one PR per milestone step, based on `main`. Claude may merge its own PR once CI is green and no review thread is open; afterwards delete the branch and start the next one from `main`.
 
 ## Decisions
 
