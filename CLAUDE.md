@@ -108,6 +108,9 @@ Things that already bit us. Add new ones as they come up.
 - **Random-noise test images miss structure-dependent bugs** (hysteresis, gradient direction). Mutation-check new filters against the ring image too.
 - **Do not judge the playground from a screenshot taken after a fixed timeout**: first-use shader compilation on SwiftShader takes seconds. Wait for `#status[data-frame]` to advance, as `scripts/smoke.mjs` does.
 - **Resizing a canvas clears it.** The after canvas is resized only when a new frame is drawn, so the previous image stays up while a new one loads.
+- **A filter's `id` is not unique**: two filter objects can share it. Anything cached per filter (shaders, Pipeline stages) keys on `objectKey(filter)` too.
+- **Async loads in the playground must not overlap**: each destroys the previous textures. `loadImage` queues them and skips superseded ones; swap Pipeline sources before destroying old textures.
+- **Integer-like object keys are reordered by JS** (`{ '5': …, '3': … }` iterates '3' first), so enum option keys must not be integer-like.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
