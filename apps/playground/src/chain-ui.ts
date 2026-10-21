@@ -19,6 +19,17 @@ export interface ChainState {
   readonly selected: string | undefined;
 }
 
+export interface ChainUi {
+  /** Replaces the state after an edit made elsewhere (e.g. on the image); redraws only if asked. */
+  set(state: ChainState, redraw: boolean): void;
+}
+
+/** The step with `mask` set, or removed when undefined. */
+export function withMask(step: StepState, mask: Mask | undefined): StepState {
+  const { mask: _, ...rest } = step;
+  return mask ? { ...rest, mask } : rest;
+}
+
 let nextUid = 0;
 export const newStep = (f: Filter<any>): StepState => ({
   uid: `step${++nextUid}`,
@@ -49,7 +60,7 @@ export function renderChain(
   initial: ChainState,
   onChange: (state: ChainState) => void,
   groups: readonly StepGroup[] = [],
-): void {
+): ChainUi {
   let state = initial;
   const byId = new Map(filters.map((f) => [f.id, f]));
 
@@ -121,10 +132,12 @@ export function renderChain(
         );
         const maskControls = document.createElement('div');
         maskControls.className = 'mask-controls';
-        renderMaskControls(maskControls, step.mask, (mask) => {
-          const { mask: _, ...rest } = state.steps.find((s) => s.uid === step.uid)!;
-          commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? (mask ? { ...rest, mask } : rest) : s)) }, false);
-        });
+        // Reads the step from the current state: the mask can also change from the image overlay.
+        renderMaskControls(
+          maskControls,
+          () => state.steps.find((s) => s.uid === step.uid)?.mask,
+          (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
+        );
         body.append(controls, maskControls);
         item.append(body);
       }
@@ -164,4 +177,10 @@ export function renderChain(
   }
 
   draw();
+  return {
+    set(next, redraw) {
+      state = next;
+      if (redraw) draw();
+    },
+  };
 }

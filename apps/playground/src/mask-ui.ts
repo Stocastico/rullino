@@ -25,9 +25,10 @@ function slider(label: string, action: string, value: number, onInput: (v: numbe
   return row;
 }
 
-export function renderMaskControls(root: HTMLElement, initial: Mask | undefined, onChange: (mask: Mask | undefined) => void): void {
-  let mask = initial;
+/** `get` returns the current mask (it may also change elsewhere, e.g. by dragging on the image). */
+export function renderMaskControls(root: HTMLElement, get: () => Mask | undefined, onChange: (mask: Mask | undefined) => void): void {
   const draw = () => {
+    const mask = get();
     root.replaceChildren();
     const kind = Object.assign(document.createElement('select'), { title: 'Mask' });
     kind.dataset.action = 'mask-kind';
@@ -35,9 +36,9 @@ export function renderMaskControls(root: HTMLElement, initial: Mask | undefined,
     kind.value = mask?.kind ?? 'none';
     kind.addEventListener('change', () => {
       const k = kind.value as keyof typeof KINDS;
+      const m = get();
       // Keep invert / opacity when switching between shapes.
-      mask = k === 'none' ? undefined : { ...DEFAULT_MASKS[k], ...(mask?.invert ? { invert: true } : {}), ...(mask?.opacity !== undefined ? { opacity: mask.opacity } : {}) };
-      onChange(mask);
+      onChange(k === 'none' ? undefined : { ...DEFAULT_MASKS[k], ...(m?.invert ? { invert: true } : {}), ...(m?.opacity !== undefined ? { opacity: m.opacity } : {}) });
       draw();
     });
     const label = Object.assign(document.createElement('label'), { className: 'mask-kind' });
@@ -47,14 +48,11 @@ export function renderMaskControls(root: HTMLElement, initial: Mask | undefined,
 
     const invert = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!mask.invert });
     invert.dataset.action = 'mask-invert';
-    invert.addEventListener('change', () => {
-      mask = { ...mask!, invert: invert.checked };
-      onChange(mask);
-    });
+    invert.addEventListener('change', () => onChange({ ...get()!, invert: invert.checked }));
     const invertLabel = document.createElement('label');
     invertLabel.append(invert, ' Invert');
-    root.append(invertLabel, slider('Opacity', 'mask-opacity', mask.opacity ?? 1, (v) => onChange((mask = { ...mask!, opacity: v }))));
-    if (mask.kind === 'radial') root.append(slider('Feather', 'mask-feather', mask.feather, (v) => onChange((mask = { ...(mask as typeof DEFAULT_MASKS.radial), feather: v }))));
+    root.append(invertLabel, slider('Opacity', 'mask-opacity', mask.opacity ?? 1, (v) => onChange({ ...get()!, opacity: v })));
+    if (mask.kind === 'radial') root.append(slider('Feather', 'mask-feather', mask.feather, (v) => onChange({ ...(get() as typeof DEFAULT_MASKS.radial), feather: v })));
   };
   draw();
 }

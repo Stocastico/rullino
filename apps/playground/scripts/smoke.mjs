@@ -70,7 +70,22 @@ try {
   await after(() => page.$eval('#chain input[data-action=mask-invert]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
   const [itop, ibottom] = await rowDiff();
   check(itop > 10 && ibottom < 1, `inverted mask: top row differs by ${itop.toFixed(1)}, bottom by ${ibottom.toFixed(1)}`);
+  // Dragging the gradient's handles on the image reverses it: 'from' to the bottom, 'to' to the top.
+  await after(() => page.$eval('#chain input[data-action=mask-invert]', (t) => { t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const drag = async (handle, fy) => {
+    const box = await page.locator(`#overlay [data-handle=${handle}]`).boundingBox();
+    const stage = await page.locator('#after').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, stage.y + stage.height * fy, { steps: 4 });
+    await page.mouse.up();
+  };
+  await after(() => drag('from', 0.97));
+  await after(() => drag('to', 0.03));
+  const [dtop, dbottom] = await rowDiff();
+  check(dtop > 10 && dbottom < 1, `dragged mask: top row differs by ${dtop.toFixed(1)}, bottom by ${dbottom.toFixed(1)}`);
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
+  check((await page.$$('#overlay [data-handle]')).length === 0, 'mask handles should disappear with the mask');
 
   // Disabling the step brings the original back.
   await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));

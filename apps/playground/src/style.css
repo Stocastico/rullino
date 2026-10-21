@@ -91,3 +91,9 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 .mask-kind { display: flex; gap: 8px; align-items: center; }
 .mask-slider { display: grid; grid-template-columns: 5em 1fr 3em; gap: 8px; align-items: center; }
 .mask-slider output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+#overlay { grid-area: 1 / 1; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.mask-handle { r: calc(7px * var(--px, 1)); fill: rgb(255 255 255 / 0.9); stroke: rgb(0 0 0 / 0.7); stroke-width: calc(1.5px * var(--px, 1)); pointer-events: all; cursor: grab; }
+.mask-handle:active { cursor: grabbing; }
+.mask-guide, .mask-edge { fill: none; stroke: rgb(255 255 255 / 0.85); stroke-width: calc(1.5px * var(--px, 1)); filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.8)); }
+.mask-guide, .mask-inner { stroke-dasharray: calc(6px * var(--px, 1)) calc(4px * var(--px, 1)); }
