@@ -26,4 +26,15 @@ describe('compareImages', () => {
   it('rejects mismatched sizes', () => {
     expect(() => compareImages(img(0, 0, 0, 0), img(0, 0, 0, 0, 0, 0, 0, 0), { abs: 0, rel: 0 })).toThrow();
   });
+
+  it('allows a declared fraction of outlier channels', () => {
+    const expected = img(0, 0, 0, 1, 0, 0, 0, 1);
+    const actual = img(1, 0, 0, 1, 0, 0, 0, 1); // 1 of 8 channels off
+    expect(compareImages(actual, expected, { abs: 0, rel: 0, outliers: 0.125 }).pass).toBe(true);
+    const res = compareImages(actual, expected, { abs: 0, rel: 0, outliers: 0.1 });
+    expect(res.pass).toBe(false);
+    expect(res.outliers).toBe(1);
+    expect(compareImages(img(NaN, 0, 0, 1), img(0, 0, 0, 1), { abs: 0, rel: 0, outliers: 1 }).pass).toBe(false); // never NaN
+  });
 });
+

@@ -52,34 +52,51 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
   device.queue.writeBuffer(uniforms, 0, values);
 
   const textures = new Map<string, GPUTexture>([['input', input]]);
+  const owned = new Set<GPUTexture>();
+  const resolved = resolveParams(filter.params, params as never) as Record<string, unknown>;
   let compiled = 0;
+  let passes = 0;
   const enc = device.createCommandEncoder();
   for (const pass of filter.passes) {
     const pipeline = cachedPipeline(ctx, `rullino.pass:${filter.id}:${pass.name}`, () => {
       compiled++;
       return passShader(filter.params, pass);
     });
-    const out = createWorkingTexture(ctx, input.width, input.height);
-    const bindGroup = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: out.createView() },
-        { binding: 1, resource: { buffer: uniforms } },
-        ...pass.inputs.map((name, i) => ({ binding: i + 2, resource: textures.get(name)!.createView() })),
-      ],
-    });
-    const cp = enc.beginComputePass();
-    cp.setPipeline(pipeline);
-    cp.setBindGroup(0, bindGroup);
-    cp.dispatchWorkgroups(Math.ceil(input.width / WORKGROUP), Math.ceil(input.height / WORKGROUP));
-    cp.end();
-    textures.set(pass.name, out);
+    const iterations = pass.repeat === undefined ? 1 : Math.max(0, resolved[pass.repeat] as number);
+    let result = textures.get(pass.inputs[0]!)!;
+    if (iterations === 0 && result === input) {
+      // Never hand back the caller's input as our output: copy it.
+      result = createWorkingTexture(ctx, input.width, input.height);
+      enc.copyTextureToTexture({ texture: input }, { texture: result }, [input.width, input.height]);
+      owned.add(result);
+    }
+    for (let it = 0; it < iterations; it++) {
+      const out = createWorkingTexture(ctx, input.width, input.height);
+      owned.add(out);
+      const sources = pass.inputs.map((name, i) => (i === 0 && it > 0 ? result : textures.get(name)!));
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: out.createView() },
+          { binding: 1, resource: { buffer: uniforms } },
+          ...sources.map((t, i) => ({ binding: i + 2, resource: t.createView() })),
+        ],
+      });
+      const cp = enc.beginComputePass();
+      cp.setPipeline(pipeline);
+      cp.setBindGroup(0, bindGroup);
+      cp.dispatchWorkgroups(Math.ceil(input.width / WORKGROUP), Math.ceil(input.height / WORKGROUP));
+      cp.end();
+      passes++;
+      result = out;
+    }
+    textures.set(pass.name, result);
   }
   device.queue.submit([enc.finish()]);
 
   const output = textures.get(filter.passes.at(-1)!.name)!;
   // Intermediates are no longer needed once the work is submitted (destruction is deferred).
-  for (const [name, t] of textures) if (name !== 'input' && t !== output) t.destroy();
+  for (const t of owned) if (t !== output) t.destroy();
   uniforms.destroy();
-  return { output, passes: filter.passes.length, compiled };
+  return { output, passes, compiled };
 }
