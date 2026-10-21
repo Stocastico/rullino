@@ -2,9 +2,9 @@ import { afterAll, expect, it } from 'vitest';
 import { compareImages } from '../compare';
 import { fromFloat16Array, toFloat16Array } from '../half';
 import { createImage } from '../image';
-import { blendMasked, createRasterMask, type Mask } from '../mask';
+import { blendMasked, createRasterMask, maskImage, type Mask } from '../mask';
 import { createGpuContext } from './context';
-import { blendMask, rasterTextureCount } from './mask';
+import { blendMask, rasterTextureCount, renderMask } from './mask';
 import { readImage, uploadImage } from './texture';
 
 const ctx = await createGpuContext();
@@ -26,14 +26,16 @@ const input = noise(w, h, 7);
 const filtered = noise(w, h, 11);
 const raster = createRasterMask(5, 3, new Float32Array([0, 0.2, 0.9, 1, 0.3, 1, 0, 0.5, 0.25, 0.75, 0.1, 0.6, 0.4, 0.8, 1]));
 
-it.each<[string, Mask]>([
+const masks: [string, Mask][] = [
   ['linear, diagonal', { kind: 'linear', from: [0.2, 0.1], to: [0.7, 0.8] }],
   ['linear, inverted at half opacity', { kind: 'linear', from: [0.9, 0.5], to: [0.1, 0.4], invert: true, opacity: 0.5 }],
   ['radial ellipse, feathered', { kind: 'radial', center: [0.4, 0.6], radius: [0.3, 0.15], feather: 0.6 }],
   ['radial, off-centre, full feather', { kind: 'radial', center: [0, 1], radius: [0.8, 0.8], feather: 1 }],
   ['raster, upsampled', { kind: 'raster', raster }],
   ['raster at the image size', { kind: 'raster', raster: createRasterMask(w, h, Float32Array.from({ length: w * h }, (_, i) => (i * 37 % 101) / 100)) }],
-])('GPU mask blend matches the CPU: %s', async (_, mask) => {
+];
+
+it.each(masks)('GPU mask blend matches the CPU: %s', async (_, mask) => {
   const out = await readImage(ctx, blendMask(ctx, uploadImage(ctx, input), uploadImage(ctx, filtered), mask));
   const res = compareImages(out, blendMasked(input, filtered, mask), { abs: 2e-4, rel: 2 ** -10 });
   expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
@@ -46,5 +48,13 @@ it('keeps only a few raster textures alive and re-uploads an evicted one', async
   const mask: Mask = { kind: 'raster', raster: rasters[0]! };
   const out = await readImage(ctx, blendMask(ctx, uploadImage(ctx, input), uploadImage(ctx, filtered), mask));
   const res = compareImages(out, blendMasked(input, filtered, mask), { abs: 2e-4, rel: 2 ** -10 });
+  expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+});
+
+it.each(masks)('renderMask matches maskImage: %s', async (_, mask) => {
+  const out = await readImage(ctx, renderMask(ctx, mask, w, h));
+  const want = maskImage(mask, w, h);
+  const img = createImage(w, h, Float32Array.from({ length: w * h * 4 }, (_, i) => want[i >> 2]!));
+  const res = compareImages(out, img, { abs: 2e-4, rel: 2 ** -10 });
   expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
 });

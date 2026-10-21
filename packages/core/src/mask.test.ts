@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRasterMask, maskValue, resampleRaster, validateMask, type Mask } from './mask';
+import { createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type Mask } from './mask';
 
 const W = 40;
 const H = 20;
@@ -87,5 +87,14 @@ describe('resampleRaster', () => {
     for (let y = 0; y < 3; y++)
       for (let x = 0; x < 8; x++) expect(big.data[y * 8 + x]).toBeCloseTo(maskValue({ kind: 'raster', raster: r }, x, y, 8, 3), 6);
     expect(resampleRaster(r, 4, 2)).toBe(r);
+  });
+});
+
+describe('maskImage', () => {
+  it('evaluates the mask at every pixel centre', () => {
+    const m: Mask = { kind: 'radial', center: [0.3, 0.6], radius: [0.4, 0.2], feather: 0.5, invert: true, opacity: 0.7 };
+    const img = maskImage(m, 9, 5);
+    expect(img).toHaveLength(45);
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 9; x++) expect(img[y * 9 + x]).toBeCloseTo(maskValue(m, x, y, 9, 5), 6);
   });
 });

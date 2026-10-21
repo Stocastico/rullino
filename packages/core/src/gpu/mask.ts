@@ -30,11 +30,13 @@ const MASK_VALUE: Record<Mask['kind'], string> = {
   return top + (bottom - top) * f.y;`,
 };
 
-const shader = (kind: Mask['kind']) => /* wgsl */ `
+// 'blend' writes mix(src, flt, m); 'render' writes m itself to every channel.
+type Mode = 'blend' | 'render';
+
+const shader = (kind: Mask['kind'], mode: Mode) => /* wgsl */ `
 struct MaskParams { a: vec4f, b: vec4f }
 @group(0) @binding(0) var dst: texture_storage_2d<${WORKING_FORMAT}, write>;
-@group(0) @binding(1) var src: texture_2d<f32>;
-@group(0) @binding(2) var flt: texture_2d<f32>;
+${mode === 'blend' ? '@group(0) @binding(1) var src: texture_2d<f32>;\n@group(0) @binding(2) var flt: texture_2d<f32>;' : ''}
 @group(0) @binding(3) var<uniform> mp: MaskParams;
 ${kind === 'raster' ? '@group(0) @binding(4) var raster: texture_2d<f32>;' : ''}
 
@@ -49,14 +51,18 @@ fn mask_shape(uv: vec2f, s: vec2f) -> f32 {${MASK_VALUE[kind]}
 
 @compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
 fn main(@builtin(global_invocation_id) id: vec3u) {
-  let size = textureDimensions(src);
+  let size = textureDimensions(dst);
   if (id.x >= size.x || id.y >= size.y) { return; }
   let fs = vec2f(size);
   var m = mask_shape((vec2f(id.xy) + 0.5) / fs, fs / max(fs.x, fs.y));
   if (mp.b.y > 0.5) { m = 1.0 - m; }
   m = m * mp.b.z;
-  let c = textureLoad(src, id.xy, 0);
-  textureStore(dst, id.xy, c + (textureLoad(flt, id.xy, 0) - c) * m);
+${
+  mode === 'blend'
+    ? `  let c = textureLoad(src, id.xy, 0);
+  textureStore(dst, id.xy, c + (textureLoad(flt, id.xy, 0) - c) * m);`
+    : '  textureStore(dst, id.xy, vec4f(m));'
+}
 }`;
 
 /**
@@ -93,23 +99,36 @@ export const rasterTextureCount = (ctx: GpuContext) => rasters.get(ctx.device)?.
 
 /** mix(input, filtered, mask) on the GPU (premultiplied, alpha included) into a new working texture. */
 export function blendMask(ctx: GpuContext, input: GPUTexture, filtered: GPUTexture, mask: Mask): GPUTexture {
+  return run(ctx, mask, input.width, input.height, [input, filtered]);
+}
+
+/** The mask as a w x h working texture with the mask value in every channel (input of mask-aware filters). */
+export function renderMask(ctx: GpuContext, mask: Mask, w: number, h: number): GPUTexture {
+  return run(ctx, mask, w, h);
+}
+
+function run(ctx: GpuContext, mask: Mask, width: number, height: number, blend?: [GPUTexture, GPUTexture]): GPUTexture {
   const { device } = ctx;
   const visibility = GPUShaderStage.COMPUTE;
-  const pipeline = cachedPipeline(ctx, `rullino.mask:${mask.kind}`, () => shader(mask.kind), () => [
+  const mode: Mode = blend ? 'blend' : 'render';
+  const pipeline = cachedPipeline(ctx, `rullino.mask:${mask.kind}:${mode}`, () => shader(mask.kind, mode), () => [
     { binding: 0, visibility, storageTexture: { access: 'write-only', format: WORKING_FORMAT } },
-    { binding: 1, visibility, texture: { sampleType: 'unfilterable-float' } },
-    { binding: 2, visibility, texture: { sampleType: 'unfilterable-float' } },
+    ...(blend
+      ? [
+          { binding: 1, visibility, texture: { sampleType: 'unfilterable-float' as const } },
+          { binding: 2, visibility, texture: { sampleType: 'unfilterable-float' as const } },
+        ]
+      : []),
     { binding: 3, visibility, buffer: { type: 'uniform' } },
     ...(mask.kind === 'raster' ? [{ binding: 4, visibility, texture: { sampleType: 'unfilterable-float' as const } }] : []),
   ]);
   const a = mask.kind === 'linear' ? [...mask.from, ...mask.to] : mask.kind === 'radial' ? [...mask.center, ...mask.radius] : [0, 0, 0, 0];
   const uniforms = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(uniforms, 0, new Float32Array([...a, mask.kind === 'radial' ? mask.feather : 0, mask.invert ? 1 : 0, mask.opacity ?? 1, 0]));
-  const out = createWorkingTexture(ctx, input.width, input.height);
+  const out = createWorkingTexture(ctx, width, height);
   const entries: GPUBindGroupEntry[] = [
     { binding: 0, resource: out.createView() },
-    { binding: 1, resource: input.createView() },
-    { binding: 2, resource: filtered.createView() },
+    ...(blend ? [{ binding: 1, resource: blend[0].createView() }, { binding: 2, resource: blend[1].createView() }] : []),
     { binding: 3, resource: { buffer: uniforms } },
   ];
   if (mask.kind === 'raster') entries.push({ binding: 4, resource: rasterTexture(ctx, mask.raster).createView() });
@@ -117,7 +136,7 @@ export function blendMask(ctx: GpuContext, input: GPUTexture, filtered: GPUTextu
   const pass = enc.beginComputePass();
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries }));
-  pass.dispatchWorkgroups(Math.ceil(input.width / WORKGROUP), Math.ceil(input.height / WORKGROUP));
+  pass.dispatchWorkgroups(Math.ceil(width / WORKGROUP), Math.ceil(height / WORKGROUP));
   pass.end();
   device.queue.submit([enc.finish()]);
   uniforms.destroy();
