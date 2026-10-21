@@ -67,4 +67,21 @@ describe('renderControls', () => {
     renderControls(root, {}, {}, () => {});
     expect(root.textContent).toMatch(/no parameters/i);
   });
+
+  it('renders kernels as an editable grid', () => {
+    const k = { kernel: { type: 'kernel', size: 3, default: [0, 0, 0, 0, 1, 0, 0, 0, 0], label: 'Kernel' } } as const;
+    const root = document.createElement('div');
+    const changes: unknown[] = [];
+    renderControls(root, k, defaultParams(k), (v) => changes.push(v));
+    const cells = root.querySelectorAll<HTMLInputElement>('input[data-kernel-index]');
+    expect(cells).toHaveLength(9);
+    expect(cells[4]!.value).toBe('1');
+    fire(cells[0]!, '-1');
+    expect(changes.at(-1)).toEqual({ kernel: [-1, 0, 0, 0, 1, 0, 0, 0, 0] });
+    fire(cells[1]!, 'abc'); // not a number: ignored
+    expect(changes).toHaveLength(1);
+    root.querySelector<HTMLButtonElement>('button[data-action=reset]')!.click();
+    expect(cells[0]!.value).toBe('0');
+  });
 });
+

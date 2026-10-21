@@ -93,8 +93,9 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       const [pw, ph] = fitWithin(original.width, original.height, PREVIEW_SIDE);
       const preview = pw < dw ? downscale(gpu, display, pw, ph) : display;
       textures = [...new Set([original, display, preview])];
-      full.setSource(display);
-      small.setSource(preview);
+      // Pixel-unit params (blur radii...) are defined at the original resolution.
+      full.setSource(display, { scale: dw / image.width });
+      small.setSource(preview, { scale: pw / image.width });
       ui.before.width = dw;
       ui.before.height = dh;
       beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), dw, dh), 0, 0);
@@ -109,6 +110,7 @@ function gpuRenderer(gpu: GpuContext): Renderer {
 
 function cpuRenderer(): Renderer {
   let source: LinearImage | undefined;
+  let scale = 1;
   return {
     name: 'CPU reference',
     async load(image) {
@@ -118,6 +120,7 @@ function cpuRenderer(): Renderer {
       tmp.drawImage(image, 0, 0, w, h);
       const data = tmp.getImageData(0, 0, w, h);
       source = decodeSrgb8(data.data, w, h);
+      scale = w / image.width;
       ui.before.width = w;
       ui.before.height = h;
       beforeCtx.putImageData(data, 0, 0);
@@ -125,7 +128,7 @@ function cpuRenderer(): Renderer {
     },
     async render(steps) {
       if (!source) return;
-      const out = runChainCpu(steps, source);
+      const out = runChainCpu(steps, source, { scale });
       await present(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
     },
   };

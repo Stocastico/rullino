@@ -87,6 +87,28 @@ export function renderControls<S extends ParamSchema>(
         row.append(el('label', { htmlFor: input.id }, input, ' ', label));
         break;
       }
+      case 'kernel': {
+        const grid = el('div', { className: 'kernel' });
+        grid.style.gridTemplateColumns = `repeat(${p.size}, 1fr)`;
+        const cells = Array.from({ length: p.size * p.size }, (_, i) => {
+          const cell = el('input', { type: 'number', step: '0.1', name: `${key}-${i}` });
+          cell.dataset.kernelIndex = String(i);
+          cell.setAttribute('aria-label', `${label} row ${Math.floor(i / p.size) + 1} column ${(i % p.size) + 1}`);
+          cell.addEventListener('input', () => {
+            const v = Number(cell.value);
+            if (cell.value.trim() === '' || !Number.isFinite(v)) return;
+            const next = [...(values[key] as number[])];
+            next[i] = v;
+            values[key] = next;
+            emit();
+          });
+          return cell;
+        });
+        grid.append(...cells);
+        widgets.set(key, { write: (v) => (v as number[]).forEach((x, i) => (cells[i]!.value = String(x))) });
+        row.append(el('span', { className: 'label' }, label), grid);
+        break;
+      }
       case 'enum': {
         const select = el('select', { name: key, id: `param-${key}` });
         for (const [value, text] of Object.entries(p.options)) select.append(el('option', { value }, text));
