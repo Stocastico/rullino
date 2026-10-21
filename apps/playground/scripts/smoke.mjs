@@ -95,6 +95,15 @@ try {
     return n / (d.length / 4);
   });
   check(opaque > 0.9, `after canvas is ${(100 - opaque * 100).toFixed(0)}% transparent after the race`);
+  // Two loads back to back: the last one must win, with matching canvas sizes.
+  await page.selectOption('#sample', 'alpha');
+  await page.selectOption('#sample', 'ramps');
+  await page.waitForFunction(() => /Ramps & hues/.test(document.getElementById('status').textContent), null, { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(1000);
+  const sizes = await page.evaluate(() => ['before', 'after'].map((id) => { const c = document.getElementById(id); return `${c.width}x${c.height}`; }));
+  check(/Ramps & hues/.test(await status()), `last load should win, status: ${await status()}`);
+  check(sizes.every((s) => s === '768x384'), `canvas sizes after back-to-back loads: ${sizes.join(', ')}`);
+
   console.log(`smoke: ${ids.length} filters chained, status "${await status()}"`);
 } finally {
   await browser.close();

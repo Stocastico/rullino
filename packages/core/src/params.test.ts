@@ -65,6 +65,8 @@ describe('parameter schema', () => {
     expect(() => validateSchema({ x: { type: 'int', min: 0, max: 4, default: 1.5 } })).toThrow(/integer/);
     expect(() => validateSchema({ x: { type: 'enum', options: { a: 'A' }, default: 'b' } as never })).toThrow(/default/);
     expect(() => validateSchema({ x: { type: 'enum', options: {}, default: 'a' } as never })).toThrow(/option/);
+    // JS reorders integer-like keys, which would break "index = declaration order" in WGSL.
+    expect(() => validateSchema({ x: { type: 'enum', options: { '5': 'Five', '3': 'Three' }, default: '5' } })).toThrow(/integer-like/);
     // Keys become WGSL identifiers.
     expect(() => validateSchema({ 'bad-name': { type: 'bool', default: true } })).toThrow(/identifier/);
     expect(() => validateSchema({ _x: { type: 'bool', default: true } })).toThrow(/identifier/);

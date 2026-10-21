@@ -2,7 +2,7 @@ import type { MultipassFilter, PassDef } from '../filter';
 import { packParams, paramsStructWgsl, resolveParams } from '../params';
 import { colorWgsl } from '../wgsl';
 import type { GpuContext } from './context';
-import { cachedPipeline } from './readback';
+import { cachedPipeline, objectKey } from './readback';
 import { createWorkingTexture, WORKING_FORMAT } from './texture';
 
 const WORKGROUP = 8;
@@ -109,7 +109,7 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
   for (const pass of filter.passes) {
     const pipeline = cachedPipeline(
       ctx,
-      `rullino.pass:${filter.id}:${pass.name}`,
+      `rullino.pass:${filter.id}#${objectKey(filter)}:${pass.name}`,
       () => {
         compiled++;
         return passShader(filter, pass);

@@ -80,6 +80,8 @@ export function validateSchema(schema: ParamSchema): void {
         break;
       case 'enum':
         if (Object.keys(p.options).length === 0) fail('enum needs at least one option');
+        // Object key order puts integer-like keys first, which would break "WGSL index = declaration order".
+        if (Object.keys(p.options).some((k) => /^(0|[1-9]\d*)$/.test(k))) fail('enum option keys must not be integer-like');
         if (!Object.hasOwn(p.options, p.default)) fail(`default "${p.default}" is not an option`);
         break;
       case 'kernel':
