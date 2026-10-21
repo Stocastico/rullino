@@ -80,6 +80,20 @@ try {
   check(lutChanged > 0.5, `an inverting .cube changed only ${(lutChanged * 100).toFixed(1)}% of channels`);
   check(/invert · 2³/.test(await page.textContent('#chain .lut-info')), 'LUT step should show the loaded file');
 
+  // Adding a look appends its steps (LUT, vignette, grain for Noir) and turns the image black and white.
+  const stepsBefore = await page.$$eval('#chain li[data-step]', (l) => l.length);
+  await after(() => page.selectOption('#chain select[data-action=add-look]', 'noir'));
+  check((await page.$$eval('#chain li[data-step]', (l) => l.length)) === stepsBefore + 3, 'the Noir look should add 3 steps');
+  const colourful = await page.$eval('#after', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) n += Math.max(Math.abs(d[i] - d[i + 1]), Math.abs(d[i + 1] - d[i + 2])) > 3 ? 1 : 0;
+    return n / (d.length / 4);
+  });
+  check(colourful < 0.01, `after the Noir look ${(colourful * 100).toFixed(1)}% of pixels still have colour`);
+  // Back to the chain without the look's steps, so the checks below see a known chain.
+  for (let i = 0; i < 3; i++) await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));

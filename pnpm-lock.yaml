@@ -38,6 +38,9 @@ importers:
       '@rullino/filters':
         specifier: workspace:*
         version: link:../../packages/filters
+      '@rullino/presets':
+        specifier: workspace:*
+        version: link:../../packages/presets
     devDependencies:
       playwright:
         specifier: 1.56.1
@@ -53,6 +56,15 @@ importers:
       '@rullino/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/presets:
+    dependencies:
+      '@rullino/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rullino/filters':
+        specifier: workspace:*
+        version: link:../filters
 
 packages:
 

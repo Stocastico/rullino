@@ -8,8 +8,9 @@ rullino spans the whole arc from classic computer-vision operations (thresholds,
 > - **M0**: skeleton, CI, GPU/CPU parity.
 > - **M1**: parameter schema, `defineFilter()`, eleven pointwise filters, playground with generated UI and before/after.
 > - **M2**: filter chains with pointwise fusion, incremental recompute and reduced-resolution preview; multipass filters with repeated passes and GPU reductions; convolutions (Gaussian, box, sharpen, unsharp mask, custom kernel), Canny, Otsu and adaptive threshold.
+> - **M3** (in progress): curves (with an editor), levels, black point, shadows/highlights; 3D LUT engine (`.cube` / HaldCLUT) with intensity, vignette, grain; ten built-in looks in `@rullino/presets`. Export is next.
 >
-> Next is M3 (curves, levels, LUTs, looks, export). See [PLAN.md](./PLAN.md) for the design and roadmap.
+> See [PLAN.md](./PLAN.md) for the design and roadmap.
 
 ## Why
 

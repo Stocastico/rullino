@@ -25,6 +25,13 @@ export const newStep = (f: Filter<any>): StepState => ({
   enabled: true,
 });
 
+/** A named group of steps added in one go (a look). */
+export interface StepGroup {
+  readonly id: string;
+  readonly label: string;
+  steps(): readonly { readonly filter: Filter<any>; readonly params?: Readonly<Record<string, unknown>> }[];
+}
+
 const CATEGORY_LABELS: Record<string, string> = { adjust: 'Adjust', look: 'Look', classic: 'Classic', stylize: 'Stylize' };
 
 function button(label: string, action: string, title: string): HTMLButtonElement {
@@ -39,6 +46,7 @@ export function renderChain(
   filters: readonly Filter<any>[],
   initial: ChainState,
   onChange: (state: ChainState) => void,
+  groups: readonly StepGroup[] = [],
 ): void {
   let state = initial;
   const byId = new Map(filters.map((f) => [f.id, f]));
@@ -132,6 +140,19 @@ export function renderChain(
       commit({ steps: [...state.steps, step], selected: step.uid }, true);
     });
     root.append(add);
+
+    if (groups.length === 0) return;
+    const addGroup = document.createElement('select');
+    addGroup.dataset.action = 'add-look';
+    addGroup.setAttribute('aria-label', 'Add look');
+    addGroup.append(new Option('+ Add look…', ''), ...groups.map((g) => new Option(g.label, g.id)));
+    addGroup.addEventListener('change', () => {
+      const group = groups.find((g) => g.id === addGroup.value);
+      if (!group) return;
+      const added = group.steps().map((s) => ({ ...newStep(s.filter), params: { ...defaultParams(s.filter.params), ...s.params } }));
+      commit({ steps: [...state.steps, ...added], selected: added[0]?.uid ?? state.selected }, true);
+    });
+    root.append(addGroup);
   }
 
   draw();
