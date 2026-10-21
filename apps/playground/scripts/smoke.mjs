@@ -56,6 +56,60 @@ try {
   const changed = await differs();
   check(changed > 0.3, `exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
 
+  // A linear-gradient mask (top to bottom by default) restricts the step to the bottom of the image.
+  const rowDiff = () =>
+    page.evaluate(() => {
+      const px = (id) => { const c = document.getElementById(id); return [c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height]; };
+      const [[a, w, h], [b]] = [px('before'), px('after')];
+      const row = (y) => { let n = 0; for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) n += Math.abs(a[(y * w + x) * 4 + c] - b[(y * w + x) * 4 + c]); return n / (w * 3); };
+      return [row(2), row(h - 3)];
+    });
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'linear'));
+  const [top, bottom] = await rowDiff();
+  check(top < 1 && bottom > 10, `linear mask: top row differs by ${top.toFixed(1)}, bottom by ${bottom.toFixed(1)}`);
+  await after(() => page.$eval('#chain input[data-action=mask-invert]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const [itop, ibottom] = await rowDiff();
+  check(itop > 10 && ibottom < 1, `inverted mask: top row differs by ${itop.toFixed(1)}, bottom by ${ibottom.toFixed(1)}`);
+  // Dragging the gradient's handles on the image reverses it: 'from' to the bottom, 'to' to the top.
+  await after(() => page.$eval('#chain input[data-action=mask-invert]', (t) => { t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const drag = async (handle, fy) => {
+    const box = await page.locator(`#overlay [data-handle=${handle}]`).boundingBox();
+    const stage = await page.locator('#after').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, stage.y + stage.height * fy, { steps: 4 });
+    await page.mouse.up();
+  };
+  await after(() => drag('from', 0.97));
+  await after(() => drag('to', 0.03));
+  const [dtop, dbottom] = await rowDiff();
+  check(dtop > 10 && dbottom < 1, `dragged mask: top row differs by ${dtop.toFixed(1)}, bottom by ${dbottom.toFixed(1)}`);
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
+  check((await page.$$('#overlay [data-handle]')).length === 0, 'mask handles should disappear with the mask');
+
+  // Brush: an empty mask changes nothing; a stroke across the middle changes only that band.
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'brush'));
+  check((await differs()) < 0.01, 'an empty brush mask should leave the image unchanged');
+  const midRows = () =>
+    page.evaluate(() => {
+      const px = (id) => { const c = document.getElementById(id); return [c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height]; };
+      const [[a, w, h], [b]] = [px('before'), px('after')];
+      const row = (y) => { let n = 0; for (let x = Math.floor(w * 0.6); x < Math.floor(w * 0.9); x++) for (let c = 0; c < 3; c++) n += Math.abs(a[(y * w + x) * 4 + c] - b[(y * w + x) * 4 + c]); return n / (Math.floor(w * 0.3) * 3); };
+      return [row(Math.floor(h / 2)), row(2)];
+    });
+  await after(async () => {
+    const box = await page.locator('#after').boundingBox();
+    await page.mouse.move(box.x + box.width * 0.05, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.95, box.y + box.height / 2, { steps: 12 });
+    await page.mouse.up();
+  });
+  const [mid, edge] = await midRows();
+  check(mid > 10 && edge < 1, `brush stroke: middle row differs by ${mid.toFixed(1)}, top row by ${edge.toFixed(1)}`);
+  await after(() => page.click('#chain button[data-action=mask-clear]'));
+  check((await differs()) < 0.01, 'clearing the brush mask should restore the image');
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
+
   // Disabling the step brings the original back.
   await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
   check((await differs()) < 0.01, 'disabled step should leave the image unchanged');
@@ -130,6 +184,10 @@ try {
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
+  // Transparency at full strength (its default) would hide everything after it; the checks below
+  // need to see a drawn image.
+  await after(() => page.click('#chain button[data-action=select][aria-label="Edit Transparency"]'));
+  await after(() => slider('amount', 0));
   check((await status()).includes(`${ids.length + 2} steps`), `expected ${ids.length + 2} steps, status: ${await status()}`);
 
   for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {

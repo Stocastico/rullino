@@ -5,6 +5,7 @@ import { createGpuContext } from '../gpu/context';
 import { readImage, uploadImage } from '../gpu/texture';
 import { fromFloat16Array, toFloat16Array } from '../half';
 import { createImage } from '../image';
+import { createRasterMask } from '../mask';
 import { linearToOklab, oklabToLinear } from '../oklab';
 import { downscaleCpu } from '../resize';
 import { runChainCpu, type Step } from './chain';
@@ -213,3 +214,56 @@ describe('Pipeline', () => {
   });
 });
 
+
+describe('Pipeline with masks', () => {
+  const linear = { kind: 'linear', from: [0.2, 0.3], to: [0.8, 0.6] } as const;
+  const radial = { kind: 'radial', center: [0.5, 0.5], radius: [0.3, 0.2], feather: 0.5, invert: true } as const;
+  const masked: Step[] = [
+    { filter: gain },
+    { filter: chroma, params: { k: 1.4 }, mask: linear },
+    { filter: gain, params: { k: 0.7 } },
+    { filter: blur, params: { radius: 3 }, mask: radial },
+    { filter: gain, params: { k: 1.2 } },
+  ];
+  let pipe: Pipeline;
+  beforeEach(() => {
+    pipe?.destroy();
+    pipe = new Pipeline(ctx);
+    pipe.setSource(uploadImage(ctx, src));
+  });
+
+  it('matches the CPU chain with masked pointwise and multipass steps', async () => {
+    const out = await readImage(ctx, pipe.run(masked));
+    const res = compareImages(out, runChainCpu(masked, src), tol);
+    expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+  });
+
+  it('never fuses a masked step with its neighbours, and adds one blend pass per mask', () => {
+    pipe.run(masked);
+    // gain | chroma (+ blend) | gain | blur h, v (+ blend) | gain
+    expect(pipe.stats.passes).toBe(1 + 2 + 1 + 3 + 1);
+  });
+
+  it('recomputes from the masked step when only its mask changes', () => {
+    pipe.run(masked);
+    const before = pipe.stats.passes;
+    const moved = masked.map((s, i) => (i === 3 ? { ...s, mask: { ...radial, center: [0.4, 0.5] as const } } : s));
+    pipe.run(moved);
+    expect(pipe.stats.passes - before).toBe(3 + 1);
+  });
+
+  it('keys raster masks by identity', () => {
+    const raster = createRasterMask(4, 4, new Float32Array(16).fill(0.5));
+    const steps = (r: typeof raster): Step[] => [{ filter: gain, mask: { kind: 'raster', raster: r } }];
+    pipe.run(steps(raster));
+    const before = pipe.stats.passes;
+    pipe.run(steps(raster));
+    expect(pipe.stats.passes).toBe(before);
+    pipe.run(steps(createRasterMask(4, 4, new Float32Array(16).fill(0.5))));
+    expect(pipe.stats.passes).toBe(before + 2);
+  });
+
+  it('rejects invalid masks', () => {
+    expect(() => pipe.run([{ filter: gain, mask: { kind: 'radial', center: [0, 0], radius: [0, 1], feather: 0 } }])).toThrow(/radius/);
+  });
+});

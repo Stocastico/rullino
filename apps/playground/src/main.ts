@@ -18,7 +18,9 @@ import {
 } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
-import { newStep, renderChain, type ChainState } from './chain-ui';
+import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
+import { createMaskOverlay } from './mask-overlay';
+import { brush, setImageSize } from './mask-ui';
 import { samples } from './samples';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
@@ -39,6 +41,7 @@ const ui = {
   stage: $<HTMLElement>('stage'),
   before: $<HTMLCanvasElement>('before'),
   after: $<HTMLCanvasElement>('after'),
+  overlay: document.getElementById('overlay') as unknown as SVGSVGElement,
   exportFormat: $<HTMLSelectElement>('export-format'),
   exportQuality: $<HTMLInputElement>('export-quality'),
   exportButton: $<HTMLButtonElement>('export'),
@@ -54,7 +57,7 @@ let chain: ChainState = (() => {
 })();
 
 const toSteps = (s: ChainState): Step[] =>
-  s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled }));
+  s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled, ...(st.mask ? { mask: st.mask } : {}) }));
 
 /** Size of the after canvas for the current image; applied when a frame is ready, not on load. */
 let displaySize: [number, number] = [0, 0];
@@ -222,6 +225,8 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
       const image = await createImageBitmap(source);
       const [w, h] = await renderer.load(image);
       displaySize = [w, h];
+      setImageSize(w, h);
+      showOverlay();
       imageName = name.replace(/\.[^.]+$/, '') || 'image';
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
       image.close();
@@ -273,12 +278,26 @@ ui.exportButton.addEventListener('click', () => void exportFile());
 ui.exportFormat.addEventListener('change', () => (ui.exportQuality.disabled = !['jpeg', 'webp'].includes(ui.exportFormat.value)));
 ui.exportQuality.disabled = true;
 
-renderChain(
+const selectedMask = () => chain.steps.find((s) => s.uid === chain.selected)?.mask;
+const overlay = createMaskOverlay(
+  ui.overlay,
+  (mask) => {
+    chain = { ...chain, steps: chain.steps.map((s) => (s.uid === chain.selected ? withMask(s, mask) : s)) };
+    chainUi.set(chain, false);
+    void render();
+  },
+  () => (dragging = true),
+  () => brush,
+);
+const showOverlay = () => overlay.show(selectedMask(), displaySize[0], displaySize[1]);
+
+const chainUi = renderChain(
   ui.chain,
   filters,
   chain,
   (next) => {
     chain = next;
+    showOverlay();
     void render();
   },
   looks.map((l) => ({ id: l.id, label: l.label, steps: () => lookSteps(l) })),

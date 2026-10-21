@@ -1,5 +1,6 @@
-import { defaultParams, type Filter } from '@rullino/core';
+import { defaultParams, type Filter, type Mask } from '@rullino/core';
 import { renderControls } from './controls';
+import { renderMaskControls } from './mask-ui';
 
 // The filter chain editor: a list of steps (enable, reorder, remove), an "add filter" menu, and
 // the generated controls of the selected step. Structural edits rebuild the list; param edits
@@ -10,11 +11,23 @@ export interface StepState {
   readonly filterId: string;
   readonly params: Readonly<Record<string, unknown>>;
   readonly enabled: boolean;
+  readonly mask?: Mask;
 }
 
 export interface ChainState {
   readonly steps: readonly StepState[];
   readonly selected: string | undefined;
+}
+
+export interface ChainUi {
+  /** Replaces the state after an edit made elsewhere (e.g. on the image); redraws only if asked. */
+  set(state: ChainState, redraw: boolean): void;
+}
+
+/** The step with `mask` set, or removed when undefined. */
+export function withMask(step: StepState, mask: Mask | undefined): StepState {
+  const { mask: _, ...rest } = step;
+  return mask ? { ...rest, mask } : rest;
 }
 
 let nextUid = 0;
@@ -47,7 +60,7 @@ export function renderChain(
   initial: ChainState,
   onChange: (state: ChainState) => void,
   groups: readonly StepGroup[] = [],
-): void {
+): ChainUi {
   let state = initial;
   const byId = new Map(filters.map((f) => [f.id, f]));
 
@@ -117,7 +130,15 @@ export function renderChain(
         renderControls(controls, filter.params, step.params as never, (params) =>
           commit({ ...state, steps: update(step.uid, { params }) }, false),
         );
-        body.append(controls);
+        const maskControls = document.createElement('div');
+        maskControls.className = 'mask-controls';
+        // Reads the step from the current state: the mask can also change from the image overlay.
+        renderMaskControls(
+          maskControls,
+          () => state.steps.find((s) => s.uid === step.uid)?.mask,
+          (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
+        );
+        body.append(controls, maskControls);
         item.append(body);
       }
       list.append(item);
@@ -156,4 +177,10 @@ export function renderChain(
   }
 
   draw();
+  return {
+    set(next, redraw) {
+      state = next;
+      if (redraw) draw();
+    },
+  };
 }

@@ -29,10 +29,11 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
   - `png.ts` dependency-free PNG encoder (8/16-bit RGBA); `encode.ts` `encodeImage` (PNG / JPEG / WebP from a `LinearImage`); `gpu/export.ts` `exportImage` from a texture.
+  - `mask.ts` masks (linear, radial, raster), CPU `maskValue` / `blendMasked`; `gpu/mask.ts` the WGSL twin and `blendMask`; `paint.ts` `paintStroke` (brush on raster masks).
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
@@ -113,6 +114,11 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Own PNG encoder over `CompressionStream('deflate')`; JPEG / WebP via `OffscreenCanvas.convertToBlob` | Canvas encoding goes through premultiplied 8-bit storage (lossy for semi-transparent pixels) and cannot write 16 bits; zlib is built into browsers and Node, so the encoder stays dependency-free (filter 0 only: larger files, simple code). |
 | 16-bit PNG export; input stays 8-bit for now | 16 bits keep the float16 pipeline's precision on output (PLAN §7); 16-bit / HDR input needs a decoder and is left open. |
 | Flattening (JPEG, or an explicit `background`) composites in linear light on the float readback | Same rule as the rest of the pipeline: blending in sRGB darkens edges. Plain 8-bit exports keep the faster GPU encode path. |
+| Masks are a property of a step: `out = mix(in, step(in), m)` on premultiplied values, alpha included | Works for every filter kind without touching filters; a masked step is its own Pipeline stage (never fused) plus one blend pass. |
+| Mask coordinates normalised to the image, distances in units of the longer side | The same mask at preview, display and export resolution; circles stay circles on non-square images. |
+| Raster masks immutable, keyed by identity, GPU textures in a 4-entry LRU per device (evicted ones destroyed) | Same contract as LUTs for caching; painting makes a new raster per pointer move, and a WeakMap left their textures alive until GC. |
+| Brush rasters at the image's aspect ratio, ≤ 1024 px | Round dabs; bilinear upsampling at export keeps soft edges soft. Fine detail beyond 1024 px is a future option. |
+| Cut-out = `transparency` filter + mask | No separate mechanism; any mask kind can cut out. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -149,4 +155,6 @@ Things that already bit us. Add new ones as they come up.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
 - **A LUT cannot follow the sRGB curve's kink at 0**: grades that push colours out of gamut (saturation boosts) interpolate poorly next to the gamut edge. Compare baked vs live chains as displayed (clipped) and on average, not by the worst pixel alone.
 - **`convertToBlob` silently falls back to PNG** for a type the browser cannot encode (e.g. WebP in some browsers); `encodeSamples` checks `blob.type` and throws.
+- **Replacing an SVG element while it is dragged drops its pointer capture**: the mask overlay updates attributes and rebuilds elements only when the mask kind changes.
+- **UI modules that keep their own copy of shared state go stale** once a second editor exists (panel vs on-image handles): read the current state through a getter.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.

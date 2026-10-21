@@ -1,6 +1,8 @@
 import type { PointwiseFilter } from '../filter';
 import type { GpuContext } from '../gpu/context';
+import { blendMask } from '../gpu/mask';
 import { runMultipass } from '../gpu/multipass';
+import { validateMask } from '../mask';
 import { releaseTexture } from '../gpu/pool';
 import { objectKey } from '../gpu/readback';
 import { activeSteps, effectiveParams, type ChainOptions, type Step } from './chain';
@@ -84,6 +86,14 @@ export class Pipeline {
         if (r.compiled) this.stats.compiles++;
         output = r.output;
       }
+      const { mask } = stage.steps[0]!;
+      if (mask) {
+        // Masked steps are always alone in their stage (see #plan).
+        const filtered = output;
+        output = blendMask(this.#ctx, input, filtered, mask);
+        releaseTexture(this.#ctx, filtered);
+        this.stats.passes++;
+      }
       this.#cache.push({ key: stage.key, output });
       input = output;
     }
@@ -97,15 +107,18 @@ export class Pipeline {
 
   #plan(steps: readonly Step[]): Stage[] {
     const groups: Step[][] = [];
+    // A masked step blends with its own input, so it is never fused with its neighbours.
+    const fusable = (s: Step) => s.filter.kind === 'pointwise' && !s.mask;
     for (const s of activeSteps(steps)) {
+      if (s.mask) validateMask(s.mask);
       const last = groups.at(-1);
-      if (this.#fuse && last && last.at(-1)!.filter.kind === 'pointwise' && s.filter.kind === 'pointwise') last.push(s);
+      if (this.#fuse && last && fusable(last.at(-1)!) && fusable(s)) last.push(s);
       else groups.push([s]);
     }
     let key = `src${this.#sourceVersion}`;
     return groups.map((g) => {
       const params = g.map((s) => effectiveParams(s, this.#scale));
-      key = `${key}|${g.map((s, i) => `${s.filter.id}#${objectKey(s.filter)}${JSON.stringify(params[i], lutAsIdentity)}`).join('+')}`;
+      key = `${key}|${g.map((s, i) => `${s.filter.id}#${objectKey(s.filter)}${JSON.stringify(params[i], byIdentity)}${s.mask ? `@${JSON.stringify(s.mask, byIdentity)}` : ''}`).join('+')}`;
       return { steps: g, params, key };
     });
   }
@@ -115,7 +128,10 @@ export class Pipeline {
   }
 }
 
-/** In stage keys a LUT stands for itself (its texture is cached per object), not for its data. */
-function lutAsIdentity(this: unknown, _key: string, v: unknown): unknown {
-  return v !== null && typeof v === 'object' && (v as { data?: unknown }).data instanceof Float32Array ? `lut#${objectKey(v as object)}` : v;
+/**
+ * In stage keys, objects holding a Float32Array table (LUTs, raster masks) stand for themselves:
+ * their GPU textures are cached per object, and serialising the data would be slow.
+ */
+function byIdentity(this: unknown, _key: string, v: unknown): unknown {
+  return v !== null && typeof v === 'object' && (v as { data?: unknown }).data instanceof Float32Array ? `obj#${objectKey(v as object)}` : v;
 }

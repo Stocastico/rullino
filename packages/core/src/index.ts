@@ -30,6 +30,9 @@ export { float16ToFloat32, float32ToFloat16, fromFloat16Array, toFloat16Array } 
 export { createImage, type LinearImage } from './image';
 export { applyLutCpu, createLut, identityLut, lutFromFunction, lutSamplerWgsl, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { lutTexture } from './gpu/lut';
+export { blendMask } from './gpu/mask';
+export { blendMasked, createRasterMask, maskValue, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
+export { paintStroke, type BrushOptions } from './paint';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {
   defaultParams,
