@@ -3,12 +3,15 @@ import {
   createGpuContext,
   decodeSrgb8,
   downscale,
+  encodeImage,
   encodeSrgb8,
+  exportImage,
   fitWithin,
   importImage,
   Pipeline,
   readSrgb8,
   runChainCpu,
+  type ExportOptions,
   type GpuContext,
   type LinearImage,
   type Step,
@@ -18,7 +21,7 @@ import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, type ChainState } from './chain-ui';
 import { samples } from './samples';
 
-/** Display resolution: the after/before canvases. Full-resolution export comes in M3. */
+/** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
 const DISPLAY_SIDE = 2048;
 /** Resolution used while a slider is being dragged. */
 const PREVIEW_SIDE = 768;
@@ -36,6 +39,9 @@ const ui = {
   stage: $<HTMLElement>('stage'),
   before: $<HTMLCanvasElement>('before'),
   after: $<HTMLCanvasElement>('after'),
+  exportFormat: $<HTMLSelectElement>('export-format'),
+  exportQuality: $<HTMLInputElement>('export-quality'),
+  exportButton: $<HTMLButtonElement>('export'),
 };
 const beforeCtx = ui.before.getContext('2d')!;
 const afterCtx = ui.after.getContext('2d')!;
@@ -76,6 +82,8 @@ interface Renderer {
   /** Loads an image and returns the display size. */
   load(image: ImageBitmap): Promise<[number, number]>;
   render(steps: Step[], preview: boolean): Promise<void>;
+  /** Runs the chain at the largest resolution available and encodes the result. */
+  export(steps: Step[], options: ExportOptions): Promise<Blob>;
 }
 
 // Output goes through readback + putImageData on a 2D canvas rather than a WebGPU canvas:
@@ -85,6 +93,8 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   const full = new Pipeline(gpu);
   const small = new Pipeline(gpu);
   let textures: GPUTexture[] = [];
+  let original: GPUTexture | undefined;
+  let originalScale = 1;
   return {
     name: 'WebGPU',
     async load(image) {
@@ -95,19 +105,21 @@ function gpuRenderer(gpu: GpuContext): Renderer {
         const [w, h] = fitWithin(image.width, image.height, limit);
         fitted = await createImageBitmap(image, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' });
       }
-      const original = importImage(gpu, fitted);
+      const fullRes = importImage(gpu, fitted);
       if (fitted !== image) fitted.close();
       // Shrinking happens on the GPU in linear light, unlike a canvas or createImageBitmap resize.
-      const [dw, dh] = fitWithin(original.width, original.height, DISPLAY_SIDE);
-      const display = dw < original.width ? downscale(gpu, original, dw, dh) : original;
-      const [pw, ph] = fitWithin(original.width, original.height, PREVIEW_SIDE);
+      const [dw, dh] = fitWithin(fullRes.width, fullRes.height, DISPLAY_SIDE);
+      const display = dw < fullRes.width ? downscale(gpu, fullRes, dw, dh) : fullRes;
+      const [pw, ph] = fitWithin(fullRes.width, fullRes.height, PREVIEW_SIDE);
       const preview = pw < dw ? downscale(gpu, display, pw, ph) : display;
       // Pixel-unit params (blur radii...) are defined at the original resolution.
       full.setSource(display, { scale: dw / image.width });
       small.setSource(preview, { scale: pw / image.width });
       // Only now are the previous textures unreferenced (destruction waits for queued GPU work).
       for (const t of textures) t.destroy();
-      textures = [...new Set([original, display, preview])];
+      textures = [...new Set([fullRes, display, preview])];
+      original = fullRes;
+      originalScale = fullRes.width / image.width;
       ui.before.width = dw;
       ui.before.height = dh;
       beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), dw, dh), 0, 0);
@@ -116,6 +128,17 @@ function gpuRenderer(gpu: GpuContext): Renderer {
     async render(steps, preview) {
       const out = (preview ? small : full).run(steps);
       await present(await readSrgb8(gpu, out), out.width, out.height);
+    },
+    async export(steps, options) {
+      if (!original) throw new Error('no image loaded');
+      // A throwaway Pipeline: full-resolution intermediates are freed as soon as the file is encoded.
+      const pipeline = new Pipeline(gpu);
+      try {
+        pipeline.setSource(original, { scale: originalScale });
+        return await exportImage(gpu, pipeline.run(steps), options);
+      } finally {
+        pipeline.destroy();
+      }
     },
   };
 }
@@ -143,6 +166,11 @@ function cpuRenderer(): Renderer {
       const out = runChainCpu(steps, source, { scale });
       await present(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
     },
+    async export(steps, options) {
+      if (!source) throw new Error('no image loaded');
+      // The CPU fallback only ever has the reduced image.
+      return encodeImage(runChainCpu(steps, source, { scale }), options);
+    },
   };
 }
 
@@ -152,6 +180,7 @@ function cpuRenderer(): Renderer {
 
 let renderer: Renderer;
 let imageInfo = '';
+let imageName = 'image';
 let loaded = false;
 let dragging = false;
 let busy = false;
@@ -193,6 +222,7 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
       const image = await createImageBitmap(source);
       const [w, h] = await renderer.load(image);
       displaySize = [w, h];
+      imageName = name.replace(/\.[^.]+$/, '') || 'image';
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
       image.close();
       loaded = true;
@@ -204,8 +234,44 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
   return loads.then(render);
 }
 
+const EXPORTS: Record<string, { options: ExportOptions; ext: string }> = {
+  png: { options: { format: 'png' }, ext: 'png' },
+  png16: { options: { format: 'png', bitDepth: 16 }, ext: 'png' },
+  jpeg: { options: { format: 'jpeg' }, ext: 'jpg' },
+  webp: { options: { format: 'webp' }, ext: 'webp' },
+};
+
+// Exports wait for any queued load, so the textures they read are not destroyed underneath them.
+function exportFile(): Promise<void> {
+  const { options, ext } = EXPORTS[ui.exportFormat.value]!;
+  const steps = toSteps(chain);
+  const quality = Number(ui.exportQuality.value);
+  ui.exportButton.disabled = true;
+  const done = loads.then(async () => {
+    const t0 = performance.now();
+    try {
+      const blob = await renderer.export(steps, { ...options, quality });
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${imageName}-rullino.${ext}` });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      ui.status.textContent = `Exported ${a.download} (${(blob.size / 1024).toFixed(0)} KB) in ${(performance.now() - t0).toFixed(0)} ms`;
+    } catch (e) {
+      ui.status.textContent = `Export failed: ${(e as Error).message}`;
+      console.error(e);
+    } finally {
+      ui.exportButton.disabled = false;
+    }
+  });
+  loads = done;
+  return done;
+}
+
 // ---------------------------------------------------------------------------------------------
 // UI wiring.
+
+ui.exportButton.addEventListener('click', () => void exportFile());
+ui.exportFormat.addEventListener('change', () => (ui.exportQuality.disabled = !['jpeg', 'webp'].includes(ui.exportFormat.value)));
+ui.exportQuality.disabled = true;
 
 renderChain(
   ui.chain,

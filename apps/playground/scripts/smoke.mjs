@@ -1,6 +1,7 @@
 // End-to-end smoke test of the built playground: serves dist/ with `vite preview`, opens it in
 // headless Chromium (WebGPU on SwiftShader without a GPU) and fails on any page error, on
 // falling back to the CPU renderer, or if the chain does not change the pixels as expected.
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 
@@ -93,6 +94,38 @@ try {
   check(colourful < 0.01, `after the Noir look ${(colourful * 100).toFixed(1)}% of pixels still have colour`);
   // Back to the chain without the look's steps, so the checks below see a known chain.
   for (let i = 0; i < 3; i++) await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+
+  // Export happens at full resolution, not at the 2048 px display size.
+  await after(() =>
+    page.evaluate(async () => {
+      const c = new OffscreenCanvas(2600, 1300);
+      const g = c.getContext('2d');
+      g.fillStyle = '#c84'; g.fillRect(0, 0, 2600, 1300);
+      g.fillStyle = '#48c'; g.fillRect(400, 300, 1200, 600);
+      const file = new File([await c.convertToBlob()], 'big.png', { type: 'image/png' });
+      const input = document.getElementById('file');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change'));
+    }),
+  );
+  const exported = async (format) => {
+    await page.selectOption('#export-format', format);
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#export')]);
+    return { name: download.suggestedFilename(), bytes: readFileSync(await download.path()) };
+  };
+  {
+    const { name, bytes } = await exported('png16');
+    check(name === 'big-rullino.png', `export file name: ${name}`);
+    check(bytes.readUInt32BE(16) === 2600 && bytes.readUInt32BE(20) === 1300, `export size ${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}, expected 2600x1300`);
+    check(bytes[24] === 16, `expected a 16-bit PNG, bit depth ${bytes[24]}`);
+  }
+  {
+    const { name, bytes } = await exported('jpeg');
+    check(name === 'big-rullino.jpg' && bytes[0] === 0xff && bytes[1] === 0xd8, `expected a JPEG download, got ${name}`);
+  }
+  await after(() => page.selectOption('#sample', 'ramps'));
 
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));

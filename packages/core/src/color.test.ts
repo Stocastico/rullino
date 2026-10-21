@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeSrgb8, encodeSrgb8, linearToSrgb, srgbToLinear } from './color';
+import { decodeSrgb8, encodeSrgb16, encodeSrgb8, linearToSrgb, srgbToLinear } from './color';
 
 describe('sRGB transfer function', () => {
   it('maps the endpoints to themselves', () => {
@@ -65,5 +65,15 @@ describe('8-bit sRGB <-> linear premultiplied image', () => {
 
   it('rejects a buffer whose size does not match the dimensions', () => {
     expect(() => decodeSrgb8(new Uint8ClampedArray(12), 2, 2)).toThrow(RangeError);
+  });
+});
+
+describe('encodeSrgb16', () => {
+  it('encodes straight sRGB at 16 bits, clamped, transparent pixels zero', () => {
+    const out = encodeSrgb16({ width: 3, height: 1, data: new Float32Array([0.5 * 0.214, 0.5, 2, 0.5, 0.1, 0.1, 0.1, 0, -1, 0, 0, 1]) });
+    expect(out[0]).toBe(Math.round(linearToSrgb(0.214) * 65535));
+    expect([out[1], out[2], out[3]]).toEqual([65535, 65535, 32768]);
+    expect([...out.subarray(4, 8)]).toEqual([0, 0, 0, 0]);
+    expect(out[8]).toBe(0);
   });
 });

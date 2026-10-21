@@ -165,5 +165,5 @@ The user marks regions by hand; the library turns marks into masks and applies o
 - ~~Library name~~ → **rullino**, npm scope `@rullino` (org to be registered).
 - ~~License~~ → **MIT**.
 - ~~Test runner~~ → **Vitest** (unit in Node + browser mode via Playwright).
-- Format of LUT assets in the repo and their licenses (third-party LUTs are often not redistributable: better to generate them in-house).
-- HDR / 16-bit input support (the float16 pipeline allows it; I/O still to be decided).
+- ~~16-bit output~~ → 16-bit PNG export (own encoder). HDR / 16-bit *input* still to be decided (needs a decoder).
+- ~~LUT assets~~ → looks are generated in-house from recipes (`bakeLut`); users can load their own `.cube` / Hald files.

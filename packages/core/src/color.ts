@@ -14,6 +14,20 @@ export function linearToSrgb(v: number): number {
   return Math.sign(v) * e;
 }
 
+/** Like {@link encodeSrgb8} at 16 bits per sample (e.g. for 16-bit PNG): straight sRGB, clamped. */
+export function encodeSrgb16(img: LinearImage): Uint16Array {
+  const src = img.data;
+  const out = new Uint16Array(src.length);
+  const q = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 65535);
+  for (let i = 0; i < src.length; i += 4) {
+    const a = src[i + 3]!;
+    if (a <= 0) continue;
+    for (let c = 0; c < 3; c++) out[i + c] = q(linearToSrgb(src[i + c]! / a));
+    out[i + 3] = q(a);
+  }
+  return out;
+}
+
 /** Decodes 8-bit sRGB, straight-alpha RGBA (as in ImageData) into a linear premultiplied image. */
 export function decodeSrgb8(src: Uint8ClampedArray, width: number, height: number): LinearImage {
   if (src.length !== width * height * 4) {

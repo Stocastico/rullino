@@ -28,6 +28,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runMultipass`, `runFilter` (any kind).
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
+  - `png.ts` dependency-free PNG encoder (8/16-bit RGBA); `encode.ts` `encodeImage` (PNG / JPEG / WebP from a `LinearImage`); `gpu/export.ts` `exportImage` from a texture.
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
@@ -80,7 +81,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | `runPointwise` is the one-filter case of `runFused` | One codegen path; every per-filter parity test also exercises fusion. |
 | Pipeline caches each stage's output keyed on everything upstream | Changing a step recomputes from that stage on; with neighbourhood filters (next) the stages before a blur are reused. Fused GPU chains keep f32 between filters, so they are slightly *more* precise than the CPU reference applied in f16 steps would be; chain parity uses summed tolerances. |
 | Linear-light area downscale for display and preview | Box filtering premultiplied linear values is the correct way to shrink; `createImageBitmap` / canvas resizes work in sRGB. Only images beyond the device's texture limit get a browser resize first. |
-| Playground: display ≤ 2048 px, preview ≤ 768 px while dragging | Two Pipelines with their own caches; release re-renders at display size. Full-resolution export is M3. |
+| Playground: display ≤ 2048 px, preview ≤ 768 px while dragging | Two Pipelines with their own caches; release re-renders at display size. Export re-runs the chain on the full-resolution texture in a throwaway Pipeline, so its intermediates do not stay in memory. |
 | `multipass` filter kind = static list of named passes over textures | Covers convolutions, edges, morphology without a general graph language; each multipass filter is its own Pipeline stage, so the stages before it are reused when something after it changes. Workgroup-memory tiling is a later optimisation; correctness first. |
 | Convolutions work on premultiplied linear values with clamp-to-edge | Blurring premultiplied light is physically right and avoids dark fringes at alpha edges. Sharpening touches colour only (alpha kept) and floors colour at 0. |
 | Unsharp mask has no threshold (yet) | A hard threshold makes GPU (f16 intermediates) and CPU (f64) disagree on pixels near it; add a soft one later. |
@@ -109,6 +110,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Looks are recipes of ordinary pointwise filters, baked once into a 33³ LUT (`bakeLut`), plus vignette and grain steps | Readable, tweakable, no third-party LUT licences (PLAN §7), and one LUT lookup per pixel at run time. A baked grade clamps HDR to [0, 1] and differs from the live chain by < 1/255 on average (up to ~0.02 for saturated colours at the gamut edge). |
 | `lookSteps(look, { intensity })` returns plain chain steps | A look is not a new concept for the Pipeline; the playground expands it into editable steps. Intensity scales the LUT blend, vignette and grain together. |
 | Golden look charts are Vitest snapshots of a 12-colour chart rounded to 1e-3 | Catches unintended recipe or filter changes; regenerate with `-u` only for deliberate ones. |
+| Own PNG encoder over `CompressionStream('deflate')`; JPEG / WebP via `OffscreenCanvas.convertToBlob` | Canvas encoding goes through premultiplied 8-bit storage (lossy for semi-transparent pixels) and cannot write 16 bits; zlib is built into browsers and Node, so the encoder stays dependency-free (filter 0 only: larger files, simple code). |
+| 16-bit PNG export; input stays 8-bit for now | 16 bits keep the float16 pipeline's precision on output (PLAN §7); 16-bit / HDR input needs a decoder and is left open. |
+| Flattening (JPEG, or an explicit `background`) composites in linear light on the float readback | Same rule as the rest of the pipeline: blending in sRGB darkens edges. Plain 8-bit exports keep the faster GPU encode path. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -144,4 +148,5 @@ Things that already bit us. Add new ones as they come up.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
 - **A LUT cannot follow the sRGB curve's kink at 0**: grades that push colours out of gamut (saturation boosts) interpolate poorly next to the gamut edge. Compare baked vs live chains as displayed (clipped) and on average, not by the worst pixel alone.
+- **`convertToBlob` silently falls back to PNG** for a type the browser cannot encode (e.g. WebP in some browsers); `encodeSamples` checks `blob.type` and throws.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.
