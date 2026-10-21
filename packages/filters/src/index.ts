@@ -1,6 +1,7 @@
 import type { Filter } from '@rullino/core';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
+import { canny } from './canny';
 import { contrast } from './contrast';
 import { convolve } from './convolve';
 import { exposure } from './exposure';
@@ -19,6 +20,7 @@ import { whiteBalance } from './whiteBalance';
 export {
   boxBlur,
   brightness,
+  canny,
   contrast,
   convolve,
   exposure,
@@ -53,4 +55,5 @@ export const filters: readonly Filter<any>[] = [
   sharpen,
   unsharpMask,
   convolve,
+  canny,
 ];

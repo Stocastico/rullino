@@ -1,0 +1,59 @@
+import { createImage, srgbToLinear } from '@rullino/core';
+import { describe, expect, it } from 'vitest';
+import { at, imageOf } from '../test-utils';
+import { canny } from './index';
+
+const enc = (v: number): [number, number, number] => {
+  const l = srgbToLinear(v);
+  return [l, l, l];
+};
+const edgesInRow = (img: ReturnType<typeof createImage>, y: number) =>
+  Array.from({ length: img.width }, (_, x) => x).filter((x) => at(img, x, y) > 0.5);
+
+const params = { sigma: 1, low: 0.08, high: 0.3, iterations: 64 };
+
+describe('canny', () => {
+  it('finds nothing in a flat image', () => {
+    const out = canny.cpu(imageOf(16, 12, () => enc(0.4)), params);
+    expect(Math.max(...Array.from(out.data).filter((_, i) => i % 4 === 0))).toBe(0);
+  });
+
+  it('turns a step into a one-pixel-wide line at the step', () => {
+    const out = canny.cpu(imageOf(40, 20, (x) => enc(x < 20 ? 0 : 1)), params);
+    for (const y of [3, 10, 16]) {
+      const xs = edgesInRow(out, y);
+      expect(xs).toHaveLength(1);
+      expect([19, 20]).toContain(xs[0]);
+    }
+  });
+
+  it('keeps weak edges only when connected to strong ones (hysteresis)', () => {
+    // One vertical edge whose contrast fades from 1 (strong) at the top to 0.25 (weak) at the
+    // bottom. The fade is gradual so it creates no competing horizontal edge (a T-junction would
+    // break the chain under non-maximum suppression, as in any Canny).
+    const img = imageOf(40, 30, (x, y) => enc(x < 20 ? 0.75 * Math.min(1, Math.max(0, (y - 5) / 20)) : 1));
+    const kept = canny.cpu(img, params);
+    const noHyst = canny.cpu(img, { ...params, iterations: 0 });
+    expect(edgesInRow(kept, 25)).toHaveLength(1);
+    expect(edgesInRow(noHyst, 25)).toHaveLength(0);
+    expect(edgesInRow(noHyst, 5)).toHaveLength(1); // strong part needs no propagation
+
+    // The same weak step on its own is dropped entirely.
+    const weakOnly = canny.cpu(imageOf(40, 30, (x) => enc(x < 20 ? 0 : 0.25)), params);
+    expect(edgesInRow(weakOnly, 25)).toHaveLength(0);
+  });
+
+  it('outputs white edges on black and keeps alpha (premultiplied)', () => {
+    const img = imageOf(40, 20, (x) => enc(x < 20 ? 0 : 1));
+    for (let i = 3; i < img.data.length; i += 4) img.data[i] = 0.5;
+    for (let i = 0; i < img.data.length; i += 4) for (let c = 0; c < 3; c++) img.data[i + c]! *= 0.5;
+    const out = canny.cpu(img, params);
+    const x = edgesInRow(createImage(out.width, out.height, out.data.map((v, i) => (i % 4 === 0 ? v * 2 : v))), 10)[0]!;
+    expect([at(out, x, 10, 0), at(out, x, 10, 3)]).toEqual([0.5, 0.5]);
+    expect(at(out, 2, 10, 0)).toBe(0);
+  });
+
+  it('measures sigma in pixels', () => {
+    expect(canny.params.sigma.unit).toBe('px');
+  });
+});
