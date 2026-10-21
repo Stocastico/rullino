@@ -45,4 +45,11 @@ describe('paintStroke', () => {
     expect(r.data).not.toBe(blank.data);
     expect(blank.data.every((v) => v === 0)).toBe(true);
   });
+
+  it('erasing with the same dab removes a soft dab completely', () => {
+    const dab = { radius: 0.2, hardness: 0.3 };
+    const painted = paintStroke(blank, [[0.5, 0.5]], dab);
+    expect([...painted.data].some((v) => v > 0 && v < 1)).toBe(true);
+    expect(Math.max(...paintStroke(painted, [[0.5, 0.5]], { ...dab, erase: true }).data)).toBe(0);
+  });
 });

@@ -66,4 +66,13 @@ describe('magicWand', () => {
     expect(() => magicWand(im, seedAt(im, 0, 0), { tolerance: 0.1, into: createRasterMask(3, 2) })).toThrow(/6x4/);
     expect(base.data[0]).toBe(0); // inputs untouched
   });
+
+  it('undoes a soft selection exactly when the same click subtracts it', () => {
+    const im = createImage(10, 1);
+    for (let x = 0; x < 10; x++) im.data.set([0.05 + 0.08 * x, 0.05 + 0.08 * x, 0.05 + 0.08 * x, 1], x * 4);
+    const opts = { tolerance: 0.4, softness: 0.8 };
+    const added = magicWand(im, seedAt(im, 0, 0), opts);
+    expect([...added.data].some((v) => v > 0 && v < 1)).toBe(true);
+    expect([...magicWand(im, seedAt(im, 0, 0), { ...opts, into: added, subtract: true }).data]).toEqual(new Array(10).fill(0));
+  });
 });

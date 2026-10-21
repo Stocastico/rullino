@@ -11,7 +11,7 @@ export interface WandOptions {
   readonly softness?: number;
   /** Combine with this mask (same size as the image) instead of starting from an empty one. */
   readonly into?: RasterMaskData;
-  /** Remove the selection from `into` instead of adding it. */
+  /** Remove the selection from `into` instead of adding it (coverage minus selection). */
   readonly subtract?: boolean;
 }
 
@@ -71,6 +71,8 @@ export function magicWand(img: LinearImage, seed: Vec2, options: WandOptions): R
   }
 
   const out = options.into ? options.into.data.slice() : new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) out[i] = options.subtract ? Math.min(out[i]!, 1 - selection[i]!) : Math.max(out[i]!, selection[i]!);
+  // Subtracting removes exactly the coverage the same selection would add, so add + subtract of
+  // one click is a no-op even on soft edges (min(m, 1 - v) would leave them half selected).
+  for (let i = 0; i < w * h; i++) out[i] = options.subtract ? Math.max(0, out[i]! - selection[i]!) : Math.max(out[i]!, selection[i]!);
   return createRasterMask(w, h, out);
 }

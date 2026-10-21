@@ -18,8 +18,9 @@ const smoothstep = (e0: number, e1: number, x: number) => {
 
 /**
  * Paints a stroke through `points` (normalised coordinates) onto a copy of `raster`. Dabs are
- * spaced at most a quarter radius apart, and combine with max (paint) / min (erase), so going
- * over the same area again never exceeds `strength`.
+ * spaced at most a quarter radius apart. Painting combines with max, so going over the same area
+ * again never exceeds `strength`; erasing subtracts the dab, so erasing with the brush that
+ * painted removes it completely, soft edges included.
  */
 export function paintStroke(raster: RasterMaskData, points: readonly Vec2[], brush: BrushOptions): RasterMaskData {
   const { width: w, height: h } = raster;
@@ -37,10 +38,11 @@ export function paintStroke(raster: RasterMaskData, points: readonly Vec2[], bru
     const y1 = Math.min(h - 1, Math.ceil(cy + r));
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        const k = strength * (1 - smoothstep(core, r, Math.hypot(x + 0.5 - cx, y + 0.5 - cy)));
+        // In f32, like the stored values, so erasing what was painted cancels exactly.
+        const k = Math.fround(strength * (1 - smoothstep(core, r, Math.hypot(x + 0.5 - cx, y + 0.5 - cy))));
         if (k <= 0) continue;
         const i = y * w + x;
-        out.data[i] = brush.erase ? Math.min(out.data[i]!, 1 - k) : Math.max(out.data[i]!, k);
+        out.data[i] = brush.erase ? Math.max(0, out.data[i]! - k) : Math.max(out.data[i]!, k);
       }
     }
   };
