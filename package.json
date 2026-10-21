@@ -12,7 +12,8 @@
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "dev": "pnpm --filter @rullino/playground dev"
+    "dev": "pnpm --filter @rullino/playground dev",
+    "test:e2e": "pnpm --filter @rullino/playground smoke"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

@@ -1,21 +1,24 @@
-import type { ParamSchema, ParamValues, PointwiseFilter } from '../filter';
+import type { PointwiseFilter } from '../filter';
+import { packParams, paramsStructWgsl, resolveParams, type ParamSchema, type ParamValues } from '../params';
+import { colorWgsl } from '../wgsl';
 import type { GpuContext } from './context';
 import { createWorkingTexture, WORKING_FORMAT } from './texture';
 
 const WORKGROUP = 8;
 
 export function pointwiseShader(filter: PointwiseFilter): string {
-  const fields = Object.keys(filter.params).map((k) => `  ${k}: f32,`);
-  // WGSL forbids empty structs.
-  if (fields.length === 0) fields.push('  _unused: f32,');
+  const body =
+    filter.alpha === 'straight'
+      ? 'rl_premultiply(apply(rl_unpremultiply(c), params))'
+      : 'apply(c, params)';
   return /* wgsl */ `
-struct Params {
-${fields.join('\n')}
-}
+${paramsStructWgsl('Params', filter.params)}
 
 @group(0) @binding(0) var src: texture_2d<f32>;
 @group(0) @binding(1) var dst: texture_storage_2d<${WORKING_FORMAT}, write>;
 @group(0) @binding(2) var<uniform> params: Params;
+
+${colorWgsl}
 
 ${filter.wgsl}
 
@@ -23,39 +26,38 @@ ${filter.wgsl}
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = textureDimensions(src);
   if (id.x >= size.x || id.y >= size.y) { return; }
-  textureStore(dst, id.xy, apply(textureLoad(src, id.xy, 0), params));
+  let c = textureLoad(src, id.xy, 0);
+  textureStore(dst, id.xy, ${body});
 }
 `;
 }
 
-const pipelines = new WeakMap<GPUDevice, Map<string, GPUComputePipeline>>();
+const pipelines = new WeakMap<GPUDevice, WeakMap<PointwiseFilter, GPUComputePipeline>>();
 
 function getPipeline(ctx: GpuContext, filter: PointwiseFilter): GPUComputePipeline {
   let cache = pipelines.get(ctx.device);
-  if (!cache) pipelines.set(ctx.device, (cache = new Map()));
-  let pipeline = cache.get(filter.id);
+  if (!cache) pipelines.set(ctx.device, (cache = new WeakMap()));
+  let pipeline = cache.get(filter);
   if (!pipeline) {
     const module = ctx.device.createShaderModule({ label: filter.id, code: pointwiseShader(filter) });
     pipeline = ctx.device.createComputePipeline({ label: filter.id, layout: 'auto', compute: { module } });
-    cache.set(filter.id, pipeline);
+    cache.set(filter, pipeline);
   }
   return pipeline;
 }
 
-/** Runs a pointwise filter on a working texture and returns a new working texture. */
+/** Runs a pointwise filter on a working texture and returns a new working texture. Missing params take defaults. */
 export function runPointwise<S extends ParamSchema>(
   ctx: GpuContext,
   filter: PointwiseFilter<S>,
   input: GPUTexture,
-  params: ParamValues<S>,
+  params?: Partial<ParamValues<S>>,
 ): GPUTexture {
   const { device } = ctx;
-  const pipeline = getPipeline(ctx, filter as PointwiseFilter);
+  const pipeline = getPipeline(ctx, filter as unknown as PointwiseFilter);
   const output = createWorkingTexture(ctx, input.width, input.height);
 
-  const keys = Object.keys(filter.params);
-  const values = new Float32Array(Math.max(4, Math.ceil(keys.length / 4) * 4));
-  keys.forEach((k, i) => (values[i] = params[k]!));
+  const values = packParams(filter.params, resolveParams(filter.params, params));
   const uniforms = device.createBuffer({ size: values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(uniforms, 0, values);
 
