@@ -57,4 +57,43 @@ describe('defineFilter', () => {
     expect(() => defineFilter({ ...halve(), wgsl: 'fn nope() {}' })).toThrow(/apply/);
     expect(() => defineFilter({ ...halve(), wgsl: halve().wgsl + '\nstruct Params { k: f32 }' })).toThrow(/Params/);
   });
+
+  it('validates multipass definitions', () => {
+    const base = {
+      id: 'mp',
+      label: 'MP',
+      category: 'classic',
+      kind: 'multipass',
+      params: {},
+      passes: [
+        { name: 'a', inputs: ['input'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }' },
+        { name: 'b', inputs: ['a', 'input'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_a(xy) - load_input(xy); }' },
+      ],
+      cpu: (src: ReturnType<typeof createImage>) => src,
+      tolerance: { abs: 0, rel: 0 },
+    } as const;
+    expect(() => defineFilter(base)).not.toThrow();
+    expect(() => defineFilter({ ...base, passes: [] })).toThrow(/at least one pass/);
+    expect(() => defineFilter({ ...base, passes: [{ ...base.passes[1] }, { ...base.passes[0] }] })).toThrow(/unknown input "a"/);
+    expect(() => defineFilter({ ...base, passes: [{ ...base.passes[0], wgsl: 'fn nope() {}' }] })).toThrow(/fn run/);
+    expect(() => defineFilter({ ...base, passes: [{ ...base.passes[0], name: 'bad-name' }] })).toThrow(/identifier/);
+    expect(() => defineFilter({ ...base, passes: [base.passes[0], { ...base.passes[0] }] })).toThrow(/duplicate/);
+  });
+
+  it('fills multipass CPU params with defaults', () => {
+    const seen: unknown[] = [];
+    const f = defineFilter({
+      id: 'mp2',
+      label: 'MP2',
+      category: 'classic',
+      kind: 'multipass',
+      params: { r: { type: 'int', min: 0, max: 4, default: 2, label: 'R' } },
+      passes: [{ name: 'a', inputs: ['input'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }' }],
+      cpu: (src, p) => (seen.push(p), src),
+      tolerance: { abs: 0, rel: 0 },
+    });
+    f.cpu(createImage(1, 1));
+    expect(seen).toEqual([{ r: 2 }]);
+  });
 });
+

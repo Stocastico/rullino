@@ -6,6 +6,7 @@ import { readImage, uploadImage } from '../gpu/texture';
 import { fromFloat16Array, toFloat16Array } from '../half';
 import { createImage } from '../image';
 import { linearToOklab, oklabToLinear } from '../oklab';
+import { downscaleCpu } from '../resize';
 import { runChainCpu, type Step } from './chain';
 import { Pipeline } from './pipeline';
 
@@ -47,6 +48,42 @@ const chroma = defineFilter({
     return [...oklabToLinear(L, A * kk, B * kk), a];
   },
   tolerance: { abs: 2e-4, rel: 2e-3 },
+});
+
+/** Separable box blur with a pixel-unit radius: a minimal multipass filter. */
+const blurPass = (name: string, input: string, axis: string) => ({
+  name,
+  inputs: [input],
+  wgsl: `fn run(xy: vec2i, p: Params) -> vec4f {
+  var acc = vec4f(0.0);
+  for (var k = -p.radius; k <= p.radius; k++) { acc += load_${input}(xy + ${axis}); }
+  return acc / f32(2 * p.radius + 1);
+}`,
+});
+function boxCpu(img: ReturnType<typeof createImage>, r: number, dx: number, dy: number) {
+  const out = createImage(img.width, img.height);
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++)
+      for (let c = 0; c < 4; c++) {
+        let acc = 0;
+        for (let k = -r; k <= r; k++) {
+          const sx = Math.min(img.width - 1, Math.max(0, x + k * dx));
+          const sy = Math.min(img.height - 1, Math.max(0, y + k * dy));
+          acc += img.data[(sy * img.width + sx) * 4 + c]!;
+        }
+        out.data[(y * img.width + x) * 4 + c] = acc / (2 * r + 1);
+      }
+  return out;
+}
+const blur = defineFilter({
+  id: 'testBlur',
+  label: 'Blur',
+  category: 'classic',
+  kind: 'multipass',
+  params: { radius: { type: 'int', min: 0, max: 10, default: 2, unit: 'px', label: 'Radius' } },
+  passes: [blurPass('h', 'input', 'vec2i(k, 0)'), blurPass('v', 'h', 'vec2i(0, k)')],
+  cpu: (img, { radius }) => boxCpu(boxCpu(img, radius, 1, 0), radius, 0, 1),
+  tolerance: { abs: 1e-3, rel: 2 ** -9 },
 });
 
 function testImage(w: number, h: number) {
@@ -143,4 +180,29 @@ describe('Pipeline', () => {
     pipe.run(chain);
     expect(pipe.stats.passes - passes).toBe(1);
   });
+
+  it('splits stages at multipass filters and only recomputes downstream of a change', async () => {
+    const steps: Step[] = [{ filter: gain }, { filter: blur }, { filter: chroma }, { filter: gain, params: { k: 0.8 } }];
+    const out = await readImage(ctx, pipe.run(steps));
+    // gain | blur (2 passes) | chroma+gain fused
+    expect(pipe.stats.passes).toBe(4);
+    const res = compareImages(out, runChainCpu(steps, src), tol);
+    expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+
+    pipe.run(steps.map((s, i) => (i === 3 ? { ...s, params: { k: 1.2 } } : s)));
+    expect(pipe.stats.passes).toBe(5); // the blur and everything before it are reused
+  });
+
+  it('scales pixel-unit params with the source scale, matching the CPU chain', async () => {
+    const steps: Step[] = [{ filter: blur, params: { radius: 4 } }];
+    const half = downscaleCpu(src, 20, 11);
+    const p = new Pipeline(ctx);
+    p.setSource(uploadImage(ctx, half), { scale: 0.5 });
+    const out = await readImage(ctx, p.run(steps));
+    const scaled = runChainCpu(steps, half, { scale: 0.5 });
+    expect(compareImages(out, scaled, tol).pass).toBe(true);
+    expect(compareImages(scaled, runChainCpu(steps, half), tol).pass).toBe(false); // radius 2 != radius 4
+    p.destroy();
+  });
 });
+

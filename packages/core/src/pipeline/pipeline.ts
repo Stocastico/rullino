@@ -1,6 +1,7 @@
+import type { PointwiseFilter } from '../filter';
 import type { GpuContext } from '../gpu/context';
-import { resolveParams } from '../params';
-import { activeSteps, type Step } from './chain';
+import { runMultipass } from '../gpu/multipass';
+import { activeSteps, effectiveParams, type ChainOptions, type Step } from './chain';
 import { runFused } from './fuse';
 
 export interface PipelineOptions {
@@ -10,6 +11,7 @@ export interface PipelineOptions {
 
 interface Stage {
   readonly steps: readonly Step[];
+  readonly params: readonly Record<string, unknown>[];
   /** Identifies this stage's result: everything upstream plus this stage's filters and params. */
   readonly key: string;
 }
@@ -22,13 +24,16 @@ interface CachedStage {
 /**
  * Runs a filter chain on the GPU, caching each stage's output so that a change only recomputes
  * from the first affected stage onwards. Consecutive pointwise steps form a single stage (one pass);
- * the shader depends only on the filters, so moving a slider never recompiles.
+ * each multipass filter is a stage of its own. Shaders depend only on the filters, so moving a
+ * slider never recompiles.
  */
 export class Pipeline {
+  /** Cumulative GPU passes dispatched and shaders compiled; useful in tests and for profiling. */
   readonly stats = { passes: 0, compiles: 0 };
   readonly #ctx: GpuContext;
   readonly #fuse: boolean;
   #source: GPUTexture | undefined;
+  #scale = 1;
   #sourceVersion = 0;
   #cache: CachedStage[] = [];
 
@@ -37,9 +42,13 @@ export class Pipeline {
     this.#fuse = options.fuse ?? true;
   }
 
-  /** Sets the input working texture. Not owned: the caller keeps it alive and destroys it. */
-  setSource(texture: GPUTexture): void {
+  /**
+   * Sets the input working texture. Not owned: the caller keeps it alive and destroys it.
+   * `scale` is its resolution relative to the full image (see {@link ChainOptions}).
+   */
+  setSource(texture: GPUTexture, options: ChainOptions = {}): void {
     this.#source = texture;
+    this.#scale = options.scale ?? 1;
     this.#sourceVersion++;
     this.#evict(0);
   }
@@ -60,14 +69,19 @@ export class Pipeline {
     let input = first === 0 ? source : this.#cache[first - 1]!.output;
     for (let i = first; i < stages.length; i++) {
       const stage = stages[i]!;
-      const { output, compiled } = runFused(
-        this.#ctx,
-        stage.steps.map((s) => s.filter),
-        stage.steps.map((s) => s.params ?? {}),
-        input,
-      );
-      this.stats.passes++;
-      if (compiled) this.stats.compiles++;
+      const head = stage.steps[0]!.filter;
+      let output: GPUTexture;
+      if (head.kind === 'multipass') {
+        const r = runMultipass(this.#ctx, head, input, stage.params[0]!);
+        this.stats.passes += r.passes;
+        this.stats.compiles += r.compiled;
+        output = r.output;
+      } else {
+        const r = runFused(this.#ctx, stage.steps.map((s) => s.filter as PointwiseFilter<any>), stage.params, input);
+        this.stats.passes++;
+        if (r.compiled) this.stats.compiles++;
+        output = r.output;
+      }
       this.#cache.push({ key: stage.key, output });
       input = output;
     }
@@ -88,9 +102,9 @@ export class Pipeline {
     }
     let key = `src${this.#sourceVersion}`;
     return groups.map((g) => {
-      const sig = g.map((s) => `${s.filter.id}${JSON.stringify(resolveParams(s.filter.params, (s.params ?? {}) as never))}`);
-      key = `${key}|${sig.join('+')}`;
-      return { steps: g, key };
+      const params = g.map((s) => effectiveParams(s, this.#scale));
+      key = `${key}|${g.map((s, i) => `${s.filter.id}${JSON.stringify(params[i])}`).join('+')}`;
+      return { steps: g, params, key };
     });
   }
 
