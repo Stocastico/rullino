@@ -1,4 +1,4 @@
-import { defaultParams, type PointwiseFilter } from '@rullino/core';
+import { defaultParams, type Filter } from '@rullino/core';
 import { renderControls } from './controls';
 
 // The filter chain editor: a list of steps (enable, reorder, remove), an "add filter" menu, and
@@ -18,7 +18,7 @@ export interface ChainState {
 }
 
 let nextUid = 0;
-export const newStep = (f: PointwiseFilter<any>): StepState => ({
+export const newStep = (f: Filter<any>): StepState => ({
   uid: `step${++nextUid}`,
   filterId: f.id,
   params: defaultParams(f.params),
@@ -36,7 +36,7 @@ function button(label: string, action: string, title: string): HTMLButtonElement
 
 export function renderChain(
   root: HTMLElement,
-  filters: readonly PointwiseFilter<any>[],
+  filters: readonly Filter<any>[],
   initial: ChainState,
   onChange: (state: ChainState) => void,
 ): void {

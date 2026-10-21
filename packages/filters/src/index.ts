@@ -1,20 +1,42 @@
-import type { PointwiseFilter } from '@rullino/core';
+import type { Filter } from '@rullino/core';
+import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
 import { contrast } from './contrast';
+import { convolve } from './convolve';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
+import { gaussianBlur } from './gaussianBlur';
 import { grayscale } from './grayscale';
 import { invert } from './invert';
 import { posterize } from './posterize';
 import { saturation } from './saturation';
+import { sharpen } from './sharpen';
 import { threshold } from './threshold';
+import { unsharpMask } from './unsharpMask';
 import { vibrance } from './vibrance';
 import { whiteBalance } from './whiteBalance';
 
-export { brightness, contrast, exposure, gamma, grayscale, invert, posterize, saturation, threshold, vibrance, whiteBalance };
+export {
+  boxBlur,
+  brightness,
+  contrast,
+  convolve,
+  exposure,
+  gamma,
+  gaussianBlur,
+  grayscale,
+  invert,
+  posterize,
+  saturation,
+  sharpen,
+  threshold,
+  unsharpMask,
+  vibrance,
+  whiteBalance,
+};
 
 /** Every filter, in the order the playground lists them. */
-export const filters: readonly PointwiseFilter<any>[] = [
+export const filters: readonly Filter<any>[] = [
   exposure,
   contrast,
   brightness,
@@ -26,4 +48,9 @@ export const filters: readonly PointwiseFilter<any>[] = [
   invert,
   threshold,
   posterize,
+  gaussianBlur,
+  boxBlur,
+  sharpen,
+  unsharpMask,
+  convolve,
 ];
