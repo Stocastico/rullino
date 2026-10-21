@@ -29,6 +29,18 @@ export async function readTextureBytes(ctx: GpuContext, tex: GPUTexture, bytesPe
 
 const pipelines = new WeakMap<GPUDevice, Map<string, GPUComputePipeline>>();
 
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 0;
+/**
+ * A number unique to `o` for the lifetime of the page. Shader cache keys use it instead of a
+ * filter's `id`, which two different filters can share (e.g. a user filter reusing a built-in id).
+ */
+export function objectKey(o: object): number {
+  let k = objectIds.get(o);
+  if (k === undefined) objectIds.set(o, (k = ++nextObjectId));
+  return k;
+}
+
 /**
  * Compiles a compute pipeline once per device and key. With `layout: 'auto'` (the default)
  * WebGPU drops bindings the shader never touches, so pass explicit layout entries whenever a

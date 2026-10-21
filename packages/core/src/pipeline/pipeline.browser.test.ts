@@ -204,5 +204,12 @@ describe('Pipeline', () => {
     expect(compareImages(scaled, runChainCpu(steps, half), tol).pass).toBe(false); // radius 2 != radius 4
     p.destroy();
   });
+
+  it('treats different filter objects with the same id as different steps', async () => {
+    const twin = defineFilter({ ...gain, pixel: ([r, g, b, a]) => [r, g, b, a], wgsl: 'fn apply(c: vec4f, p: Params) -> vec4f { return c; }' });
+    const a = await readImage(ctx, pipe.run([{ filter: gain }]));
+    const b = await readImage(ctx, pipe.run([{ filter: twin }]));
+    expect(Array.from(b.data)).not.toEqual(Array.from(a.data));
+  });
 });
 

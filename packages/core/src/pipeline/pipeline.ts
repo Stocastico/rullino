@@ -1,6 +1,7 @@
 import type { PointwiseFilter } from '../filter';
 import type { GpuContext } from '../gpu/context';
 import { runMultipass } from '../gpu/multipass';
+import { objectKey } from '../gpu/readback';
 import { activeSteps, effectiveParams, type ChainOptions, type Step } from './chain';
 import { runFused } from './fuse';
 
@@ -103,7 +104,7 @@ export class Pipeline {
     let key = `src${this.#sourceVersion}`;
     return groups.map((g) => {
       const params = g.map((s) => effectiveParams(s, this.#scale));
-      key = `${key}|${g.map((s, i) => `${s.filter.id}${JSON.stringify(params[i])}`).join('+')}`;
+      key = `${key}|${g.map((s, i) => `${s.filter.id}#${objectKey(s.filter)}${JSON.stringify(params[i])}`).join('+')}`;
       return { steps: g, params, key };
     });
   }

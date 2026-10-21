@@ -3,7 +3,7 @@
 // through every apply() in order, with each filter's own alpha convention.
 
 import type { PointwiseFilter } from '../filter';
-import { cachedPipeline } from '../gpu/readback';
+import { cachedPipeline, objectKey } from '../gpu/readback';
 import type { GpuContext } from '../gpu/context';
 import { createWorkingTexture, WORKING_FORMAT } from '../gpu/texture';
 import { packParams, paramsStructWgsl, resolveParams } from '../params';
@@ -90,7 +90,7 @@ export function runFused(
   const { device } = ctx;
   let compiled = false;
   // The shader depends only on which filters, in which order: slider moves reuse it.
-  const key = `rullino.fused:${filters.map((f) => f.id).join(',')}`;
+  const key = `rullino.fused:${filters.map((f) => `${f.id}#${objectKey(f)}`).join(',')}`;
   const pipeline = cachedPipeline(ctx, key, () => {
     compiled = true;
     return fusedShader(filters);
