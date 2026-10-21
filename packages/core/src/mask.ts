@@ -135,15 +135,25 @@ export function maskValue(m: Mask, x: number, y: number, w: number, h: number): 
   return value * (m.opacity ?? 1);
 }
 
+/** The mask evaluated at every pixel of a w x h image, row-major. */
+export function maskImage(m: Mask, w: number, h: number): Float32Array {
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * w + x] = maskValue(m, x, y, w, h);
+  return out;
+}
+
 /** CPU reference of a masked step: mix(input, filtered, m) on premultiplied values, alpha included. */
 export function blendMasked(input: LinearImage, filtered: LinearImage, m: Mask): LinearImage {
-  const { width: w, height: h } = input;
-  const out = createImage(w, h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const k = maskValue(m, x, y, w, h);
-      for (let c = 0, i = (y * w + x) * 4; c < 4; c++, i++) out.data[i] = input.data[i]! + (filtered.data[i]! - input.data[i]!) * k;
-    }
-  }
+  const out = createImage(input.width, input.height);
+  const k = maskImage(m, input.width, input.height);
+  for (let i = 0; i < out.data.length; i++) out.data[i] = input.data[i]! + (filtered.data[i]! - input.data[i]!) * k[i >> 2]!;
+  return out;
+}
+
+/** The raster at another size (bilinear, like mask sampling); the same object if the size matches. */
+export function resampleRaster(r: RasterMaskData, width: number, height: number): RasterMaskData {
+  if (r.width === width && r.height === height) return r;
+  const out = createRasterMask(width, height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) out.data[y * width + x] = rasterAt(r, (x + 0.5) / width, (y + 0.5) / height);
   return out;
 }

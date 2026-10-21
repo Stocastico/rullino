@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRasterMask, maskValue, validateMask, type Mask } from './mask';
+import { createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type Mask } from './mask';
 
 const W = 40;
 const H = 20;
@@ -76,5 +76,25 @@ describe('common mask options', () => {
     expect(() => validateMask({ kind: 'linear', from: [0, 0], to: [1, 0], opacity: 1.5 })).toThrow(/opacity/);
     expect(() => createRasterMask(2, 2, new Float32Array(3))).toThrow(/4/);
     expect(() => validateMask({ kind: 'blob' } as never)).toThrow(/kind/);
+  });
+});
+
+describe('resampleRaster', () => {
+  it('resamples to a new size with the mask sampler, so the mask means the same', () => {
+    const r = createRasterMask(4, 2, new Float32Array([0, 0.25, 0.5, 1, 1, 1, 0, 0]));
+    const big = resampleRaster(r, 8, 3);
+    expect([big.width, big.height]).toEqual([8, 3]);
+    for (let y = 0; y < 3; y++)
+      for (let x = 0; x < 8; x++) expect(big.data[y * 8 + x]).toBeCloseTo(maskValue({ kind: 'raster', raster: r }, x, y, 8, 3), 6);
+    expect(resampleRaster(r, 4, 2)).toBe(r);
+  });
+});
+
+describe('maskImage', () => {
+  it('evaluates the mask at every pixel centre', () => {
+    const m: Mask = { kind: 'radial', center: [0.3, 0.6], radius: [0.4, 0.2], feather: 0.5, invert: true, opacity: 0.7 };
+    const img = maskImage(m, 9, 5);
+    expect(img).toHaveLength(45);
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 9; x++) expect(img[y * 9 + x]).toBeCloseTo(maskValue(m, x, y, 9, 5), 6);
   });
 });

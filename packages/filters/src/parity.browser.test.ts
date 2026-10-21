@@ -5,6 +5,8 @@ import {
   defaultParams,
   fromFloat16Array,
   lutFromFunction,
+  maskImage,
+  type Mask,
   readImage,
   runFilter,
   toFloat16Array,
@@ -79,6 +81,9 @@ function structuredImage(w: number, h: number) {
   return createImage(w, h, fromFloat16Array(toFloat16Array(data)));
 }
 
+// Mask-aware filters (inpainting) get a feathered hole, off-centre, on both sides.
+const parityMask: Mask = { kind: 'radial', center: [0.45, 0.55], radius: [0.2, 0.15], feather: 0.4 };
+
 // Non-multiple-of-8 sizes exercise the workgroup bounds check.
 const images = { noise: testImage(67, 45), rings: structuredImage(71, 53) };
 
@@ -86,8 +91,9 @@ describe.each(filters.map((f) => [f.id, f as Filter] as const))('%s GPU <-> CPU 
   const all = Object.entries(images).flatMap(([img, src]) => cases(f.params).map(([name, p]) => [`${img}: ${name}`, src, p] as const));
   it.each(all)('%s', async (_, src, params) => {
     const full = { ...defaultParams(f.params), ...params } as never;
-    const out = await readImage(ctx, runFilter(ctx, f, uploadImage(ctx, src), full));
-    const result = compareImages(out, f.cpu(src, full), f.tolerance);
+    const mask = f.kind === 'multipass' && f.usesMask ? parityMask : undefined;
+    const out = await readImage(ctx, runFilter(ctx, f, uploadImage(ctx, src), full, mask));
+    const result = compareImages(out, mask ? f.cpu(src, full, maskImage(mask, src.width, src.height)) : f.cpu(src, full), f.tolerance);
     expect(result.pass, `${result.outliers} channels out of tolerance, worst ${JSON.stringify(result.worst)}`).toBe(true);
   });
 });

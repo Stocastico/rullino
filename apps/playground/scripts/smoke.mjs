@@ -108,6 +108,52 @@ try {
   check(mid > 10 && edge < 1, `brush stroke: middle row differs by ${mid.toFixed(1)}, top row by ${edge.toFixed(1)}`);
   await after(() => page.click('#chain button[data-action=mask-clear]'));
   check((await differs()) < 0.01, 'clearing the brush mask should restore the image');
+
+  // Magic wand on the colour chart: a click inside one patch selects that patch only;
+  // refining the edges keeps it; Alt+click on the same patch removes it again.
+  await after(() => page.selectOption('#sample', 'chart'));
+  await page.click('#chain button[data-action=tool-wand]');
+  const clickAt = async (fx, fy, alt = false) => {
+    const box = await page.locator('#after').boundingBox();
+    // mouse.click has no modifiers option: hold the key explicitly.
+    if (alt) await page.keyboard.down('Alt');
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    if (alt) await page.keyboard.up('Alt');
+  };
+  await after(() => clickAt(0.09, 0.12));
+  const patch = await differs();
+  check(patch > 0.01 && patch < 0.1, `wand on one chart patch changed ${(patch * 100).toFixed(1)}% of the image`);
+  await after(() => clickAt(0.09, 0.12, true));
+  check((await differs()) < 0.01, 'Alt+click with the wand should remove the selection');
+  // Refining a selection that already follows the patch edges keeps it about the same
+  // (the guided filter leaves a faint halo in the flat gap around it).
+  await after(() => clickAt(0.09, 0.12));
+  await after(() => page.click('#chain button[data-action=mask-refine]'));
+  const refined = await differs();
+  check(Math.abs(refined - patch) < 0.03, `refining a patch-aligned selection changed it from ${(patch * 100).toFixed(1)}% to ${(refined * 100).toFixed(1)}%`);
+  await after(() => page.click('#chain button[data-action=mask-clear]'));
+  await page.click('#chain button[data-action=tool-paint]');
+
+  // Inpainting: the new step comes with an empty brush mask (no "No mask" option); painting over
+  // a chart patch replaces it with its surroundings while far patches stay as they were.
+  await after(() => page.selectOption('#chain select[data-action=add]', 'inpaint'));
+  check(!(await page.$$eval('#chain select[data-action=mask-kind] option', (o) => o.map((x) => x.value))).includes('none'), 'inpaint should not offer "No mask"');
+  const afterPx = (fx, fy) => page.$eval('#after', (c, [fx, fy]) => [...c.getContext('2d').getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data], [fx, fy]);
+  const [centreBefore, farBefore] = [await afterPx(0.09, 0.12), await afterPx(0.75, 0.85)];
+  await page.$eval('#chain [data-action=brush-size]', (el) => { el.value = '0.5'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  await after(async () => {
+    const box = await page.locator('#after').boundingBox();
+    await page.mouse.move(box.x + box.width * 0.06, box.y + box.height * 0.12);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.12, box.y + box.height * 0.12, { steps: 4 });
+    await page.mouse.up();
+  });
+  const [centreAfter, farAfter] = [await afterPx(0.09, 0.12), await afterPx(0.75, 0.85)];
+  const dist = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])));
+  check(dist(centreBefore, centreAfter) > 20, `inpainting did not change the painted patch: ${centreBefore} -> ${centreAfter}`);
+  check(dist(farBefore, farAfter) <= 2, `inpainting changed a far patch: ${farBefore} -> ${farAfter}`);
+  await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+  await after(() => page.selectOption('#sample', 'ramps'));
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
 
   // Disabling the step brings the original back.

@@ -10,12 +10,13 @@ describe('filter registry', () => {
 
   it('contains the expected filters', () => {
     expect(filters.map((f) => f.id).sort()).toEqual(
-      ['adaptiveThreshold', 'applyLut', 'blackPoint', 'boxBlur', 'brightness', 'canny', 'contrast', 'convolve', 'curves', 'exposure', 'gamma', 'gaussianBlur', 'grain', 'grayscale', 'invert', 'levels', 'otsu', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'threshold', 'transparency', 'unsharpMask', 'vibrance', 'vignette', 'whiteBalance'].sort(),
+      ['adaptiveThreshold', 'applyLut', 'blackPoint', 'boxBlur', 'brightness', 'canny', 'contrast', 'convolve', 'curves', 'exposure', 'gamma', 'gaussianBlur', 'grain', 'grayscale', 'inpaint', 'invert', 'levels', 'otsu', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'threshold', 'transparency', 'unsharpMask', 'vibrance', 'vignette', 'whiteBalance'].sort(),
     );
   });
 
   it.each(filters.map((f) => [f.id, f] as const))('%s: defaults are valid and every param has a label', (_, f) => {
-    expect(() => f.cpu({ width: 1, height: 1, data: new Float32Array([0.2, 0.3, 0.4, 1]) }, defaultParams(f.params))).not.toThrow();
+    const mask = f.kind === 'multipass' && f.usesMask ? new Float32Array([1]) : undefined;
+    expect(() => f.cpu({ width: 1, height: 1, data: new Float32Array([0.2, 0.3, 0.4, 1]) }, defaultParams(f.params), mask)).not.toThrow();
     for (const p of Object.values(f.params as ParamSchema)) expect(p.label, `${f.id} param label`).toBeTruthy();
   });
 });

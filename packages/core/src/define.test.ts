@@ -124,5 +124,21 @@ describe('defineFilter', () => {
       defineFilter({ ...halve(), id: 'lutPw', params: { look: { type: 'lut', default: identityLut(2), label: 'Look' } } } as never),
     ).toThrow(/lut/);
   });
-});
 
+  it('lets passes read the mask only in mask-aware filters, whose CPU reference then needs one', () => {
+    const def = {
+      id: 'maskAware',
+      label: 'Mask aware',
+      category: 'classic',
+      kind: 'multipass',
+      params: {},
+      passes: [{ name: 'out', inputs: ['input', 'mask'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy) * load_mask(xy).r; }' }],
+      cpu: (src: ReturnType<typeof createImage>) => src,
+      tolerance: { abs: 0, rel: 0 },
+    } as const;
+    expect(() => defineFilter(def)).toThrow(/unknown input "mask"/);
+    const f = defineFilter({ ...def, usesMask: true });
+    expect(() => f.cpu(createImage(1, 1))).toThrow(/needs a mask/);
+    expect(() => f.cpu(createImage(1, 1), {}, new Float32Array(1))).not.toThrow();
+  });
+});

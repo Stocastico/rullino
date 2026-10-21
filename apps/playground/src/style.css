@@ -101,3 +101,4 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 .brush-cursor { fill: none; stroke: rgb(255 255 255 / 0.9); stroke-width: calc(1.5px * var(--px, 1)); filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9)); pointer-events: none; }
 .brush-mode { display: flex; gap: 6px; }
 .brush-mode button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+#overlay.painting.wand { cursor: crosshair; }

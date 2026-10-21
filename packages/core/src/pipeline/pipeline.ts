@@ -1,6 +1,6 @@
 import type { PointwiseFilter } from '../filter';
 import type { GpuContext } from '../gpu/context';
-import { blendMask } from '../gpu/mask';
+import { blendMask, renderMask } from '../gpu/mask';
 import { runMultipass } from '../gpu/multipass';
 import { validateMask } from '../mask';
 import { releaseTexture } from '../gpu/pool';
@@ -76,7 +76,15 @@ export class Pipeline {
       const head = stage.steps[0]!.filter;
       let output: GPUTexture;
       if (head.kind === 'multipass') {
-        const r = runMultipass(this.#ctx, head, input, stage.params[0]!);
+        let maskTex: GPUTexture | undefined;
+        if (head.usesMask) {
+          const { mask } = stage.steps[0]!;
+          if (!mask) throw new Error(`filter "${head.id}" needs a mask`);
+          maskTex = renderMask(this.#ctx, mask, input.width, input.height);
+          this.stats.passes++;
+        }
+        const r = runMultipass(this.#ctx, head, input, stage.params[0]!, maskTex);
+        if (maskTex) releaseTexture(this.#ctx, maskTex);
         this.stats.passes += r.passes;
         this.stats.compiles += r.compiled;
         output = r.output;
