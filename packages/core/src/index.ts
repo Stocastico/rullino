@@ -34,6 +34,7 @@ export { blendMask } from './gpu/mask';
 export { blendMasked, createRasterMask, maskValue, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
 export { paintStroke, type BrushOptions } from './paint';
 export { magicWand, type WandOptions } from './wand';
+export { refineMask, type RefineOptions } from './refine';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {
   defaultParams,
