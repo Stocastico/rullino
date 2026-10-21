@@ -4,7 +4,7 @@ import { fromFloat16Array, toFloat16Array } from '../half';
 import { createImage } from '../image';
 import { blendMasked, createRasterMask, type Mask } from '../mask';
 import { createGpuContext } from './context';
-import { blendMask } from './mask';
+import { blendMask, rasterTextureCount } from './mask';
 import { readImage, uploadImage } from './texture';
 
 const ctx = await createGpuContext();
@@ -34,6 +34,16 @@ it.each<[string, Mask]>([
   ['raster, upsampled', { kind: 'raster', raster }],
   ['raster at the image size', { kind: 'raster', raster: createRasterMask(w, h, Float32Array.from({ length: w * h }, (_, i) => (i * 37 % 101) / 100)) }],
 ])('GPU mask blend matches the CPU: %s', async (_, mask) => {
+  const out = await readImage(ctx, blendMask(ctx, uploadImage(ctx, input), uploadImage(ctx, filtered), mask));
+  const res = compareImages(out, blendMasked(input, filtered, mask), { abs: 2e-4, rel: 2 ** -10 });
+  expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+});
+
+it('keeps only a few raster textures alive and re-uploads an evicted one', async () => {
+  const rasters = Array.from({ length: 12 }, (_, k) => createRasterMask(7, 5, Float32Array.from({ length: 35 }, (_, i) => ((i + k) % 7) / 6)));
+  for (const raster of rasters) blendMask(ctx, uploadImage(ctx, input), uploadImage(ctx, filtered), { kind: 'raster', raster }).destroy();
+  expect(rasterTextureCount(ctx)).toBeLessThanOrEqual(4);
+  const mask: Mask = { kind: 'raster', raster: rasters[0]! };
   const out = await readImage(ctx, blendMask(ctx, uploadImage(ctx, input), uploadImage(ctx, filtered), mask));
   const res = compareImages(out, blendMasked(input, filtered, mask), { abs: 2e-4, rel: 2 ** -10 });
   expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();

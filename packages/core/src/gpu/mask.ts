@@ -59,20 +59,37 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, id.xy, c + (textureLoad(flt, id.xy, 0) - c) * m);
 }`;
 
-const rasters = new WeakMap<GPUDevice, WeakMap<RasterMaskData, GPUTexture>>();
+/**
+ * Raster textures, most recently used last. Painting creates a new raster per pointer move, so
+ * waiting for garbage collection would pile up GPU memory; the least recently used textures are
+ * destroyed instead (the data stays in the raster object, so it can be uploaded again).
+ */
+const MAX_RASTER_TEXTURES = 4;
+const rasters = new WeakMap<GPUDevice, Map<RasterMaskData, GPUTexture>>();
 
 /** The raster as an r32float texture, uploaded once per object and device (rasters are immutable). */
 function rasterTexture(ctx: GpuContext, r: RasterMaskData): GPUTexture {
-  let perDevice = rasters.get(ctx.device);
-  if (!perDevice) rasters.set(ctx.device, (perDevice = new WeakMap()));
-  let tex = perDevice.get(r);
-  if (!tex) {
+  let lru = rasters.get(ctx.device);
+  if (!lru) rasters.set(ctx.device, (lru = new Map()));
+  let tex = lru.get(r);
+  if (tex) {
+    lru.delete(r);
+  } else {
     tex = ctx.device.createTexture({ label: 'rullino.mask', size: [r.width, r.height], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
     ctx.device.queue.writeTexture({ texture: tex }, r.data as Float32Array<ArrayBuffer>, { bytesPerRow: r.width * 4 }, [r.width, r.height]);
-    perDevice.set(r, tex);
+    // Destroying a texture that submitted work still reads is fine: the work completes first.
+    for (const [old, t] of lru) {
+      if (lru.size < MAX_RASTER_TEXTURES) break;
+      t.destroy();
+      lru.delete(old);
+    }
   }
+  lru.set(r, tex);
   return tex;
 }
+
+/** Raster mask textures currently alive on this device (for tests). */
+export const rasterTextureCount = (ctx: GpuContext) => rasters.get(ctx.device)?.size ?? 0;
 
 /** mix(input, filtered, mask) on the GPU (premultiplied, alpha included) into a new working texture. */
 export function blendMask(ctx: GpuContext, input: GPUTexture, filtered: GPUTexture, mask: Mask): GPUTexture {
