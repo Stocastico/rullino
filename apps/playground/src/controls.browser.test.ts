@@ -83,5 +83,26 @@ describe('renderControls', () => {
     root.querySelector<HTMLButtonElement>('button[data-action=reset]')!.click();
     expect(cells[0]!.value).toBe('0');
   });
+
+  it('groups several curve params into one editor with tabs', () => {
+    const id = [[0, 0], [1, 1]] as const;
+    const c = {
+      rgb: { type: 'curve', default: id, label: 'RGB' },
+      red: { type: 'curve', default: [[0, 0.5], [1, 1]], label: 'Red' },
+      k: { type: 'float', min: 0, max: 1, step: 0.1, default: 0, label: 'K' },
+    } as const;
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderControls(root, c, defaultParams(c), () => {});
+    expect(root.querySelectorAll('svg.curve-editor')).toHaveLength(1);
+    const tabs = root.querySelectorAll<HTMLButtonElement>('button[data-curve-tab]');
+    expect([...tabs].map((t) => t.textContent)).toEqual(['RGB', 'Red']);
+    expect(tabs[0]!.getAttribute('aria-pressed')).toBe('true');
+    tabs[1]!.click();
+    expect(tabs[1]!.getAttribute('aria-pressed')).toBe('true');
+    // The editor now shows the red curve: first point at y = 0.5.
+    expect(root.querySelector('circle[data-point]')!.getAttribute('cy')).toBe('0.5');
+    expect(root.querySelectorAll('input[name=k]')).toHaveLength(1);
+  });
 });
 

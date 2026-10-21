@@ -1,4 +1,5 @@
 import { defaultParams, resolveParams, type Param, type ParamSchema, type ParamValues } from '@rullino/core';
+import { renderCurveEditor } from './curve-editor';
 
 // Builds the parameter UI for a filter straight from its schema: a new filter gets
 // sliders, checkboxes and menus without any playground code.
@@ -35,6 +36,8 @@ export function renderControls<S extends ParamSchema>(
 
   let values: Record<string, unknown> = { ...initial };
   const widgets = new Map<string, { write(v: unknown): void }>();
+  // Several curve params (e.g. RGB / red / green / blue) share one editor with tabs.
+  const curveKeys = entries.filter(([, p]) => p.type === 'curve').map(([k]) => k);
 
   const emit = () => {
     const resolved = resolveParams(schema, values as Partial<ParamValues<S>>);
@@ -107,6 +110,31 @@ export function renderControls<S extends ParamSchema>(
         grid.append(...cells);
         widgets.set(key, { write: (v) => (v as number[]).forEach((x, i) => (cells[i]!.value = String(x))) });
         row.append(el('span', { className: 'label' }, label), grid);
+        break;
+      }
+      case 'curve': {
+        if (key !== curveKeys[0]) continue; // rendered with the first curve param's group
+        let active = key;
+        const host = el('div', { className: 'curve-host' });
+        const editor = renderCurveEditor(host, values[key] as [number, number][], label, (points) => {
+          values[active] = points;
+          emit();
+        });
+        const tabs = el('div', { className: 'curve-tabs' });
+        const buttons = curveKeys.map((k) => {
+          const b = el('button', { type: 'button', textContent: schema[k]!.label ?? k });
+          b.dataset.curveTab = k;
+          b.addEventListener('click', () => {
+            active = k;
+            for (const other of buttons) other.setAttribute('aria-pressed', String(other === b));
+            editor.set(values[k] as [number, number][]);
+          });
+          return b;
+        });
+        buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === 0)));
+        tabs.append(...buttons);
+        for (const k of curveKeys) widgets.set(k, { write: () => k === active && editor.set(values[k] as [number, number][]) });
+        row.append(curveKeys.length > 1 ? tabs : el('span', { className: 'label' }, label), host);
         break;
       }
       case 'enum': {
