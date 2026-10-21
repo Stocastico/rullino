@@ -1,5 +1,6 @@
-import { defaultParams, type Filter } from '@rullino/core';
+import { defaultParams, type Filter, type Mask } from '@rullino/core';
 import { renderControls } from './controls';
+import { renderMaskControls } from './mask-ui';
 
 // The filter chain editor: a list of steps (enable, reorder, remove), an "add filter" menu, and
 // the generated controls of the selected step. Structural edits rebuild the list; param edits
@@ -10,6 +11,7 @@ export interface StepState {
   readonly filterId: string;
   readonly params: Readonly<Record<string, unknown>>;
   readonly enabled: boolean;
+  readonly mask?: Mask;
 }
 
 export interface ChainState {
@@ -117,7 +119,13 @@ export function renderChain(
         renderControls(controls, filter.params, step.params as never, (params) =>
           commit({ ...state, steps: update(step.uid, { params }) }, false),
         );
-        body.append(controls);
+        const maskControls = document.createElement('div');
+        maskControls.className = 'mask-controls';
+        renderMaskControls(maskControls, step.mask, (mask) => {
+          const { mask: _, ...rest } = state.steps.find((s) => s.uid === step.uid)!;
+          commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? (mask ? { ...rest, mask } : rest) : s)) }, false);
+        });
+        body.append(controls, maskControls);
         item.append(body);
       }
       list.append(item);

@@ -56,6 +56,22 @@ try {
   const changed = await differs();
   check(changed > 0.3, `exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
 
+  // A linear-gradient mask (top to bottom by default) restricts the step to the bottom of the image.
+  const rowDiff = () =>
+    page.evaluate(() => {
+      const px = (id) => { const c = document.getElementById(id); return [c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height]; };
+      const [[a, w, h], [b]] = [px('before'), px('after')];
+      const row = (y) => { let n = 0; for (let x = 0; x < w; x++) for (let c = 0; c < 3; c++) n += Math.abs(a[(y * w + x) * 4 + c] - b[(y * w + x) * 4 + c]); return n / (w * 3); };
+      return [row(2), row(h - 3)];
+    });
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'linear'));
+  const [top, bottom] = await rowDiff();
+  check(top < 1 && bottom > 10, `linear mask: top row differs by ${top.toFixed(1)}, bottom by ${bottom.toFixed(1)}`);
+  await after(() => page.$eval('#chain input[data-action=mask-invert]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const [itop, ibottom] = await rowDiff();
+  check(itop > 10 && ibottom < 1, `inverted mask: top row differs by ${itop.toFixed(1)}, bottom by ${ibottom.toFixed(1)}`);
+  await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
+
   // Disabling the step brings the original back.
   await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
   check((await differs()) < 0.01, 'disabled step should leave the image unchanged');

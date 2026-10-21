@@ -54,7 +54,7 @@ let chain: ChainState = (() => {
 })();
 
 const toSteps = (s: ChainState): Step[] =>
-  s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled }));
+  s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled, ...(st.mask ? { mask: st.mask } : {}) }));
 
 /** Size of the after canvas for the current image; applied when a frame is ready, not on load. */
 let displaySize: [number, number] = [0, 0];

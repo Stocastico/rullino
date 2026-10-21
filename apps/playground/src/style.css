@@ -86,3 +86,8 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 .curve-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .curve-point { fill: var(--bg); stroke: var(--text); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; }
 .curve-point:focus { outline: none; stroke: var(--accent); }
+
+.mask-controls { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.mask-kind { display: flex; gap: 8px; align-items: center; }
+.mask-slider { display: grid; grid-template-columns: 5em 1fr 3em; gap: 8px; align-items: center; }
+.mask-slider output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
