@@ -25,6 +25,7 @@ export { encodeToTexture, importImage, readSrgb8, type EncodeOptions } from './g
 export { createWorkingTexture, readImage, uploadImage, WORKING_FORMAT } from './gpu/texture';
 export { float16ToFloat32, float32ToFloat16, fromFloat16Array, toFloat16Array } from './half';
 export { createImage, type LinearImage } from './image';
+export { applyLutCpu, createLut, identityLut, lutFromFunction, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {
   defaultParams,
