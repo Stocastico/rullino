@@ -13,6 +13,7 @@ import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
 import { grain } from './grain';
 import { grayscale } from './grayscale';
+import { inpaint } from './inpaint';
 import { invert } from './invert';
 import { levels } from './levels';
 import { otsu } from './otsu';
@@ -42,6 +43,7 @@ export {
   gaussianBlur,
   grain,
   grayscale,
+  inpaint,
   invert,
   levels,
   otsu,
@@ -86,4 +88,5 @@ export const filters: readonly Filter<any>[] = [
   unsharpMask,
   convolve,
   canny,
+  inpaint,
 ];
