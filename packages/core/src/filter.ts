@@ -42,18 +42,38 @@ export interface PointwiseFilter<S extends ParamSchema = ParamSchema> extends Po
  * returning the output pixel at `xy`. In scope: `load_<input>(xy: vec2i) -> vec4f` for each name in
  * `inputs` (clamped to the edge), `size() -> vec2i`, the generated `Params` and the rl_* library.
  */
-export interface PassDef {
+export interface TexturePassDef {
+  readonly kind?: 'texture';
   /** WGSL identifier; later passes read this pass's output as `load_<name>`. */
   readonly name: string;
-  /** 'input' (the filter's input) and/or names of earlier passes. */
+  /** 'input' (the filter's input) and/or names of earlier texture passes. */
   readonly inputs: readonly string[];
   readonly wgsl: string;
+  /** Filter buffers this pass can access as `buf_<name>` (array<atomic<u32>, N>). */
+  readonly buffers?: readonly string[];
   /**
    * Name of an int param: run the pass that many times, ping-ponging. From the second iteration
    * on, `inputs[0]` reads the previous iteration's output. Zero iterations pass `inputs[0]` through.
    */
   readonly repeat?: string;
 }
+
+/**
+ * A pass with no texture output, for reductions: `wgsl` defines `fn run(xy: vec2i, p: Params)`
+ * and works through `buf_<name>` atomics. 'pixels' runs it once per pixel of the filter's input
+ * (`size()` is the input size), 'single' runs it once (xy = 0), e.g. to turn a histogram into a value.
+ * Compute passes cannot be read as texture inputs and cannot be the last pass.
+ */
+export interface ComputePassDef {
+  readonly kind: 'compute';
+  readonly name: string;
+  readonly inputs: readonly string[];
+  readonly buffers: readonly string[];
+  readonly dispatch: 'pixels' | 'single';
+  readonly wgsl: string;
+}
+
+export type PassDef = TexturePassDef | ComputePassDef;
 
 interface FilterBase<S extends ParamSchema> {
   readonly id: string;
@@ -70,6 +90,11 @@ interface FilterBase<S extends ParamSchema> {
  */
 export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends FilterBase<S> {
   readonly kind: 'multipass';
+  /**
+   * Storage buffers shared by the passes: name -> length in u32, zeroed on every run.
+   * Each is `array<atomic<u32>, N>` in WGSL; store floats with bitcast.
+   */
+  readonly buffers?: Readonly<Record<string, number>>;
   readonly passes: readonly PassDef[];
   /** Whole-image CPU reference: obvious, not fast. Must not mutate `src`. */
   readonly cpu: (src: LinearImage, p: ParamValues<S>) => LinearImage;

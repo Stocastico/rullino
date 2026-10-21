@@ -96,5 +96,26 @@ describe('defineFilter', () => {
     f.cpu(createImage(1, 1));
     expect(seen).toEqual([{ r: 2 }]);
   });
+
+  it('validates buffers and compute passes', () => {
+    const tex = { name: 'out', inputs: ['input'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }' };
+    const comp = { kind: 'compute', name: 'c', inputs: ['input'], buffers: ['b'], dispatch: 'pixels', wgsl: 'fn run(xy: vec2i, p: Params) { }' } as const;
+    const base = {
+      id: 'bf',
+      label: 'BF',
+      category: 'classic',
+      kind: 'multipass',
+      params: {},
+      buffers: { b: 4 },
+      passes: [comp, tex],
+      cpu: (src: ReturnType<typeof createImage>) => src,
+      tolerance: { abs: 0, rel: 0 },
+    } as const;
+    expect(() => defineFilter(base)).not.toThrow();
+    expect(() => defineFilter({ ...base, buffers: {} })).toThrow(/unknown buffer "b"/);
+    expect(() => defineFilter({ ...base, passes: [comp] })).toThrow(/last pass/);
+    expect(() => defineFilter({ ...base, passes: [comp, { ...tex, inputs: ['c'] }] })).toThrow(/compute pass "c"/);
+    expect(() => defineFilter({ ...base, buffers: { b: 0 } })).toThrow(/size/);
+  });
 });
 

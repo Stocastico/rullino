@@ -1,7 +1,19 @@
 export { decodeSrgb8, encodeSrgb8, linearToSrgb, srgbToLinear } from './color';
 export { compareImages, type Comparison, type Mismatch, type Tolerance } from './compare';
 export { defineFilter } from './define';
-export type { Filter, FilterCategory, FilterDef, MultipassFilter, MultipassFilterDef, PassDef, PointwiseFilter, PointwiseFilterDef, Rgba } from './filter';
+export type {
+  ComputePassDef,
+  Filter,
+  FilterCategory,
+  FilterDef,
+  MultipassFilter,
+  MultipassFilterDef,
+  PassDef,
+  PointwiseFilter,
+  PointwiseFilterDef,
+  Rgba,
+  TexturePassDef,
+} from './filter';
 export { createGpuContext, WebGpuUnavailableError, type GpuContext } from './gpu/context';
 export { passShader, runMultipass, type FilterRun } from './gpu/multipass';
 export { runPointwise } from './gpu/pointwise';
