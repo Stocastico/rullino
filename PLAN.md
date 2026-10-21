@@ -112,8 +112,8 @@ Tiers: **A** = MVP, **B** = second wave, **C** = once the rest is solid.
 ### 4.6 Interactive editing
 The user marks regions by hand; the library turns marks into masks and applies operations through them.
 - **B** **Mask layer**: a single-channel texture that a step can be applied through (`out = mix(in, filtered, mask)`), from linear/radial gradients, a brush (paint / erase, soft edge) or a lasso. Needs a second texture input to a step, so it is a change to the `Step` / `Pipeline` model, designed together with the gradient masks.
-- **B** **Cut-out**: mask to alpha (transparent background). Selection helpers without ML: magic wand (flood fill by colour distance, on GPU by iterative propagation like Canny's hysteresis) and edge refinement of a rough brush mask with the guided filter.
-- **B** **Object removal, small regions**: inpainting of a masked area by diffusion / Telea for blemishes and thin objects, PatchMatch (iterative, fits `repeat` passes) for textured areas.
+- **B** **Cut-out**: mask to alpha (transparent background). Selection helpers without ML: magic wand (flood fill by colour distance — on the CPU at mask resolution: linear there, while GPU propagation needs a pass per pixel of path length) and edge refinement of a rough brush mask with the guided filter. *Done.*
+- **B** **Object removal, small regions**: inpainting of a masked area (normalised convolution + diffusion) for blemishes and thin objects. *Done.* Next: multi-scale fill for wider areas, PatchMatch for textured ones.
 - **C** Large-object inpainting and one-click background removal need neural models (e.g. LaMa, a segmentation net via ONNX / WebNN). They would live in a separate optional package, so the core keeps zero runtime dependencies.
 
 ## 5. Testing strategy

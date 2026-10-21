@@ -29,7 +29,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
   - `png.ts` dependency-free PNG encoder (8/16-bit RGBA); `encode.ts` `encodeImage` (PNG / JPEG / WebP from a `LinearImage`); `gpu/export.ts` `exportImage` from a texture.
-  - `mask.ts` masks (linear, radial, raster), CPU `maskValue` / `blendMasked`; `gpu/mask.ts` the WGSL twin and `blendMask`; `paint.ts` `paintStroke` (brush on raster masks).
+  - `mask.ts` masks (linear, radial, raster), CPU `maskValue` / `maskImage` / `blendMasked` / `resampleRaster`; `gpu/mask.ts` the WGSL twin, `blendMask` and `renderMask`; `paint.ts` `paintStroke` (brush on raster masks); `wand.ts` `magicWand`; `refine.ts` `refineMask` (guided filter).
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
@@ -119,6 +119,10 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Raster masks immutable, keyed by identity, GPU textures in a 4-entry LRU per device (evicted ones destroyed) | Same contract as LUTs for caching; painting makes a new raster per pointer move, and a WeakMap left their textures alive until GC. |
 | Brush rasters at the image's aspect ratio, ≤ 1024 px | Round dabs; bilinear upsampling at export keeps soft edges soft. Fine detail beyond 1024 px is a future option. |
 | Cut-out = `transparency` filter + mask | No separate mechanism; any mask kind can cut out. |
+| Magic wand and edge refinement run on the CPU at mask resolution (≤ 1024 px) | A flood fill is linear on the CPU but needs as many GPU passes as the longest path through the region; the guided filter is linear with integral images. Both produce raster masks directly. The image comes from `maskSource` (original shrunk in linear light), cached per image. |
+| Wand subtract and eraser remove coverage: `max(0, m − v)` | Adding then subtracting the same soft selection must be a no-op; `min(m, 1 − v)` left soft borders half selected. Dab values are computed in f32 so they cancel exactly. |
+| Mask-aware filters (`usesMask`): passes read `mask`, the CPU reference gets it per pixel; the step still blends with its mask | Inpainting must know which pixels to rebuild; one generic mechanism instead of a special stage. Using one without a mask is an error; the playground gives such steps an empty brush mask. |
+| Inpainting = normalised convolution + Jacobi diffusion, single resolution | Fits the static multipass model and gives near-invisible results on thin strokes; wide areas need a reach ≥ half their width. Multi-scale / patch-based (PatchMatch) inpainting is a later step. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -157,4 +161,6 @@ Things that already bit us. Add new ones as they come up.
 - **`convertToBlob` silently falls back to PNG** for a type the browser cannot encode (e.g. WebP in some browsers); `encodeSamples` checks `blob.type` and throws.
 - **Replacing an SVG element while it is dragged drops its pointer capture**: the mask overlay updates attributes and rebuilds elements only when the mask kind changes.
 - **UI modules that keep their own copy of shared state go stale** once a second editor exists (panel vs on-image handles): read the current state through a getter.
+- **A mask outlives image changes** (normalised coordinates), so a raster can have another image's proportions: refit it (`fitRaster` / `resampleRaster`) before tools that need the image at the raster's size.
+- **Playwright's `mouse.click` has no `modifiers` option** (only `page.click` does): hold keys with `keyboard.down` / `up`.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.
