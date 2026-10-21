@@ -58,6 +58,8 @@ function defineMultipass<S extends ParamSchema>(def: MultipassFilterDef<S>, wher
 function definePointwise<S extends ParamSchema>(def: PointwiseFilterDef<S>, where: string): PointwiseFilter<S> {
   if (!/\bfn\s+apply\s*\(/.test(def.wgsl)) throw new Error(`${where}: wgsl must define fn apply(c: vec4f, p: Params) -> vec4f`);
   if (/\bstruct\s+Params\b/.test(def.wgsl)) throw new Error(`${where}: wgsl must not declare struct Params (it is generated)`);
+  for (const [key, p] of Object.entries(def.params))
+    if (p.type === 'lut') throw new Error(`${where}: param "${key}": lut params need a multipass filter (they bind a texture)`);
 
   const straight = def.alpha === 'straight';
   return {

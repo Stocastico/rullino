@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createLut, identityLut } from './lut';
 import { defaultParams, packParams, paramsStructWgsl, resolveParams, scaleParams, validateSchema, type ParamValues } from './params';
 
 const schema = {
@@ -124,6 +125,18 @@ describe('parameter schema', () => {
     expect(view.getFloat32(255 * 4, true)).toBeCloseTo(1, 6);
     expect(view.getFloat32(128 * 4, true)).toBeCloseTo(128 / 255, 6);
     expect(view.getFloat32(1024, true)).toBe(0.5);
+  });
+
+  it('validates lut params and packs only their domain', () => {
+    const l = { look: { type: 'lut', default: identityLut(2), label: 'Look' }, k: { type: 'float', min: 0, max: 1, step: 0.1, default: 0.5, label: 'K' } } as const;
+    expect(() => validateSchema(l)).not.toThrow();
+    expect(() => resolveParams(l, { look: { size: 3 } as never })).toThrow(/look/);
+    const custom = createLut(2, new Float32Array(24), { domainMin: [0, 0, 0], domainMax: [2, 2, 2] });
+    expect(resolveParams(l, { look: custom }).look).toBe(custom); // same object: GPU textures are cached by identity
+    expect(paramsStructWgsl('P', l)).toBe('struct P {\n  @align(16) look: array<vec4f, 2>,\n  k: f32,\n}');
+    const view = new DataView(packParams(l, resolveParams(l, { look: custom })));
+    expect([view.getFloat32(0, true), view.getFloat32(16, true), view.getFloat32(20, true)]).toEqual([0, 2, 2]);
+    expect(view.getFloat32(32, true)).toBe(0.5);
   });
 });
 

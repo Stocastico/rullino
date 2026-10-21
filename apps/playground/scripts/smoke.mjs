@@ -69,10 +69,21 @@ try {
   await after(() => page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup'))));
   check(!(await status()).includes('preview'), `expected a full frame after release, status: ${await status()}`);
 
+  // A .cube file loaded into a LUT step changes the image (an inverting LUT).
+  const afterPixels = () => page.$eval('#after', (c) => Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data));
+  await after(() => page.selectOption('#chain select[data-action=add]', 'applyLut'));
+  const beforeLut = await afterPixels();
+  const cube = ['LUT_3D_SIZE 2', ...[0, 1].flatMap((b) => [0, 1].flatMap((g) => [0, 1].map((r) => `${1 - r} ${1 - g} ${1 - b}`)))].join('\n');
+  await after(() => page.setInputFiles('#chain input[type=file][name=look]', { name: 'invert.cube', mimeType: 'text/plain', buffer: Buffer.from(cube) }));
+  const afterLut = await afterPixels();
+  const lutChanged = afterLut.filter((v, i) => i % 4 !== 3 && Math.abs(v - beforeLut[i]) > 2).length / (afterLut.length * 0.75);
+  check(lutChanged > 0.5, `an inverting .cube changed only ${(lutChanged * 100).toFixed(1)}% of channels`);
+  check(/invert · 2³/.test(await page.textContent('#chain .lut-info')), 'LUT step should show the loaded file');
+
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
-  check((await status()).includes(`${ids.length + 1} steps`), `expected ${ids.length + 1} steps, status: ${await status()}`);
+  check((await status()).includes(`${ids.length + 2} steps`), `expected ${ids.length + 2} steps, status: ${await status()}`);
 
   for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {
     await after(() => page.selectOption('#sample', s));
@@ -83,8 +94,8 @@ try {
   await page.waitForTimeout(500);
   await page.selectOption('#sample', 'chart');
   await page.selectOption('#chain select[data-action=add]', 'canny');
-  // Initial exposure + every filter + the canny just added.
-  const expected = new RegExp(`Colour chart .* ${ids.length + 2} steps`);
+  // Initial exposure + the LUT step + every filter + the canny just added.
+  const expected = new RegExp(`Colour chart .* ${ids.length + 3} steps`);
   await page.waitForFunction((re) => new RegExp(re).test(document.getElementById('status').textContent), expected.source, { timeout: 20000 }).catch(() => {});
   check(expected.test(await status()), `renderer stuck after racing a load with a render, status: ${await status()}`);
   const opaque = await page.evaluate(() => {

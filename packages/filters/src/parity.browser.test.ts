@@ -4,6 +4,7 @@ import {
   createImage,
   defaultParams,
   fromFloat16Array,
+  lutFromFunction,
   readImage,
   runFilter,
   toFloat16Array,
@@ -45,6 +46,10 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
     if (p.type === 'curve') {
       // A strong S-curve: steep in the middle, flat near the ends, so LUT indexing errors show.
       out.push([`${k}=S`, { [k]: [[0, 0], [0.3, 0.08], [0.6, 0.85], [1, 1]] }]);
+    }
+    if (p.type === 'lut') {
+      // Non-separable and non-linear, on a grid that does not divide the test values evenly.
+      out.push([`${k}=look`, { [k]: lutFromFunction(17, (r, g, b) => [g * g, 0.2 + 0.6 * Math.sqrt(b), Math.abs(r - b)]) }]);
     }
     if (p.type === 'kernel') {
       // A non-symmetric kernel catches transposed or mirrored indexing.

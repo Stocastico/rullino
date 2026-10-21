@@ -1,5 +1,6 @@
 import type { Filter } from '@rullino/core';
 import { adaptiveThreshold } from './adaptiveThreshold';
+import { applyLut } from './applyLut';
 import { blackPoint } from './blackPoint';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
@@ -10,6 +11,7 @@ import { curves } from './curves';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
+import { grain } from './grain';
 import { grayscale } from './grayscale';
 import { invert } from './invert';
 import { levels } from './levels';
@@ -21,10 +23,12 @@ import { sharpen } from './sharpen';
 import { threshold } from './threshold';
 import { unsharpMask } from './unsharpMask';
 import { vibrance } from './vibrance';
+import { vignette } from './vignette';
 import { whiteBalance } from './whiteBalance';
 
 export {
   adaptiveThreshold,
+  applyLut,
   blackPoint,
   boxBlur,
   brightness,
@@ -35,6 +39,7 @@ export {
   exposure,
   gamma,
   gaussianBlur,
+  grain,
   grayscale,
   invert,
   levels,
@@ -46,6 +51,7 @@ export {
   threshold,
   unsharpMask,
   vibrance,
+  vignette,
   whiteBalance,
 };
 
@@ -68,6 +74,9 @@ export const filters: readonly Filter<any>[] = [
   otsu,
   adaptiveThreshold,
   posterize,
+  applyLut,
+  vignette,
+  grain,
   gaussianBlur,
   boxBlur,
   sharpen,

@@ -71,6 +71,9 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 .control-kernel { display: flex; flex-direction: column; gap: 6px; }
 .kernel { display: grid; gap: 3px; }
 .kernel input { width: 100%; min-width: 0; font: inherit; font-size: 12px; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; text-align: right; }
+.control-lut { display: flex; flex-direction: column; gap: 4px; }
+.lut-info { color: var(--muted); font-size: 0.9em; }
+.lut-info.error { color: #d33; }
 .control-curve { display: flex; flex-direction: column; gap: 6px; }
 .curve-host { width: 100%; max-width: 220px; aspect-ratio: 1; align-self: center; }
 .curve-tabs { display: flex; gap: 4px; }
