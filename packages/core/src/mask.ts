@@ -1,3 +1,5 @@
+import { createImage, type LinearImage } from './image';
+
 // Masks restrict a chain step to part of the image: out = mix(in, step(in), m). Coordinates are
 // normalised to the image ([0, 1] across width and height), so a mask means the same thing at
 // preview, display and export resolution. Distances (gradient direction, radii) are measured in
@@ -131,4 +133,17 @@ export function maskValue(m: Mask, x: number, y: number, w: number, h: number): 
   }
   if (m.invert) value = 1 - value;
   return value * (m.opacity ?? 1);
+}
+
+/** CPU reference of a masked step: mix(input, filtered, m) on premultiplied values, alpha included. */
+export function blendMasked(input: LinearImage, filtered: LinearImage, m: Mask): LinearImage {
+  const { width: w, height: h } = input;
+  const out = createImage(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const k = maskValue(m, x, y, w, h);
+      for (let c = 0, i = (y * w + x) * 4; c < 4; c++, i++) out.data[i] = input.data[i]! + (filtered.data[i]! - input.data[i]!) * k;
+    }
+  }
+  return out;
 }
