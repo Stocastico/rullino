@@ -1,6 +1,6 @@
 // End-to-end smoke test of the built playground: serves dist/ with `vite preview`, opens it in
 // headless Chromium (WebGPU on SwiftShader without a GPU) and fails on any page error, on
-// falling back to the CPU renderer, or if a filter leaves the image unchanged.
+// falling back to the CPU renderer, or if the chain does not change the pixels as expected.
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 
@@ -8,23 +8,30 @@ const server = await preview({ root: new URL('..', import.meta.url).pathname, pr
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
 const failures = [];
+const check = (ok, msg) => ok || failures.push(msg);
 
 try {
   const page = await browser.newPage();
   page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && failures.push(`console error: ${m.text()}`));
-  await page.goto(url);
-  await page.waitForFunction(() => /ms$/.test(document.getElementById('status').textContent), null, { timeout: 20000 });
 
-  const status = await page.textContent('#status');
-  if (!status.startsWith('WebGPU')) failures.push(`expected the WebGPU renderer, status was: ${status}`);
-
-  const setSlider = (name, value) =>
-    page.$eval(`[name=${name}]`, (el, v) => {
+  const frame = () => page.$eval('#status', (s) => Number(s.dataset.frame ?? 0));
+  /** Runs an action and waits until at least one new frame has finished after it. */
+  const after = async (action) => {
+    const n = await frame();
+    await action();
+    await page.waitForFunction((n) => Number(document.getElementById('status').dataset.frame ?? 0) > n, n, { timeout: 20000 });
+    // Changes made during that frame collapse into one more; let it finish too.
+    await page.waitForTimeout(50);
+    const m = await frame();
+    await page.waitForFunction((m) => Number(document.getElementById('status').dataset.frame ?? 0) >= m, m);
+  };
+  const status = () => page.textContent('#status');
+  const slider = (name, value) =>
+    page.$eval(`#chain [name=${name}]`, (el, v) => {
       el.value = String(v);
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }, value);
-  const settle = () => page.waitForFunction(() => /ms$/.test(document.getElementById('status').textContent) && !document.getElementById('status').textContent.startsWith('Render failed'));
   const differs = () =>
     page.evaluate(() => {
       const px = (id) => {
@@ -37,29 +44,40 @@ try {
       return n / a.length;
     });
 
-  // Every filter renders without errors.
-  const ids = await page.$$eval('#filter option', (o) => o.map((x) => x.value));
-  for (const id of ids) {
-    await page.selectOption('#filter', id);
-    await settle();
-  }
+  await page.goto(url);
+  await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+  check((await status()).startsWith('WebGPU'), `expected the WebGPU renderer, status was: ${await status()}`);
 
-  // A visible change actually reaches the canvas.
-  await page.selectOption('#filter', 'exposure');
-  await setSlider('ev', 0);
-  await page.waitForTimeout(300);
+  // Initial chain is a single exposure step at 0 EV: identity.
   const identity = await differs();
-  if (identity > 0.01) failures.push(`exposure 0 EV should match the original, ${(identity * 100).toFixed(1)}% differs`);
-  await setSlider('ev', 1.5);
-  await page.waitForTimeout(300);
+  check(identity < 0.01, `exposure 0 EV should match the original, ${(identity * 100).toFixed(1)}% differs`);
+  await after(() => slider('ev', 1.5));
   const changed = await differs();
-  if (changed < 0.3) failures.push(`exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
+  check(changed > 0.3, `exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
+
+  // Disabling the step brings the original back.
+  await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
+  check((await differs()) < 0.01, 'disabled step should leave the image unchanged');
+
+  // Dragging a slider renders the reduced preview, releasing renders full resolution.
+  await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = true; t.dispatchEvent(new Event('change')); }));
+  await after(async () => {
+    await page.$eval('#chain [name=ev]', (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    await slider('ev', -1);
+  });
+  check((await status()).includes('preview'), `expected a preview frame while dragging, status: ${await status()}`);
+  await after(() => page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup'))));
+  check(!(await status()).includes('preview'), `expected a full frame after release, status: ${await status()}`);
+
+  // Every filter in one chain renders without errors.
+  const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
+  for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
+  check((await status()).includes(`${ids.length + 1} steps`), `expected ${ids.length + 1} steps, status: ${await status()}`);
 
   for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {
-    await page.selectOption('#sample', s);
-    await settle();
+    await after(() => page.selectOption('#sample', s));
   }
-  console.log(`smoke: ${ids.length} filters, status "${await page.textContent('#status')}"`);
+  console.log(`smoke: ${ids.length} filters chained, status "${await status()}"`);
 } finally {
   await browser.close();
   await new Promise((r) => server.httpServer.close(r));

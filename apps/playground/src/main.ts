@@ -1,166 +1,196 @@
 import {
+  activeSteps,
   createGpuContext,
   decodeSrgb8,
-  defaultParams,
+  downscale,
   encodeSrgb8,
+  fitWithin,
   importImage,
+  Pipeline,
   readSrgb8,
-  runPointwise,
+  runChainCpu,
   type GpuContext,
   type LinearImage,
-  type PointwiseFilter,
+  type Step,
 } from '@rullino/core';
 import { filters } from '@rullino/filters';
-import { renderControls } from './controls';
+import { newStep, renderChain, type ChainState } from './chain-ui';
 import { samples } from './samples';
 
-/** Longest side images are scaled down to on load. Full-resolution processing comes with M2's preview/export split. */
-const MAX_SIDE = 2048;
+/** Display resolution: the after/before canvases. Full-resolution export comes in M3. */
+const DISPLAY_SIDE = 2048;
+/** Resolution used while a slider is being dragged. */
+const PREVIEW_SIDE = 768;
+/** The CPU fallback works at a smaller size to stay usable. */
+const CPU_SIDE = 1024;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ui = {
   status: $<HTMLParagraphElement>('status'),
   sample: $<HTMLSelectElement>('sample'),
   file: $<HTMLInputElement>('file'),
-  filter: $<HTMLSelectElement>('filter'),
-  description: $<HTMLParagraphElement>('filter-description'),
-  controls: $<HTMLDivElement>('controls'),
+  chain: $<HTMLDivElement>('chain'),
   compare: $<HTMLInputElement>('compare'),
   split: $<HTMLInputElement>('split'),
   stage: $<HTMLElement>('stage'),
   before: $<HTMLCanvasElement>('before'),
   after: $<HTMLCanvasElement>('after'),
 };
+const beforeCtx = ui.before.getContext('2d')!;
+const afterCtx = ui.after.getContext('2d')!;
 
-type AnyFilter = PointwiseFilter<any>;
+const byId = new Map(filters.map((f) => [f.id, f]));
+const exposure = byId.get('exposure')!;
+let chain: ChainState = (() => {
+  const first = newStep(exposure);
+  return { steps: [first], selected: first.uid };
+})();
 
-let filter: AnyFilter = filters[0]!;
-let params: Record<string, unknown> = defaultParams(filter.params);
+const toSteps = (s: ChainState): Step[] =>
+  s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled }));
+
+/** Draws straight-alpha sRGB bytes onto the after canvas, scaling up if they are a preview. */
+async function present(bytes: Uint8ClampedArray<ArrayBuffer>, w: number, h: number) {
+  const data = new ImageData(bytes, w, h);
+  afterCtx.clearRect(0, 0, ui.after.width, ui.after.height);
+  if (w === ui.after.width && h === ui.after.height) afterCtx.putImageData(data, 0, 0);
+  else afterCtx.drawImage(await createImageBitmap(data), 0, 0, ui.after.width, ui.after.height);
+}
 
 // ---------------------------------------------------------------------------------------------
 // Two back ends behind one interface: WebGPU, or the CPU reference implementations as fallback.
 
 interface Renderer {
   readonly name: string;
-  load(image: ImageBitmap): void;
-  render(): Promise<void>;
+  /** Loads an image and returns the display size. */
+  load(image: ImageBitmap): Promise<[number, number]>;
+  render(steps: Step[], preview: boolean): Promise<void>;
 }
 
 // Output goes through readback + putImageData on a 2D canvas rather than a WebGPU canvas:
 // configuring a WebGPU canvas loses the device in headless Chromium/SwiftShader (CI, cloud
-// sessions), so direct presentation could not be tested. Revisit with M2's reduced-size preview.
+// sessions), so direct presentation could not be tested.
 function gpuRenderer(gpu: GpuContext): Renderer {
-  const beforeCtx = ui.before.getContext('2d')!;
-  const afterCtx = ui.after.getContext('2d')!;
-  let source: GPUTexture | undefined;
+  const full = new Pipeline(gpu);
+  const small = new Pipeline(gpu);
+  let textures: GPUTexture[] = [];
   return {
     name: 'WebGPU',
-    load(image) {
-      source?.destroy();
-      source = importImage(gpu, image);
-      beforeCtx.clearRect(0, 0, image.width, image.height);
-      beforeCtx.drawImage(image, 0, 0);
+    async load(image) {
+      for (const t of textures) t.destroy();
+      // Beyond the device's texture limit the browser has to shrink it first (in sRGB, unavoidably).
+      const limit = gpu.device.limits.maxTextureDimension2D;
+      let fitted = image;
+      if (Math.max(image.width, image.height) > limit) {
+        const [w, h] = fitWithin(image.width, image.height, limit);
+        fitted = await createImageBitmap(image, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' });
+      }
+      const original = importImage(gpu, fitted);
+      if (fitted !== image) fitted.close();
+      // Shrinking happens on the GPU in linear light, unlike a canvas or createImageBitmap resize.
+      const [dw, dh] = fitWithin(original.width, original.height, DISPLAY_SIDE);
+      const display = dw < original.width ? downscale(gpu, original, dw, dh) : original;
+      const [pw, ph] = fitWithin(original.width, original.height, PREVIEW_SIDE);
+      const preview = pw < dw ? downscale(gpu, display, pw, ph) : display;
+      textures = [...new Set([original, display, preview])];
+      full.setSource(display);
+      small.setSource(preview);
+      ui.before.width = dw;
+      ui.before.height = dh;
+      beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), dw, dh), 0, 0);
+      return [dw, dh];
     },
-    async render() {
-      if (!source) return;
-      const out = runPointwise(gpu, filter, source, params as never);
-      const bytes = await readSrgb8(gpu, out);
-      out.destroy();
-      afterCtx.putImageData(new ImageData(bytes, out.width, out.height), 0, 0);
+    async render(steps, preview) {
+      const out = (preview ? small : full).run(steps);
+      await present(await readSrgb8(gpu, out), out.width, out.height);
     },
   };
 }
 
 function cpuRenderer(): Renderer {
-  const beforeCtx = ui.before.getContext('2d')!;
-  const afterCtx = ui.after.getContext('2d')!;
   let source: LinearImage | undefined;
-  const put = (ctx: CanvasRenderingContext2D, img: LinearImage) =>
-    ctx.putImageData(new ImageData(encodeSrgb8(img) as Uint8ClampedArray<ArrayBuffer>, img.width, img.height), 0, 0);
   return {
     name: 'CPU reference',
-    load(image) {
-      const tmp = new OffscreenCanvas(image.width, image.height).getContext('2d')!;
-      tmp.drawImage(image, 0, 0);
-      const data = tmp.getImageData(0, 0, image.width, image.height);
-      source = decodeSrgb8(data.data, data.width, data.height);
+    async load(image) {
+      // Canvas resize happens in sRGB; acceptable for the fallback path.
+      const [w, h] = fitWithin(image.width, image.height, CPU_SIDE);
+      const tmp = new OffscreenCanvas(w, h).getContext('2d')!;
+      tmp.drawImage(image, 0, 0, w, h);
+      const data = tmp.getImageData(0, 0, w, h);
+      source = decodeSrgb8(data.data, w, h);
+      ui.before.width = w;
+      ui.before.height = h;
       beforeCtx.putImageData(data, 0, 0);
+      return [w, h];
     },
-    async render() {
-      if (source) put(afterCtx, filter.cpu(source, params as never));
+    async render(steps) {
+      if (!source) return;
+      const out = runChainCpu(steps, source);
+      await present(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
     },
   };
 }
 
 // ---------------------------------------------------------------------------------------------
 // Rendering: at most one frame in flight; changes made meanwhile collapse into the next frame.
+// While a control is being dragged, frames use the reduced-resolution pipeline.
 
 let renderer: Renderer;
 let imageInfo = '';
+let loaded = false;
+let dragging = false;
 let busy = false;
 let dirty = false;
+let frames = 0;
 
 async function render() {
+  if (!loaded) return;
   if (busy) return void (dirty = true);
   busy = true;
   do {
     dirty = false;
+    const preview = dragging;
     const t0 = performance.now();
     try {
-      await renderer.render();
-      ui.status.textContent = `${renderer.name} · ${imageInfo} · ${filter.label} · ${(performance.now() - t0).toFixed(1)} ms`;
+      const steps = toSteps(chain);
+      await renderer.render(steps, preview);
+      const n = activeSteps(steps).length;
+      ui.status.textContent = `${renderer.name} · ${imageInfo} · ${n} step${n === 1 ? '' : 's'}${preview ? ' · preview' : ''} · ${(performance.now() - t0).toFixed(1)} ms`;
     } catch (e) {
       ui.status.textContent = `Render failed: ${(e as Error).message}`;
       console.error(e);
     }
   } while (dirty);
   busy = false;
+  ui.status.dataset.frame = String(++frames); // lets the e2e smoke test wait for a finished frame
 }
 
 async function loadImage(source: ImageBitmapSource, name: string) {
-  const probe = await createImageBitmap(source);
-  const scale = Math.min(1, MAX_SIDE / Math.max(probe.width, probe.height));
-  const image =
-    scale < 1
-      ? await createImageBitmap(source, {
-          resizeWidth: Math.round(probe.width * scale),
-          resizeHeight: Math.round(probe.height * scale),
-          resizeQuality: 'high',
-        })
-      : probe;
-  if (image !== probe) probe.close();
-
-  for (const c of [ui.before, ui.after]) {
-    c.width = image.width;
-    c.height = image.height;
-  }
-  imageInfo = `${name} ${image.width}×${image.height}${scale < 1 ? ' (scaled)' : ''}`;
-  renderer.load(image);
+  const image = await createImageBitmap(source);
+  const [w, h] = await renderer.load(image);
+  ui.after.width = w;
+  ui.after.height = h;
+  imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
   image.close();
-  void render();
+  loaded = true;
+  await render();
 }
 
 // ---------------------------------------------------------------------------------------------
 // UI wiring.
 
-function selectFilter(id: string) {
-  filter = filters.find((f) => f.id === id) ?? filters[0]!;
-  params = defaultParams(filter.params);
-  ui.description.textContent = filter.description ?? '';
-  renderControls(ui.controls, filter.params, params as never, (v) => {
-    params = v;
-    void render();
-  });
+renderChain(ui.chain, filters, chain, (next) => {
+  chain = next;
   void render();
-}
-
-const CATEGORY_LABELS: Record<string, string> = { adjust: 'Adjust', look: 'Look', classic: 'Classic', stylize: 'Stylize' };
-for (const [category, label] of Object.entries(CATEGORY_LABELS)) {
-  const group = Object.assign(document.createElement('optgroup'), { label });
-  for (const f of filters.filter((f) => f.category === category)) group.append(new Option(f.label, f.id));
-  if (group.children.length) ui.filter.append(group);
-}
-ui.filter.addEventListener('change', () => selectFilter(ui.filter.value));
+});
+ui.chain.addEventListener('pointerdown', (e) => {
+  if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
+});
+window.addEventListener('pointerup', () => {
+  if (!dragging) return;
+  dragging = false;
+  void render(); // full resolution on release
+});
 
 for (const s of samples) ui.sample.append(new Option(s.label, s.id));
 ui.sample.addEventListener('change', () => {
@@ -216,6 +246,5 @@ try {
   renderer = cpuRenderer();
   ui.status.textContent = `WebGPU unavailable (${(e as Error).message}); using the CPU reference.`;
 }
-selectFilter(filter.id);
 const first = samples[0]!;
 await loadImage(first.make(), first.label);

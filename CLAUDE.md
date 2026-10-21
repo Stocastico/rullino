@@ -22,9 +22,11 @@ npx vitest run path/to/file.test.ts   # single file
   - `params.ts` parameter schema (float/int/bool/enum): types, validation, defaults, uniform packing, generated WGSL `Params` struct.
   - `filter.ts` / `define.ts` filter contract and `defineFilter()`, which derives the whole-image CPU reference from `pixel()`.
   - `color.ts`, `oklab.ts` CPU colour maths; `wgsl.ts` the `rl_*` WGSL twins prepended to every shader.
-  - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), pointwise runner.
+  - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runPointwise`.
+  - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
+  - `resize.ts` CPU area downscale and `fitWithin`.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + `pixel()`) and `*.test.ts` (CPU semantics). `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema; `chain-ui.ts` is the chain editor; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
@@ -32,7 +34,8 @@ npx vitest run path/to/file.test.ts   # single file
 - **Every filter ships with both implementations, CPU semantics tests, and is registered** in `packages/filters/src/index.ts` (which gives it the parity test). The CPU version is the specification: obvious, unoptimised, never mutates its input.
 - **Every parameter has a `label`** (the registry test enforces it); the UI is generated from the schema.
 - **Working space is linear, premultiplied RGBA, `rgba16float` on GPU / `Float32Array` on CPU.** sRGB exists only at the I/O edges. Filters that need straight alpha (LUTs, curves, OKLab) must un-premultiply internally.
-- **Pointwise WGSL is a pure function** `fn apply(c: vec4f, p: Params) -> vec4f`; no bindings, no globals, no `Params` declaration (it is generated from the schema). This is what lets M2 fuse consecutive pointwise filters into one shader.
+- **Pointwise WGSL is a pure function** `fn apply(c: vec4f, p: Params) -> vec4f`; no bindings, no globals, no `Params` declaration (it is generated from the schema). This is what lets consecutive pointwise filters fuse into one shader.
+- **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
 - **Zero runtime dependencies** in `packages/*`.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
 - Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing.
@@ -62,8 +65,12 @@ npx vitest run path/to/file.test.ts   # single file
 | White balance = luminance-normalised RGB gains | Simple creative control; a proper chromatic adaptation (Bradford / CCT) can come with auto WB in tier B. |
 | Enum values are passed to WGSL as the option's index (u32) | Uniforms stay 4 bytes per param; WGSL `switch` on `0u, 1u, ...` in option declaration order. |
 | Playground output via `readSrgb8` + `putImageData` on a 2D canvas, not a WebGPU canvas | A WebGPU canvas loses the device in headless Chromium/SwiftShader, so direct presentation could not be tested in CI. Costs one readback per frame; revisit with M2's reduced preview. |
-| Playground scales images to <= 2048 px on load | Keeps CPU fallback and readback responsive until M2's preview/export split. The resize happens in `createImageBitmap` (sRGB space, so slightly wrong); fine for a preview. |
 | Sample images generated in code | No image assets to license. |
+| Fused shaders keyed on filter structure only; params live in a uniform block | Moving a slider re-uploads uniforms but never recompiles. |
+| `runPointwise` is the one-filter case of `runFused` | One codegen path; every per-filter parity test also exercises fusion. |
+| Pipeline caches each stage's output keyed on everything upstream | Changing a step recomputes from that stage on; with neighbourhood filters (next) the stages before a blur are reused. Fused GPU chains keep f32 between filters, so they are slightly *more* precise than the CPU reference applied in f16 steps would be; chain parity uses summed tolerances. |
+| Linear-light area downscale for display and preview | Box filtering premultiplied linear values is the correct way to shrink; `createImageBitmap` / canvas resizes work in sRGB. Only images beyond the device's texture limit get a browser resize first. |
+| Playground: display ≤ 2048 px, preview ≤ 768 px while dragging | Two Pipelines with their own caches; release re-renders at display size. Full-resolution export is M3. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -77,6 +84,7 @@ Things that already bit us. Add new ones as they come up.
 - **Parity tests must quantise the input to float16 first**, otherwise the tolerance has to absorb input rounding too and stops catching real bugs.
 - **Check that a parity test can fail**: break the shader slightly (e.g. scale by 1.002) and confirm it goes red before trusting it.
 - **Configuring a WebGPU canvas in headless Chromium (SwiftShader) loses the device** ("A valid external Instance reference no longer exists"), with or without `STORAGE_BINDING`, old or new headless. Anything a test must check goes through textures and readback.
+- **Integer downscale ratios hide weighting bugs** (every coverage weight is 1). Test resizes with fractional ratios.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
