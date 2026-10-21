@@ -1,0 +1,17 @@
+{
+  "name": "@rullino/presets",
+  "version": "0.0.0",
+  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rullino/core": "workspace:*",
+    "@rullino/filters": "workspace:*"
+  }
+}

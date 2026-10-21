@@ -54,6 +54,15 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/presets:
+    dependencies:
+      '@rullino/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rullino/filters':
+        specifier: workspace:*
+        version: link:../filters
+
 packages:
 
   '@blazediff/core@1.10.0':
