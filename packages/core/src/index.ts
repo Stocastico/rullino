@@ -4,6 +4,7 @@ export { defineFilter } from './define';
 export type { Filter, FilterCategory, PointwiseFilter, PointwiseFilterDef, Rgba } from './filter';
 export { createGpuContext, WebGpuUnavailableError, type GpuContext } from './gpu/context';
 export { pointwiseShader, runPointwise } from './gpu/pointwise';
+export { configureCanvas, encodeToTexture, importImage, readSrgb8, type EncodeOptions } from './gpu/io';
 export { createWorkingTexture, readImage, uploadImage, WORKING_FORMAT } from './gpu/texture';
 export { float16ToFloat32, float32ToFloat16, fromFloat16Array, toFloat16Array } from './half';
 export { createImage, type LinearImage } from './image';
