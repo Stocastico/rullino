@@ -1,9 +1,10 @@
 name: CI
 
+# Every push gets a run (branch pushes cover same-repo PRs); forks are covered by pull_request.
 on:
   push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -11,6 +12,8 @@ concurrency:
 
 jobs:
   test:
+    # Skip the duplicate pull_request run for branches in this repo.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
