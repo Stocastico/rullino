@@ -60,7 +60,11 @@ async function present(bytes: Uint8ClampedArray<ArrayBuffer>, w: number, h: numb
   if (ui.after.width !== displaySize[0] || ui.after.height !== displaySize[1]) [ui.after.width, ui.after.height] = displaySize;
   afterCtx.clearRect(0, 0, ui.after.width, ui.after.height);
   if (w === ui.after.width && h === ui.after.height) afterCtx.putImageData(data, 0, 0);
-  else afterCtx.drawImage(await createImageBitmap(data), 0, 0, ui.after.width, ui.after.height);
+  else {
+    const bitmap = await createImageBitmap(data);
+    afterCtx.drawImage(bitmap, 0, 0, ui.after.width, ui.after.height);
+    bitmap.close();
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -83,7 +87,6 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   return {
     name: 'WebGPU',
     async load(image) {
-      for (const t of textures) t.destroy();
       // Beyond the device's texture limit the browser has to shrink it first (in sRGB, unavoidably).
       const limit = gpu.device.limits.maxTextureDimension2D;
       let fitted = image;
@@ -98,10 +101,12 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       const display = dw < original.width ? downscale(gpu, original, dw, dh) : original;
       const [pw, ph] = fitWithin(original.width, original.height, PREVIEW_SIDE);
       const preview = pw < dw ? downscale(gpu, display, pw, ph) : display;
-      textures = [...new Set([original, display, preview])];
       // Pixel-unit params (blur radii...) are defined at the original resolution.
       full.setSource(display, { scale: dw / image.width });
       small.setSource(preview, { scale: pw / image.width });
+      // Only now are the previous textures unreferenced (destruction waits for queued GPU work).
+      for (const t of textures) t.destroy();
+      textures = [...new Set([original, display, preview])];
       ui.before.width = dw;
       ui.before.height = dh;
       beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), dw, dh), 0, 0);
@@ -174,14 +179,28 @@ async function render() {
   ui.status.dataset.frame = String(++frames); // lets the e2e smoke test wait for a finished frame
 }
 
-async function loadImage(source: ImageBitmapSource, name: string) {
-  const image = await createImageBitmap(source);
-  const [w, h] = await renderer.load(image);
-  displaySize = [w, h];
-  imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
-  image.close();
-  loaded = true;
-  await render();
+// Loads run one at a time (overlapping loads would destroy each other's textures), and a load
+// that has been superseded while it was queued is skipped.
+let loads: Promise<void> = Promise.resolve();
+let latestLoad = 0;
+
+function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
+  const id = ++latestLoad;
+  loads = loads.then(async () => {
+    if (id !== latestLoad) return;
+    try {
+      const image = await createImageBitmap(source);
+      const [w, h] = await renderer.load(image);
+      displaySize = [w, h];
+      imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
+      image.close();
+      loaded = true;
+    } catch (e) {
+      ui.status.textContent = `Could not load ${name}: ${(e as Error).message}`;
+      console.error(e);
+    }
+  });
+  return loads.then(render);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -239,7 +258,13 @@ ui.after.addEventListener('pointerdown', (e) => {
   move(e);
   ui.after.setPointerCapture(e.pointerId);
   ui.after.addEventListener('pointermove', move);
-  ui.after.addEventListener('pointerup', () => ui.after.removeEventListener('pointermove', move), { once: true });
+  const stop = () => {
+    ui.after.removeEventListener('pointermove', move);
+    ui.after.removeEventListener('pointerup', stop);
+    ui.after.removeEventListener('pointercancel', stop);
+  };
+  ui.after.addEventListener('pointerup', stop);
+  ui.after.addEventListener('pointercancel', stop);
 });
 // The before canvas sits on top; let pointer events fall through to the after canvas.
 ui.before.style.pointerEvents = 'none';
