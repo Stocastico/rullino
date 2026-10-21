@@ -100,15 +100,20 @@ export interface FilterRun {
   readonly compiled: number;
 }
 
-/** Runs a multipass filter. `params` are used as given after resolving (scale them beforehand if needed). */
-export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, input: GPUTexture, params: Record<string, unknown>): FilterRun {
+/**
+ * Runs a multipass filter. `params` are used as given after resolving (scale them beforehand if
+ * needed). `mask` (see `renderMask`) is required by mask-aware filters and is not owned.
+ */
+export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, input: GPUTexture, params: Record<string, unknown>, mask?: GPUTexture): FilterRun {
   const { device } = ctx;
+  if (filter.usesMask && !mask) throw new Error(`filter "${filter.id}" needs a mask`);
   const resolved = resolveParams(filter.params, params as never) as Record<string, unknown>;
   const values = packParams(filter.params, resolved as never);
   const uniforms = device.createBuffer({ size: values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(uniforms, 0, values);
 
   const textures = new Map<string, GPUTexture>([['input', input]]);
+  if (filter.usesMask) textures.set('mask', mask!);
   const owned = new Set<GPUTexture>();
   // Freshly created buffers are zero-filled, which is the reset reductions need.
   const buffers = new Map(

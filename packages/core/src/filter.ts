@@ -95,14 +95,24 @@ export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends
    * Each is `array<atomic<u32>, N>` in WGSL; store floats with bitcast.
    */
   readonly buffers?: Readonly<Record<string, number>>;
+  /**
+   * The filter needs the step's mask (e.g. inpainting must know which pixels to rebuild): passes
+   * can then list 'mask' as an input, a texture with the mask value in every channel, and the CPU
+   * reference receives it as one value per pixel. Using such a filter without a mask is an error.
+   * The step's usual blend with the mask still follows.
+   */
+  readonly usesMask?: boolean;
   readonly passes: readonly PassDef[];
   /** Whole-image CPU reference: obvious, not fast. Must not mutate `src`. */
-  readonly cpu: (src: LinearImage, p: ParamValues<S>) => LinearImage;
+  readonly cpu: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array) => LinearImage;
 }
 
 export interface MultipassFilter<S extends ParamSchema = ParamSchema> extends Omit<MultipassFilterDef<S>, 'cpu'> {
-  /** Whole-image CPU reference. Missing params take their defaults. Never mutates `src`. */
-  cpu(src: LinearImage, params?: Partial<ParamValues<S>>): LinearImage;
+  /**
+   * Whole-image CPU reference. Missing params take their defaults. Never mutates `src`.
+   * `mask` (one value per pixel, see `maskImage`) is required by mask-aware filters.
+   */
+  cpu(src: LinearImage, params?: Partial<ParamValues<S>>, mask?: Float32Array): LinearImage;
 }
 
 export type Filter<S extends ParamSchema = ParamSchema> = PointwiseFilter<S> | MultipassFilter<S>;

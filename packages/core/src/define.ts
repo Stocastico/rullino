@@ -27,10 +27,10 @@ function defineMultipass<S extends ParamSchema>(def: MultipassFilterDef<S>, wher
     if (!IDENTIFIER.test(name)) throw new Error(`${where}: buffer name "${name}" must be a WGSL identifier`);
     if (!Number.isInteger(n) || n < 1) throw new Error(`${where}: buffer "${name}" size must be a positive integer`);
   }
-  const textures = new Set(['input']);
+  const textures = new Set(def.usesMask ? ['input', 'mask'] : ['input']);
   const computes = new Set<string>();
   for (const pass of def.passes) {
-    if (!IDENTIFIER.test(pass.name) || pass.name === 'input') throw new Error(`${where}: pass name "${pass.name}" must be a WGSL identifier other than "input"`);
+    if (!IDENTIFIER.test(pass.name) || pass.name === 'input' || pass.name === 'mask') throw new Error(`${where}: pass name "${pass.name}" must be a WGSL identifier other than "input" and "mask"`);
     if (textures.has(pass.name) || computes.has(pass.name)) throw new Error(`${where}: duplicate pass name "${pass.name}"`);
     for (const i of pass.inputs) {
       if (computes.has(i)) throw new Error(`${where}: pass "${pass.name}" reads compute pass "${i}", which has no texture output`);
@@ -52,7 +52,14 @@ function defineMultipass<S extends ParamSchema>(def: MultipassFilterDef<S>, wher
   }
   if (def.passes.at(-1)!.kind === 'compute') throw new Error(`${where}: the last pass must write a texture (it is the output)`);
   const cpu = def.cpu;
-  return { ...def, cpu: (src, params) => cpu(src, resolveParams(def.params, params)) };
+  return {
+    ...def,
+    cpu(src, params, mask) {
+      if (def.usesMask && !mask) throw new Error(`${where} needs a mask`);
+      if (mask && mask.length !== src.width * src.height) throw new RangeError(`${where}: mask has ${mask.length} values for ${src.width}x${src.height}`);
+      return cpu(src, resolveParams(def.params, params), mask);
+    },
+  };
 }
 
 function definePointwise<S extends ParamSchema>(def: PointwiseFilterDef<S>, where: string): PointwiseFilter<S> {

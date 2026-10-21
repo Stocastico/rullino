@@ -1,6 +1,6 @@
 import type { Filter } from '../filter';
 import { createImage, type LinearImage } from '../image';
-import { blendMasked, validateMask, type Mask } from '../mask';
+import { blendMasked, maskImage, validateMask, type Mask } from '../mask';
 import { resolveParams, scaleParams } from '../params';
 
 /** One step of a filter chain. Params missing from `params` take their defaults. */
@@ -34,7 +34,14 @@ export function runChainCpu(steps: readonly Step[], src: LinearImage, options: C
   let img = createImage(src.width, src.height, src.data.slice());
   for (const s of activeSteps(steps)) {
     if (s.mask) validateMask(s.mask);
-    const out = s.filter.cpu(img, effectiveParams(s, options.scale) as never);
+    const params = effectiveParams(s, options.scale) as never;
+    let out: LinearImage;
+    if (s.filter.kind === 'multipass' && s.filter.usesMask) {
+      if (!s.mask) throw new Error(`filter "${s.filter.id}" needs a mask`);
+      out = s.filter.cpu(img, params, maskImage(s.mask, img.width, img.height));
+    } else {
+      out = s.filter.cpu(img, params);
+    }
     img = s.mask ? blendMasked(img, out, s.mask) : out;
   }
   return img;
