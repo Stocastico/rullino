@@ -1,6 +1,6 @@
 # Plan — WebGPU image processing library + playground
 
-> Working name: **rullino** (Italian for "roll of film"). Still open — see §7.
+> Name: **rullino** (Italian for "roll of film").
 
 ## 1. What and why
 
@@ -154,8 +154,8 @@ Tiers: **A** = MVP, **B** = second wave, **C** = once the rest is solid.
 
 ## 7. Open decisions
 
-- Library name (working name: rullino).
-- License (MIT proposed).
-- Test runner: plain `node --test` or Vitest (which makes browser mode easier).
+- ~~Library name~~ → **rullino**, npm scope `@rullino` (org to be registered).
+- ~~License~~ → **MIT**.
+- ~~Test runner~~ → **Vitest** (unit in Node + browser mode via Playwright).
 - Format of LUT assets in the repo and their licenses (third-party LUTs are often not redistributable: better to generate them in-house).
 - HDR / 16-bit input support (the float16 pipeline allows it; I/O still to be decided).
