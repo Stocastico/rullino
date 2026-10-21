@@ -1,4 +1,4 @@
-export { decodeSrgb8, encodeSrgb8, linearToSrgb, srgbToLinear } from './color';
+export { decodeSrgb8, encodeSrgb16, encodeSrgb8, linearToSrgb, srgbToLinear } from './color';
 export { CURVE_SAMPLES, curveLut, curveSamplerWgsl, sampleCurve, sampleCurveLut, type CurvePoints } from './curve';
 export { compareImages, type Comparison, type Mismatch, type Tolerance } from './compare';
 export { defineFilter } from './define';
@@ -22,6 +22,9 @@ export { runPointwise } from './gpu/pointwise';
 export { runFilter } from './gpu/run';
 export { fusedShader, namespaceWgsl, runFused, type FusedRun } from './pipeline/fuse';
 export { encodeToTexture, importImage, readSrgb8, type EncodeOptions } from './gpu/io';
+export { encodeImage, encodeSamples, type ExportOptions } from './encode';
+export { exportImage } from './gpu/export';
+export { encodePng } from './png';
 export { createWorkingTexture, readImage, uploadImage, WORKING_FORMAT } from './gpu/texture';
 export { float16ToFloat32, float32ToFloat16, fromFloat16Array, toFloat16Array } from './half';
 export { createImage, type LinearImage } from './image';
