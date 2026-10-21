@@ -11,6 +11,7 @@ import { curves } from './curves';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
+import { grain } from './grain';
 import { grayscale } from './grayscale';
 import { invert } from './invert';
 import { levels } from './levels';
@@ -38,6 +39,7 @@ export {
   exposure,
   gamma,
   gaussianBlur,
+  grain,
   grayscale,
   invert,
   levels,
@@ -74,6 +76,7 @@ export const filters: readonly Filter<any>[] = [
   posterize,
   applyLut,
   vignette,
+  grain,
   gaussianBlur,
   boxBlur,
   sharpen,

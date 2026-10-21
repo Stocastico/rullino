@@ -102,6 +102,8 @@ npx vitest run path/to/file.test.ts   # single file
 | `lut` param: domain (32 B) in the uniform block, table in an `rgba32float` 3D texture cached per `Lut` object and device | Uniforms stay small; one upload per LUT. Stage keys use the LUT's identity (`objectKey`), never its data, so LUTs must be treated as immutable. Multipass filters only (pointwise fusion has no bindings). |
 | Manual trilinear LUT interpolation with `textureLoad`, not a hardware sampler | `rgba32float` is not filterable without the optional `float32-filterable` feature, and hardware filtering uses low-precision weights; the manual version matches `applyLutCpu` step for step. |
 | `applyLut` works on straight sRGB-encoded colour; intensity blends in the same units | That is what `.cube` / Hald LUTs are authored for; intensity 0 is an exact no-op even for HDR values the LUT would clamp. |
+| Vignette darkens by multiplying linear light, lightens towards white; smoothstep on a corner-normalised distance | Multiplying light is what lens falloff does; normalising so corners are 1 keeps `midpoint` meaningful at any aspect ratio and roundness. |
+| Grain = PCG-hashed value noise (cells of `size` px) added to sRGB-encoded colour with a midtone-weighted response | Deterministic and identical on CPU/GPU (integer hash, 24-bit floats); film grain is most visible in the midtones, not uniform white noise. The noise pattern differs between preview and full resolution (only its statistics match). |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
