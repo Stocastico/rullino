@@ -1,0 +1,100 @@
+import type { GpuContext } from '../gpu/context';
+import { resolveParams } from '../params';
+import { activeSteps, type Step } from './chain';
+import { runFused } from './fuse';
+
+export interface PipelineOptions {
+  /** Fuse consecutive pointwise steps into one pass (default true). Off is useful for debugging. */
+  readonly fuse?: boolean;
+}
+
+interface Stage {
+  readonly steps: readonly Step[];
+  /** Identifies this stage's result: everything upstream plus this stage's filters and params. */
+  readonly key: string;
+}
+
+interface CachedStage {
+  readonly key: string;
+  readonly output: GPUTexture;
+}
+
+/**
+ * Runs a filter chain on the GPU, caching each stage's output so that a change only recomputes
+ * from the first affected stage onwards. Consecutive pointwise steps form a single stage (one pass);
+ * the shader depends only on the filters, so moving a slider never recompiles.
+ */
+export class Pipeline {
+  readonly stats = { passes: 0, compiles: 0 };
+  readonly #ctx: GpuContext;
+  readonly #fuse: boolean;
+  #source: GPUTexture | undefined;
+  #sourceVersion = 0;
+  #cache: CachedStage[] = [];
+
+  constructor(ctx: GpuContext, options: PipelineOptions = {}) {
+    this.#ctx = ctx;
+    this.#fuse = options.fuse ?? true;
+  }
+
+  /** Sets the input working texture. Not owned: the caller keeps it alive and destroys it. */
+  setSource(texture: GPUTexture): void {
+    this.#source = texture;
+    this.#sourceVersion++;
+    this.#evict(0);
+  }
+
+  /**
+   * Returns the chain's output. The texture belongs to the pipeline (or is the source itself for
+   * an empty chain): do not destroy it; it stays valid until the next run, setSource or destroy.
+   */
+  run(steps: readonly Step[]): GPUTexture {
+    const source = this.#source;
+    if (!source) throw new Error('Pipeline.run() before setSource()');
+    const stages = this.#plan(steps);
+
+    let first = 0;
+    while (first < stages.length && this.#cache[first]?.key === stages[first]!.key) first++;
+    this.#evict(first);
+
+    let input = first === 0 ? source : this.#cache[first - 1]!.output;
+    for (let i = first; i < stages.length; i++) {
+      const stage = stages[i]!;
+      const { output, compiled } = runFused(
+        this.#ctx,
+        stage.steps.map((s) => s.filter),
+        stage.steps.map((s) => s.params ?? {}),
+        input,
+      );
+      this.stats.passes++;
+      if (compiled) this.stats.compiles++;
+      this.#cache.push({ key: stage.key, output });
+      input = output;
+    }
+    return input;
+  }
+
+  destroy(): void {
+    this.#evict(0);
+    this.#source = undefined;
+  }
+
+  #plan(steps: readonly Step[]): Stage[] {
+    const groups: Step[][] = [];
+    for (const s of activeSteps(steps)) {
+      const last = groups.at(-1);
+      if (this.#fuse && last && last.at(-1)!.filter.kind === 'pointwise' && s.filter.kind === 'pointwise') last.push(s);
+      else groups.push([s]);
+    }
+    let key = `src${this.#sourceVersion}`;
+    return groups.map((g) => {
+      const sig = g.map((s) => `${s.filter.id}${JSON.stringify(resolveParams(s.filter.params, (s.params ?? {}) as never))}`);
+      key = `${key}|${sig.join('+')}`;
+      return { steps: g, key };
+    });
+  }
+
+  #evict(from: number): void {
+    for (const c of this.#cache.splice(from)) c.output.destroy();
+  }
+}
