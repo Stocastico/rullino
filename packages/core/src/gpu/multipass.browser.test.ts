@@ -91,3 +91,55 @@ it.each([0, 1, 3, 8])('multipass high-pass at radius %i matches the CPU referenc
   const res = compareImages(out, highPass.cpu(src, { radius }), highPass.tolerance);
   expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
 });
+
+// Iterative dilation: a repeated pass whose first input is its own previous output.
+const grow = defineFilter({
+  id: 'grow',
+  label: 'Grow',
+  category: 'classic',
+  kind: 'multipass',
+  params: { steps: { type: 'int', min: 0, max: 20, default: 3, label: 'Steps' } },
+  passes: [
+    { name: 'seed', inputs: ['input'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }' },
+    {
+      name: 'grow',
+      inputs: ['seed'],
+      repeat: 'steps',
+      wgsl: /* wgsl */ `
+fn run(xy: vec2i, p: Params) -> vec4f {
+  var m = vec4f(0.0);
+  for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) { m = max(m, load_seed(xy + vec2i(i, j))); } }
+  return m;
+}`,
+    },
+  ],
+  cpu: (img, { steps }) => {
+    let cur = img;
+    for (let s = 0; s < steps; s++) {
+      const next = createImage(cur.width, cur.height);
+      for (let y = 0; y < cur.height; y++)
+        for (let x = 0; x < cur.width; x++)
+          for (let c = 0; c < 4; c++) {
+            let m = 0;
+            for (let j = -1; j <= 1; j++)
+              for (let i = -1; i <= 1; i++) {
+                const sx = Math.min(cur.width - 1, Math.max(0, x + i));
+                const sy = Math.min(cur.height - 1, Math.max(0, y + j));
+                m = Math.max(m, cur.data[(sy * cur.width + sx) * 4 + c]!);
+              }
+            next.data[(y * cur.width + x) * 4 + c] = m;
+          }
+      cur = next;
+    }
+    return cur;
+  },
+  tolerance: { abs: 0, rel: 0 },
+});
+
+it.each([0, 1, 4, 9])('repeated pass runs %i times (ping-pong)', async (steps) => {
+  const dot = createImage(21, 21);
+  dot.data.set([1, 0.5, 0.25, 1], (10 * 21 + 10) * 4);
+  const out = await readImage(ctx, runFilter(ctx, grow, uploadImage(ctx, dot), { steps }));
+  const res = compareImages(out, grow.cpu(dot, { steps }), grow.tolerance);
+  expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+});

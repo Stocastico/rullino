@@ -29,6 +29,10 @@ function defineMultipass<S extends ParamSchema>(def: MultipassFilterDef<S>, wher
     for (const i of pass.inputs) if (!known.has(i)) throw new Error(`${where}: pass "${pass.name}" has unknown input "${i}"`);
     if (!/\bfn\s+run\s*\(/.test(pass.wgsl)) throw new Error(`${where}: pass "${pass.name}" must define fn run(xy: vec2i, p: Params) -> vec4f`);
     if (/\bstruct\s+Params\b/.test(pass.wgsl)) throw new Error(`${where}: wgsl must not declare struct Params (it is generated)`);
+    if (pass.repeat !== undefined) {
+      if (def.params[pass.repeat]?.type !== 'int') throw new Error(`${where}: pass "${pass.name}" repeat must name an int param`);
+      if (pass.inputs.length === 0) throw new Error(`${where}: repeated pass "${pass.name}" needs an input to iterate on`);
+    }
     known.add(pass.name);
   }
   const cpu = def.cpu;

@@ -48,6 +48,11 @@ export interface PassDef {
   /** 'input' (the filter's input) and/or names of earlier passes. */
   readonly inputs: readonly string[];
   readonly wgsl: string;
+  /**
+   * Name of an int param: run the pass that many times, ping-ponging. From the second iteration
+   * on, `inputs[0]` reads the previous iteration's output. Zero iterations pass `inputs[0]` through.
+   */
+  readonly repeat?: string;
 }
 
 interface FilterBase<S extends ParamSchema> {

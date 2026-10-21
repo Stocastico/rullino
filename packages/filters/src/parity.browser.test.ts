@@ -51,14 +51,34 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
   return out;
 }
 
-// Non-multiple-of-8 size exercises the workgroup bounds check.
-const src = testImage(67, 45);
+/**
+ * Concentric rings whose contrast fades from left to right: strong edges that continue as weak
+ * ones, smooth gradients in every direction. Random noise alone never exercises things like
+ * hysteresis or gradient directions properly.
+ */
+function structuredImage(w: number, h: number) {
+  const data = new Float32Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const r = Math.hypot(x - w * 0.45, y - h * 0.55);
+      const fade = 1 - 0.85 * (x / (w - 1));
+      const v = 0.5 + 0.5 * fade * Math.sin(r * 0.7);
+      const i = (y * w + x) * 4;
+      data.set([v * v, v * 0.9, v * (1 - 0.3 * (y / h)), 1], i);
+    }
+  }
+  return createImage(w, h, fromFloat16Array(toFloat16Array(data)));
+}
+
+// Non-multiple-of-8 sizes exercise the workgroup bounds check.
+const images = { noise: testImage(67, 45), rings: structuredImage(71, 53) };
 
 describe.each(filters.map((f) => [f.id, f as Filter] as const))('%s GPU <-> CPU parity', (_, f) => {
-  it.each(cases(f.params))('%s', async (_, params) => {
+  const all = Object.entries(images).flatMap(([img, src]) => cases(f.params).map(([name, p]) => [`${img}: ${name}`, src, p] as const));
+  it.each(all)('%s', async (_, src, params) => {
     const full = { ...defaultParams(f.params), ...params } as never;
     const out = await readImage(ctx, runFilter(ctx, f, uploadImage(ctx, src), full));
     const result = compareImages(out, f.cpu(src, full), f.tolerance);
-    expect(result.worst ?? null, JSON.stringify(result.worst)).toBeNull();
+    expect(result.pass, `${result.outliers} channels out of tolerance, worst ${JSON.stringify(result.worst)}`).toBe(true);
   });
 });

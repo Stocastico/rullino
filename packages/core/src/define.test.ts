@@ -78,6 +78,7 @@ describe('defineFilter', () => {
     expect(() => defineFilter({ ...base, passes: [{ ...base.passes[0], wgsl: 'fn nope() {}' }] })).toThrow(/fn run/);
     expect(() => defineFilter({ ...base, passes: [{ ...base.passes[0], name: 'bad-name' }] })).toThrow(/identifier/);
     expect(() => defineFilter({ ...base, passes: [base.passes[0], { ...base.passes[0] }] })).toThrow(/duplicate/);
+    expect(() => defineFilter({ ...base, passes: [{ ...base.passes[0], repeat: 'nope' }] })).toThrow(/repeat/);
   });
 
   it('fills multipass CPU params with defaults', () => {
