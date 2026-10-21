@@ -17,7 +17,8 @@ let imageSize: [number, number] = [1, 1];
 export function setImageSize(w: number, h: number): void {
   imageSize = [w, h];
 }
-const emptyBrush = (): Mask => ({ kind: 'raster', raster: createRasterMask(...fitWithin(imageSize[0], imageSize[1], BRUSH_RASTER_SIDE)) });
+/** A new, empty brush mask at the current image's proportions. */
+export const emptyBrush = (): Mask => ({ kind: 'raster', raster: createRasterMask(...fitWithin(imageSize[0], imageSize[1], BRUSH_RASTER_SIDE)) });
 
 /** Tool settings, shared by every brush mask (tools, not part of the mask). */
 export const tools = {
@@ -77,14 +78,17 @@ function slider(label: string, action: string, value: number, onInput: (v: numbe
   return row;
 }
 
-/** `get` returns the current mask (it may also change elsewhere, e.g. by dragging on the image). */
-export function renderMaskControls(root: HTMLElement, get: () => Mask | undefined, onChange: (mask: Mask | undefined) => void): void {
+/**
+ * `get` returns the current mask (it may also change elsewhere, e.g. by dragging on the image).
+ * `required`: the step's filter needs a mask (inpainting), so "No mask" is not offered.
+ */
+export function renderMaskControls(root: HTMLElement, get: () => Mask | undefined, onChange: (mask: Mask | undefined) => void, required = false): void {
   const draw = () => {
     const mask = get();
     root.replaceChildren();
     const kind = Object.assign(document.createElement('select'), { title: 'Mask' });
     kind.dataset.action = 'mask-kind';
-    for (const [value, text] of Object.entries(KINDS)) kind.append(new Option(text, value));
+    for (const [value, text] of Object.entries(KINDS)) if (!(required && value === 'none')) kind.append(new Option(text, value));
     kind.value = mask ? (mask.kind === 'raster' ? 'brush' : mask.kind) : 'none';
     kind.addEventListener('change', () => {
       const k = kind.value as keyof typeof KINDS;

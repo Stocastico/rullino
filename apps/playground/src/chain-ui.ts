@@ -1,6 +1,6 @@
 import { defaultParams, type Filter, type Mask } from '@rullino/core';
 import { renderControls } from './controls';
-import { renderMaskControls } from './mask-ui';
+import { emptyBrush, renderMaskControls } from './mask-ui';
 
 // The filter chain editor: a list of steps (enable, reorder, remove), an "add filter" menu, and
 // the generated controls of the selected step. Structural edits rebuild the list; param edits
@@ -31,11 +31,13 @@ export function withMask(step: StepState, mask: Mask | undefined): StepState {
 }
 
 let nextUid = 0;
+/** A step with default params; mask-aware filters (inpainting) start with an empty brush mask to paint. */
 export const newStep = (f: Filter<any>): StepState => ({
   uid: `step${++nextUid}`,
   filterId: f.id,
   params: defaultParams(f.params),
   enabled: true,
+  ...(f.kind === 'multipass' && f.usesMask ? { mask: emptyBrush() } : {}),
 });
 
 /** A named group of steps added in one go (a look). */
@@ -137,6 +139,7 @@ export function renderChain(
           maskControls,
           () => state.steps.find((s) => s.uid === step.uid)?.mask,
           (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
+          filter.kind === 'multipass' && !!filter.usesMask,
         );
         body.append(controls, maskControls);
         item.append(body);
