@@ -14,6 +14,19 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'bench',
+          include: ['packages/*/bench/**/*.bench.browser.ts'],
+          testTimeout: 600_000,
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright({ launchOptions: { args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'] } }),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+      {
+        test: {
           name: 'browser',
           include: ['packages/*/src/**/*.browser.test.ts', 'apps/*/src/**/*.browser.test.ts'],
           browser: {

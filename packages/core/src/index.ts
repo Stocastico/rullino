@@ -16,6 +16,7 @@ export type {
 } from './filter';
 export { createGpuContext, WebGpuUnavailableError, type GpuContext } from './gpu/context';
 export { passShader, runMultipass, type FilterRun } from './gpu/multipass';
+export { poolStats, releaseTexture } from './gpu/pool';
 export { runPointwise } from './gpu/pointwise';
 export { runFilter } from './gpu/run';
 export { fusedShader, namespaceWgsl, runFused, type FusedRun } from './pipeline/fuse';

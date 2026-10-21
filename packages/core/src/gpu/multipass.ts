@@ -3,6 +3,7 @@ import { packParams, paramsStructWgsl, resolveParams } from '../params';
 import { colorWgsl } from '../wgsl';
 import type { GpuContext } from './context';
 import { cachedPipeline, objectKey } from './readback';
+import { releaseTexture } from './pool';
 import { createWorkingTexture, WORKING_FORMAT } from './texture';
 
 const WORKGROUP = 8;
@@ -16,21 +17,24 @@ export function passShader(filter: Pick<MultipassFilter<any>, 'params' | 'buffer
     (name) => /* wgsl */ `
 @group(0) @binding(${binding++}) var tex_${name}: texture_2d<f32>;
 fn load_${name}(xy: vec2i) -> vec4f {
-  let s = vec2i(textureDimensions(tex_${name}));
-  return textureLoad(tex_${name}, clamp(xy, vec2i(0), s - 1), 0);
+  return textureLoad(tex_${name}, clamp(xy, vec2i(0), rl_max_xy), 0);
 }`,
   );
   const buffers = (pass.buffers ?? []).map(
     (name) => `@group(0) @binding(${binding++}) var<storage, read_write> buf_${name}: array<atomic<u32>, ${filter.buffers![name]}>;`,
   );
+  // All textures of a filter run share one size; it is read once per invocation into rl_max_xy
+  // instead of calling textureDimensions() on every load.
+  const sizeSource = compute ? `tex_${pass.inputs[0]}` : 'dst';
   const head = /* wgsl */ `
+var<private> rl_max_xy: vec2i;
 ${paramsStructWgsl('Params', filter.params)}
 ${compute ? '' : `@group(0) @binding(0) var dst: texture_storage_2d<${WORKING_FORMAT}, write>;`}
 ${params}
 ${inputs.join('\n')}
 ${buffers.join('\n')}
 
-fn size() -> vec2i { return vec2i(textureDimensions(${compute ? `tex_${pass.inputs[0]}` : 'dst'})); }
+fn size() -> vec2i { return rl_max_xy + 1; }
 
 ${colorWgsl}
 
@@ -42,6 +46,7 @@ ${pass.wgsl}
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let s = textureDimensions(dst);
   if (id.x >= s.x || id.y >= s.y) { return; }
+  rl_max_xy = vec2i(s) - 1;
   textureStore(dst, id.xy, run(vec2i(id.xy), params));
 }
 `;
@@ -49,14 +54,17 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   if (pass.dispatch === 'single') {
     return `${head}
 @compute @workgroup_size(1)
-fn main() { run(vec2i(0), params); }
+fn main() {
+  rl_max_xy = vec2i(textureDimensions(${sizeSource})) - 1;
+  run(vec2i(0), params);
+}
 `;
   }
   return `${head}
 @compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
 fn main(@builtin(global_invocation_id) id: vec3u) {
-  let s = size();
-  if (i32(id.x) >= s.x || i32(id.y) >= s.y) { return; }
+  rl_max_xy = vec2i(textureDimensions(${sizeSource})) - 1;
+  if (i32(id.x) > rl_max_xy.x || i32(id.y) > rl_max_xy.y) { return; }
   run(vec2i(id.xy), params);
 }
 `;
@@ -134,9 +142,16 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
       enc.copyTextureToTexture({ texture: input }, { texture: result }, [input.width, input.height]);
       owned.add(result);
     }
+    // Repeated passes ping-pong between two textures: allocating (and lazily zeroing) a fresh
+    // texture per iteration dominated the cost of long repeats such as Canny's hysteresis.
+    const pingPong: GPUTexture[] = [];
     for (let it = 0; it < iterations; it++) {
-      const out = createWorkingTexture(ctx, input.width, input.height);
-      owned.add(out);
+      let out = pingPong[it % 2];
+      if (!out) {
+        out = createWorkingTexture(ctx, input.width, input.height);
+        owned.add(out);
+        pingPong.push(out);
+      }
       const sources = pass.inputs.map((name, i) => (i === 0 && it > 0 ? result : textures.get(name)!));
       dispatch(
         pipeline,
@@ -156,8 +171,8 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
   device.queue.submit([enc.finish()]);
 
   const output = textures.get(filter.passes.at(-1)!.name)!;
-  // Intermediates are no longer needed once the work is submitted (destruction is deferred).
-  for (const t of owned) if (t !== output) t.destroy();
+  // Intermediates go back to the pool once the work that reads them is submitted.
+  for (const t of owned) if (t !== output) releaseTexture(ctx, t);
   for (const b of buffers.values()) b.destroy();
   uniforms.destroy();
   return { output, passes, compiled };

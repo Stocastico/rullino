@@ -12,6 +12,7 @@ pnpm test:browser     # GPU tests in headless Chromium (WebGPU), incl. GPU<->CPU
 pnpm test:all         # both
 pnpm build            # builds the playground (Vite)
 pnpm test:e2e         # smoke-tests the built playground in headless Chromium (run after build)
+pnpm bench            # GPU timings per filter + a chain at 1024x768 (SwiftShader numbers: compare runs, not machines)
 pnpm dev              # playground dev server
 npx vitest run path/to/file.test.ts   # single file
 ```
@@ -86,6 +87,9 @@ npx vitest run path/to/file.test.ts   # single file
 | Explicit bind group layouts for multipass passes | `layout: 'auto'` drops bindings the shader never reads; an input declared but unused then made the bind group invalid. |
 | Otsu on a 256-bin histogram of perceptual luminance of the straight colour, transparent pixels skipped | Matches `threshold`'s units; transparent areas would otherwise drag the threshold to black. Ties keep the first maximum on both sides. |
 | Adaptive threshold = luminance > Gaussian local mean − C (OpenCV's ADAPTIVE_THRESH_GAUSSIAN_C) | Familiar semantics; σ is a px param so it scales with previews. |
+| Texture pool (`createWorkingTexture` / `releaseTexture`) | New textures are lazily zero-filled; with one per pass, allocation dominated long filters (Canny hysteresis 5.8 s -> 2.5 s on SwiftShader with ping-pong alone). Reuse is safe because the queue runs in order and every pass overwrites every pixel. Capped at 16 free textures per device. |
+| Gaussian weights by recurrence, taps summed in symmetric pairs | One `exp()` per tap was a large share of blur cost (~-20 to -25%); f32 drift over 150 taps stays far inside the parity tolerance. |
+| Benchmarks are a separate Vitest project (`pnpm bench`), not tests | Timing assertions would be flaky on shared runners; results are written to `packages/filters/bench/results.txt` because browser console output is not forwarded. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -111,6 +115,8 @@ Things that already bit us. Add new ones as they come up.
 - **A filter's `id` is not unique**: two filter objects can share it. Anything cached per filter (shaders, Pipeline stages) keys on `objectKey(filter)` too.
 - **Async loads in the playground must not overlap**: each destroys the previous textures. `loadImage` queues them and skips superseded ones; swap Pipeline sources before destroying old textures.
 - **Integer-like object keys are reordered by JS** (`{ '5': …, '3': … }` iterates '3' first), so enum option keys must not be integer-like.
+- **Allocating textures is expensive** (lazy zero-fill): get working textures from `createWorkingTexture` and give intermediates back with `releaseTexture`, never create one per iteration.
+- **Browser-mode `console.log` does not reach the terminal** here; use `commands.writeFile` from `vitest/browser` (paths are relative to the repo root).
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.

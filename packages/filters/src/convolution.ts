@@ -40,7 +40,11 @@ export const gaussianCpu = (src: LinearImage, sigma: number) => {
   return convolve1d(convolve1d(src, w, 'x'), w, 'y');
 };
 
-/** One Gaussian pass along an axis; the `sigma` param must exist in the filter's schema. */
+/**
+ * One Gaussian pass along an axis; the `sigma` param must exist in the filter's schema.
+ * Taps are summed in symmetric pairs and the weights come from a recurrence instead of one exp()
+ * per tap: w(k+1) = w(k)·r(k), r(k+1) = r(k)·q with q = exp(−1/σ²). Two exp() per pixel in total.
+ */
 export const gaussianPass = (name: string, input: string, axis: 'x' | 'y'): PassDef => ({
   name,
   inputs: [input],
@@ -48,13 +52,18 @@ export const gaussianPass = (name: string, input: string, axis: 'x' | 'y'): Pass
 fn run(xy: vec2i, p: Params) -> vec4f {
   if (p.sigma < 1e-3) { return load_${input}(xy); }
   let r = i32(ceil(3.0 * p.sigma));
-  let k2 = -0.5 / (p.sigma * p.sigma);
-  var acc = vec4f(0.0);
-  var total = 0.0;
-  for (var k = -r; k <= r; k++) {
-    let w = exp(f32(k * k) * k2);
-    acc += w * load_${input}(xy + ${axis === 'x' ? 'vec2i(k, 0)' : 'vec2i(0, k)'});
-    total += w;
+  let s2 = p.sigma * p.sigma;
+  let q = exp(-1.0 / s2);
+  var ratio = exp(-0.5 / s2); // w(1) / w(0)
+  var w = 1.0;
+  var acc = load_${input}(xy);
+  var total = 1.0;
+  for (var k = 1; k <= r; k++) {
+    w *= ratio;
+    ratio *= q;
+    let d = ${axis === 'x' ? 'vec2i(k, 0)' : 'vec2i(0, k)'};
+    acc += w * (load_${input}(xy + d) + load_${input}(xy - d));
+    total += 2.0 * w;
   }
   return acc / total;
 }`,
