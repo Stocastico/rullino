@@ -4,6 +4,8 @@ import { paintStroke, type BrushOptions, type LinearMask, type Mask, type Radial
 // display image's pixel coordinates (viewBox = image size), so ellipses and the gradient's
 // perpendicular lines look the way the mask is computed (distances in units of the longer side).
 
+import { makeDraggable } from './drag';
+
 const NS = 'http://www.w3.org/2000/svg';
 
 export interface MaskOverlay {
@@ -30,8 +32,8 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export interface OverlayTools {
   readonly tool: () => 'paint' | 'erase' | 'wand';
   readonly brush: () => BrushOptions;
-  /** Wand click: the mask with the region at `uv` added (or removed, with `subtract`). */
-  readonly wand: (mask: RasterMask, uv: Vec2, subtract: boolean) => Promise<Mask | undefined>;
+  /** Wand click at `uv` (removing with `subtract`); the caller updates the mask (asynchronously). */
+  readonly wand: (uv: Vec2, subtract: boolean) => void;
   /** The mask with its raster at the current image's resolution (called when a stroke starts). */
   readonly fit: (mask: RasterMask) => RasterMask;
 }
@@ -47,27 +49,15 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
   const handle = (name: string, drag: (u: number, v: number) => Mask | undefined) => {
     const c = el('circle', { class: 'mask-handle' });
     c.dataset.handle = name;
-    c.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      c.setPointerCapture(e.pointerId);
+    makeDraggable(c, svg, () => {
       onDragStart();
-      const move = (ev: PointerEvent) => {
-        const r = svg.getBoundingClientRect();
-        const next = drag(clamp01((ev.clientX - r.left) / r.width), clamp01((ev.clientY - r.top) / r.height));
+      return (u, v) => {
+        const next = drag(clamp01(u), clamp01(v));
         if (!next) return;
         mask = next;
         update();
         onChange(next);
       };
-      const stop = () => {
-        c.removeEventListener('pointermove', move);
-        c.removeEventListener('pointerup', stop);
-        c.removeEventListener('pointercancel', stop);
-      };
-      c.addEventListener('pointermove', move);
-      c.addEventListener('pointerup', stop);
-      c.addEventListener('pointercancel', stop);
     });
     return c;
   };
@@ -150,11 +140,7 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
     svg.onpointerdown = (e) => {
       e.preventDefault();
       if (tools.tool() === 'wand') {
-        void tools.wand(mask as RasterMask, toUv(e), e.altKey).then((next) => {
-          if (!next) return;
-          mask = next;
-          onChange(next);
-        });
+        tools.wand(toUv(e), e.altKey);
         return;
       }
       svg.setPointerCapture(e.pointerId);

@@ -83,8 +83,8 @@ export function validateMask(m: Mask): void {
   }
 }
 
-/** smoothstep with a hard step when the edges coincide (feather 0). */
-const smoothstep = (e0: number, e1: number, x: number) => {
+/** smoothstep with a hard step when the edges coincide (feather 0). Shared with the brush. */
+export const smoothstep = (e0: number, e1: number, x: number) => {
   if (e1 <= e0) return x < e0 ? 0 : 1;
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);

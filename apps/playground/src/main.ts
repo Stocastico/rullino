@@ -10,6 +10,7 @@ import {
   encodeSrgb8,
   exportImage,
   fitWithin,
+  geometryFrame,
   histogramSrgb8,
   IDENTITY_GEOMETRY,
   isIdentityGeometry,
@@ -21,6 +22,7 @@ import {
   runChainCpu,
   type ExportOptions,
   type Geometry,
+  type Vec2,
   type GpuContext,
   type LinearImage,
   type Step,
@@ -102,14 +104,17 @@ interface Renderer {
   readonly name: string;
   /** Loads an image framed by `geometry`; returns the (framed) display size. */
   load(image: ImageBitmap, geometry: Geometry): Promise<[number, number]>;
-  /** Reframes the loaded image; returns the new display size. */
-  setGeometry(geometry: Geometry): Promise<[number, number]>;
+  /**
+   * Reframes the loaded image; returns the new display size. `previewOnly` (while dragging)
+   * reframes just the reduced preview; a later full call brings the display image up to date.
+   */
+  setGeometry(geometry: Geometry, previewOnly?: boolean): Promise<[number, number]>;
   render(steps: Step[], preview: boolean): Promise<void>;
   /**
    * Runs the chain at the largest resolution available and encodes the result, shrunk (in linear
    * light) so its long side is at most `longSide` if given. Never enlarges.
    */
-  export(steps: Step[], options: ExportOptions, longSide?: number): Promise<Blob>;
+  export(steps: Step[], options: ExportOptions, longSide: number | undefined, geometry: Geometry): Promise<Blob>;
   /** The original image at w x h on the CPU, for mask tools (wand, edge refinement). */
   maskSource(w: number, h: number): Promise<LinearImage>;
 }
@@ -123,23 +128,34 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   let textures: GPUTexture[] = [];
   let raw: { fullRes: GPUTexture; display: GPUTexture; preview: GPUTexture; fullScale: number; displayScale: number; previewScale: number } | undefined;
   let geometry: Geometry = IDENTITY_GEOMETRY;
-  /** Geometry-applied textures owned here (the raw ones when the geometry is the identity). */
-  let framed: GPUTexture[] = [];
+  /** Geometry-applied display and preview textures (the raw ones when the geometry is the identity). */
+  let framedDisplay: GPUTexture | undefined;
+  let framedPreview: GPUTexture | undefined;
+  const owned = (t: GPUTexture | undefined) => t && t !== raw?.display && t !== raw?.preview;
   let displayTex: GPUTexture | undefined;
   const maskSources = new Map<string, Promise<LinearImage>>();
   const reframe = (t: GPUTexture) => (isIdentityGeometry(geometry) ? t : applyGeometry(gpu, t, geometry));
 
   /** Applies the geometry to the display and preview images and makes them the pipelines' sources. */
-  async function frame(g: Geometry): Promise<[number, number]> {
+  async function frame(g: Geometry, previewOnly = false): Promise<[number, number]> {
     if (!raw) throw new Error('no image loaded');
     geometry = g;
+    if (previewOnly && raw.preview !== raw.display) {
+      // While dragging only the preview is shown: skip the display-size resample and readback.
+      const preview = reframe(raw.preview);
+      small.setSource(preview, { scale: raw.previewScale });
+      if (owned(framedPreview) && framedPreview !== framedDisplay) releaseTexture(gpu, framedPreview!);
+      framedPreview = preview;
+      const f = geometryFrame(g, raw.display.width, raw.display.height);
+      return [f.width, f.height];
+    }
     const display = reframe(raw.display);
     const preview = raw.preview === raw.display ? display : reframe(raw.preview);
     full.setSource(display, { scale: raw.displayScale });
     small.setSource(preview, { scale: raw.previewScale });
-    const previous = framed;
-    framed = [...new Set([display, preview])].filter((t) => t !== raw!.display && t !== raw!.preview);
-    for (const t of previous) releaseTexture(gpu, t);
+    for (const t of new Set([framedDisplay, framedPreview])) if (owned(t)) releaseTexture(gpu, t!);
+    framedDisplay = display;
+    framedPreview = preview;
     displayTex = display;
     maskSources.clear();
     ui.before.width = display.width;
@@ -174,7 +190,7 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       for (const t of previous) t.destroy();
       return size;
     },
-    setGeometry: (g) => frame(g),
+    setGeometry: (g, previewOnly) => frame(g, previewOnly),
     async render(steps, preview) {
       const out = (preview ? small : full).run(steps);
       await present(await readSrgb8(gpu, out), out.width, out.height);
@@ -192,11 +208,12 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       }
       return p;
     },
-    async export(steps, options, longSide) {
+    async export(steps, options, longSide, g) {
       if (!raw) throw new Error('no image loaded');
       // A throwaway Pipeline: full-resolution intermediates are freed as soon as the file is encoded.
+      // The geometry is the committed one, not the one shown (which drops the crop while editing it).
       const pipeline = new Pipeline(gpu);
-      const source = reframe(raw.fullRes);
+      const source = isIdentityGeometry(g) ? raw.fullRes : applyGeometry(gpu, raw.fullRes, g);
       try {
         pipeline.setSource(source, { scale: raw.fullScale });
         const out = pipeline.run(steps);
@@ -249,10 +266,10 @@ function cpuRenderer(): Renderer {
       if (!source) throw new Error('no image loaded');
       return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
     },
-    async export(steps, options, longSide) {
-      if (!source) throw new Error('no image loaded');
+    async export(steps, options, longSide, g) {
+      if (!raw) throw new Error('no image loaded');
       // The CPU fallback only ever has the reduced image.
-      const out = runChainCpu(steps, source, { scale });
+      const out = runChainCpu(steps, isIdentityGeometry(g) ? raw : applyGeometryCpu(raw, g), { scale });
       const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
       return encodeImage(w === out.width ? out : downscaleCpu(out, w, h), options);
     },
@@ -301,6 +318,8 @@ let latestLoad = 0;
 
 let geometry: Geometry = IDENTITY_GEOMETRY;
 let geometryQueued = false;
+/** The display image lags behind the geometry (it was reframed for the preview only). */
+let displayStale = false;
 /**
  * While the crop is edited the frame is shown uncropped; while the perspective is edited, the
  * oriented image is shown without perspective, straighten or crop. Changes apply on Done.
@@ -341,7 +360,9 @@ function setGeometry(g: Geometry): void {
     geometryQueued = false;
     if (!loaded) return;
     try {
-      const [w, h] = await renderer.setGeometry(shownGeometry());
+      const previewOnly = dragging;
+      const [w, h] = await renderer.setGeometry(shownGeometry(), previewOnly);
+      displayStale = previewOnly;
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
@@ -423,7 +444,7 @@ function exportFile(): Promise<void> {
     const t0 = performance.now();
     try {
       const longSide = Number(ui.exportSize.value) || undefined;
-      const blob = await renderer.export(steps, { ...options, quality }, longSide);
+      const blob = await renderer.export(steps, { ...options, quality }, longSide, geometry);
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${imageName}-rullino.${ext}` });
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
@@ -455,9 +476,32 @@ const overlay = createMaskOverlay(
     void render();
   },
   () => (dragging = true),
-  { tool: () => tools.tool, brush: brushOptions, wand: wandAt, fit: fitRaster },
+  { tool: () => tools.tool, brush: brushOptions, wand: wandClick, fit: fitRaster },
 );
 const showOverlay = () => overlay.show(selectedMask(), displaySize[0], displaySize[1]);
+
+/**
+ * Wand clicks run one after another, each from the step's current mask (two quick clicks used to
+ * start from the same mask, the second overwriting the first), and the result goes to the step
+ * that was selected when clicking, even if the selection changed meanwhile.
+ */
+let wandQueue: Promise<void> = Promise.resolve();
+function wandClick(uv: Vec2, subtract: boolean): void {
+  const uid = chain.selected;
+  wandQueue = wandQueue.then(async () => {
+    const mask = chain.steps.find((s) => s.uid === uid)?.mask;
+    if (mask?.kind !== 'raster') return;
+    const next = await wandAt(mask, uv, subtract).catch((e: Error) => {
+      ui.status.textContent = `Wand failed: ${e.message}`;
+      return undefined;
+    });
+    if (!next) return;
+    chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? withMask(s, next) : s)) };
+    chainUi.set(chain, false);
+    showOverlay();
+    void render();
+  });
+}
 // After any queued load, so the textures it reads are the current image's.
 setMaskSource((w, h) => loads.then(() => renderer.maskSource(w, h)));
 
@@ -478,7 +522,9 @@ ui.chain.addEventListener('pointerdown', (e) => {
 window.addEventListener('pointerup', () => {
   if (!dragging) return;
   dragging = false;
-  void render(); // full resolution on release
+  // Full resolution on release; a geometry dragged in preview reframes the display image first.
+  if (displayStale) setGeometry(geometry);
+  else void render();
 });
 
 for (const s of samples) ui.sample.append(new Option(s.label, s.id));

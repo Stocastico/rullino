@@ -132,6 +132,27 @@ try {
   check(patch > 0.01 && patch < 0.1, `wand on one chart patch changed ${(patch * 100).toFixed(1)}% of the image`);
   await after(() => clickAt(0.09, 0.12, true));
   check((await differs()) < 0.01, 'Alt+click with the wand should remove the selection');
+  // Two quick clicks on two patches (the second before the first is processed) select both.
+  await after(() =>
+    // Both pointerdowns in the same task: the second starts before the first wand has finished.
+    page.$eval('#overlay', (svg) => {
+      const r = svg.getBoundingClientRect();
+      for (const fx of [0.09, 0.26]) {
+        svg.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientX: r.left + r.width * fx, clientY: r.top + r.height * 0.12 }));
+        svg.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+      }
+    }),
+  );
+  await page.waitForFunction((one) => {
+    const px = (id) => { const c = document.getElementById(id); return c.getContext('2d').getImageData(0, 0, c.width, c.height).data; };
+    const [a, b] = [px('before'), px('after')];
+    let n = 0;
+    for (let i = 0; i < a.length; i++) n += Math.abs(a[i] - b[i]) > 2 ? 1 : 0;
+    return n / a.length > 1.6 * one;
+  }, patch, { timeout: 20000 }).catch(() => {});
+  const two = await differs();
+  check(two > 1.6 * patch, `two quick wand clicks selected ${(two / patch).toFixed(2)} patches, expected 2`);
+  await after(() => page.click('#chain button[data-action=mask-clear]'));
   // Refining a selection that already follows the patch edges keeps it about the same
   // (the guided filter leaves a faint halo in the flat gap around it).
   await after(() => clickAt(0.09, 0.12));
@@ -217,6 +238,20 @@ try {
       input.dispatchEvent(new Event('change'));
     }),
   );
+  // On an image larger than the preview: dragging straighten reframes only the preview; releasing must bring the display image (and
+  // the before canvas, redrawn only on a full reframe) up to date.
+  await after(async () => {
+    await page.$eval('#geometry [data-action=straighten]', (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    await page.$eval('#geometry [data-action=straighten]', (el) => { el.value = '-25'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  });
+  check((await status()).includes('preview'), `straighten drag should render the preview, status: ${await status()}`);
+  await after(() => page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup'))));
+  await page.waitForFunction(() => !document.getElementById('status').textContent.includes('preview'), null, { timeout: 20000 }).catch(() => {});
+  const beforeCorner = await page.$eval('#before', (c) => c.getContext('2d').getImageData(c.width - 1, 0, 1, 1).data[3]);
+  check(beforeCorner === 0 && !(await status()).includes('preview'), `after releasing straighten: before-canvas corner alpha ${beforeCorner}, status ${await status()}`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await page.waitForFunction(() => document.getElementById('before').getContext('2d').getImageData(0, 0, 1, 1).data[3] > 0, null, { timeout: 20000 }).catch(() => {});
+
   const exported = async (format) => {
     await page.selectOption('#export-format', format);
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#export')]);
@@ -234,6 +269,23 @@ try {
     const { bytes } = await exported('png');
     check(bytes.readUInt32BE(16) === 1000 && bytes.readUInt32BE(20) === 500, `export at long side 1000: ${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`);
     await page.fill('#export-size', '');
+  }
+  {
+    // Export while still editing the crop (before Done) uses the crop being edited, not the
+    // uncropped frame that crop mode displays.
+    await page.click('#geometry button[data-action=crop-mode]');
+    await page.waitForSelector('#geometry-overlay [data-handle=br]', { timeout: 20000 }).catch(() => {});
+    const handle = await page.locator('#geometry-overlay [data-handle=br]').boundingBox();
+    const stage = await page.locator('#after').boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(stage.x + stage.width * 0.5, stage.y + stage.height * 0.5, { steps: 5 });
+    await page.mouse.up();
+    const { bytes } = await exported('png');
+    const [ew, eh] = [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
+    check(Math.abs(ew - 1300) <= 4 && Math.abs(eh - 650) <= 4, `export during crop editing gave ${ew}x${eh}, expected about 1300x650`);
+    await page.click('#geometry button[data-action=crop-done]');
+    await after(() => page.click('#geometry button[data-action=geometry-reset]'));
   }
   {
     const { name, bytes } = await exported('jpeg');
@@ -259,6 +311,29 @@ try {
   await after(() => page.click('#geometry button[data-action=geometry-reset]'));
   await sizesBecome(sizeBefore);
   check((await canvasSizes()) === sizeBefore, `after reset: ${await canvasSizes()}, expected ${sizeBefore}`);
+  check((await page.$eval('#geometry [data-action=straighten]', (el) => el.value)) === '0', 'Reset should move the straighten slider back to 0');
+
+  // After a flip, 'rotate right' turns what is shown clockwise: the new image is the flipped one
+  // with its pixels rotated (resampling at identity scale is a pure permutation).
+  await after(() => page.click('#geometry button[data-action=flip-h]'));
+  await page.waitForTimeout(300);
+  const flipped = await page.$eval('#after', (c) => ({ w: c.width, h: c.height, d: Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data) }));
+  await after(() => page.click('#geometry button[data-action=rotate-right]'));
+  await sizesBecome(`${ch}x${cw} ${ch}x${cw}`);
+  const turnedOk = await page.$eval('#after', (c, f) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let bad = 0;
+    // Clockwise: new (x, y) shows old (y, h - 1 - x).
+    for (let y = 0; y < c.height; y += 7) for (let x = 0; x < c.width; x += 7) {
+      const o = (((f.h - 1 - x) * f.w) + y) * 4;
+      const n = (y * c.width + x) * 4;
+      for (let k = 0; k < 4; k++) bad += Math.abs(d[n + k] - f.d[o + k]) > 2 ? 1 : 0;
+    }
+    return bad;
+  }, flipped);
+  check(turnedOk === 0, `after a flip, rotate right did not turn the shown image clockwise (${turnedOk} mismatching channels)`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await sizesBecome(sizeBefore);
 
   // Crop on the image: in crop mode the frame is shown uncropped; dragging the bottom-right
   // corner to the middle and pressing Done halves both sides.

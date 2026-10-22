@@ -70,7 +70,9 @@ export function validateGeometry(g: Geometry): void {
   if (![0, 90, 180, 270].includes(g.rotate)) fail('rotate must be 0, 90, 180 or 270');
   if (!(Math.abs(g.straighten) <= 45)) fail('straighten must be in [-45, 45] degrees');
   const { x, y, width, height } = g.crop;
-  if (![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > 1 + 1e-9 || y + height > 1 + 1e-9) {
+  // A small epsilon on the bounds: UI arithmetic can land a hair outside [0, 1].
+  const eps = 1e-9;
+  if (![x, y, width, height].every(Number.isFinite) || x < -eps || y < -eps || width <= 0 || height <= 0 || x + width > 1 + eps || y + height > 1 + eps) {
     fail('crop must be a non-empty rectangle inside [0, 1]²');
   }
   if (g.perspective) {
@@ -110,11 +112,16 @@ export function geometryFrame(g: Geometry, w: number, h: number): GeometryFrame 
   const t = (g.straighten * Math.PI) / 180;
   const [c, s] = [Math.cos(t), Math.sin(t)];
   const straighten = mul(mul(affine(1, 0, W / 2, 0, 1, H / 2), affine(c, s, 0, -s, c, 0)), affine(1, 0, -W / 2, 0, 1, -H / 2));
-  const crop = affine(1, 0, g.crop.x * W, 0, 1, g.crop.y * H);
+  // The output pixels cover exactly the crop rectangle (a whole number of pixels spread over it),
+  // so the result does not depend on which corner the grid is anchored to: turning or flipping
+  // the crop with the image gives the turned or flipped result.
+  const outW = Math.max(1, Math.round(g.crop.width * W));
+  const outH = Math.max(1, Math.round(g.crop.height * H));
+  const crop = affine((g.crop.width * W) / outW, 0, g.crop.x * W, 0, (g.crop.height * H) / outH, g.crop.y * H);
   const matrix = mul(mul(mul(orientation, perspective), straighten), crop);
   return {
-    width: Math.max(1, Math.round(g.crop.width * W)),
-    height: Math.max(1, Math.round(g.crop.height * H)),
+    width: outW,
+    height: outH,
     matrix,
     toSource(x, y) {
       const m = matrix;
@@ -153,4 +160,41 @@ export function isIdentityGeometry(g: Geometry): boolean {
   const square = !q || [[0, 0], [1, 0], [1, 1], [0, 1]].every(([u, v], i) => q[i]![0] === u && q[i]![1] === v);
   const c = g.crop;
   return g.rotate === 0 && !g.flipH && !g.flipV && g.straighten === 0 && square && c.x === 0 && c.y === 0 && c.width === 1 && c.height === 1;
+}
+
+type Quad = readonly [Vec2, Vec2, Vec2, Vec2];
+const mapQuad = (q: Quad, order: readonly [number, number, number, number], f: (p: Vec2) => Vec2): Quad =>
+  order.map((i) => f(q[i]!)) as unknown as Quad;
+
+/**
+ * The geometry whose result is this one's result turned a quarter clockwise ('cw') or
+ * counter-clockwise ('ccw'). Crop and perspective follow the content. With a single flip, turning
+ * what is shown clockwise is a counter-clockwise turn of the source (a mirror reverses rotations).
+ */
+export function turnGeometry(g: Geometry, dir: 'cw' | 'ccw'): Geometry {
+  const cw = dir === 'cw';
+  const mirrored = g.flipH !== g.flipV;
+  const rotate = ((g.rotate + (cw !== mirrored ? 90 : 270)) % 360) as Geometry['rotate'];
+  const { x, y, width, height } = g.crop;
+  const crop = cw ? { x: 1 - (y + height), y: x, width: height, height: width } : { x: y, y: 1 - (x + width), width: height, height: width };
+  // New corner k (tl, tr, br, bl) is the turned image of an old corner.
+  const perspective = g.perspective && (cw ? mapQuad(g.perspective, [3, 0, 1, 2], ([u, v]) => [1 - v, u]) : mapQuad(g.perspective, [1, 2, 3, 0], ([u, v]) => [v, 1 - u]));
+  return { ...g, rotate, crop, ...(perspective ? { perspective } : {}) };
+}
+
+/** The geometry whose result is this one's result mirrored left-right ('h') or top-bottom ('v'). */
+export function flipGeometry(g: Geometry, axis: 'h' | 'v'): Geometry {
+  const h = axis === 'h';
+  const { x, y, width, height } = g.crop;
+  const crop = h ? { x: 1 - x - width, y, width, height } : { x, y: 1 - y - height, width, height };
+  const perspective = g.perspective && (h ? mapQuad(g.perspective, [1, 0, 3, 2], ([u, v]) => [1 - u, v]) : mapQuad(g.perspective, [3, 2, 1, 0], ([u, v]) => [u, 1 - v]));
+  return {
+    ...g,
+    flipH: h ? !g.flipH : g.flipH,
+    flipV: h ? g.flipV : !g.flipV,
+    // A mirror reverses the direction of the straighten rotation.
+    straighten: -g.straighten || 0,
+    crop,
+    ...(perspective ? { perspective } : {}),
+  };
 }

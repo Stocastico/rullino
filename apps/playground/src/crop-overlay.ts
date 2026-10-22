@@ -1,4 +1,5 @@
 import type { Geometry } from '@rullino/core';
+import { makeDraggable } from './drag';
 
 // On-image crop editing: the frame is shown uncropped, with the crop rectangle, darkened outside,
 // four corner handles and a draggable body. Coordinates are the frame's display pixels
@@ -58,31 +59,15 @@ export function createCropOverlay(svg: SVGSVGElement, onChange: (crop: Crop) => 
     }
   };
 
-  const drag = (node: SVGElement, move: (u: number, v: number, start: { u: number; v: number; crop: Crop }) => Crop) => {
-    node.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      node.setPointerCapture(e.pointerId);
-      const r = svg.getBoundingClientRect();
-      const uv = (ev: PointerEvent) => [(ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height] as const;
-      const [u0, v0] = uv(e);
+  const drag = (node: SVGElement, move: (u: number, v: number, start: { u: number; v: number; crop: Crop }) => Crop) =>
+    makeDraggable(node, svg, (u0, v0) => {
       const start = { u: u0, v: v0, crop };
-      const onMove = (ev: PointerEvent) => {
-        const [u, v] = uv(ev);
+      return (u, v) => {
         crop = move(u, v, start);
         update();
         onChange(crop);
       };
-      const stop = () => {
-        node.removeEventListener('pointermove', onMove);
-        node.removeEventListener('pointerup', stop);
-        node.removeEventListener('pointercancel', stop);
-      };
-      node.addEventListener('pointermove', onMove);
-      node.addEventListener('pointerup', stop);
-      node.addEventListener('pointercancel', stop);
     });
-  };
 
   // Moving keeps the size and stays inside the frame.
   drag(body, (u, v, s) => ({
@@ -108,7 +93,8 @@ export function createCropOverlay(svg: SVGSVGElement, onChange: (crop: Crop) => 
         width *= k;
         height *= k;
       }
-      return { x: left ? ax - width : ax, y: top ? ay - height : ay, width, height };
+      // Clamped: the rescale above can land a hair below 0.
+      return { x: Math.max(0, left ? ax - width : ax), y: Math.max(0, top ? ay - height : ay), width, height };
     });
   }
 

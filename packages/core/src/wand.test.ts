@@ -75,4 +75,9 @@ describe('magicWand', () => {
     expect([...added.data].some((v) => v > 0 && v < 1)).toBe(true);
     expect([...magicWand(im, seedAt(im, 0, 0), { ...opts, into: added, subtract: true }).data]).toEqual(new Array(10).fill(0));
   });
+
+  it('at tolerance 0 selects exactly the seed colour (not nothing)', () => {
+    const im = img(rows);
+    expect(show(magicWand(im, seedAt(im, 0, 0), { tolerance: 0 }))).toEqual(['110000', '110000', '000000', '000000']);
+  });
 });

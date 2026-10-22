@@ -39,8 +39,9 @@ export function magicWand(img: LinearImage, seed: Vec2, options: WandOptions): R
   const inner = tol * (1 - Math.min(1, Math.max(0, options.softness ?? 0)));
   const value = (i: number) => {
     const d = Math.hypot(lab[i * 4]! - lab[s]!, lab[i * 4 + 1]! - lab[s + 1]!, lab[i * 4 + 2]! - lab[s + 2]!, lab[i * 4 + 3]! - lab[s + 3]!);
-    if (d >= tol) return 0;
+    // Exact matches first: at tolerance 0 the seed colour itself is still selected.
     if (d <= inner) return 1;
+    if (d >= tol) return 0;
     const t = (d - inner) / (tol - inner);
     return 1 - t * t * (3 - 2 * t);
   };

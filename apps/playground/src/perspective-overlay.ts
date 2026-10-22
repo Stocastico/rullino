@@ -1,4 +1,5 @@
 import { validateGeometry, IDENTITY_GEOMETRY, type Vec2 } from '@rullino/core';
+import { makeDraggable } from './drag';
 
 // On-image perspective editing: four handles (top-left, top-right, bottom-right, bottom-left)
 // placed on the corners of something that should be rectangular; on Done that quadrilateral fills
@@ -32,27 +33,13 @@ export function createPerspectiveOverlay(svg: SVGSVGElement, onChange: (quad: Qu
     const c = document.createElementNS(NS, 'circle');
     c.setAttribute('class', 'mask-handle');
     c.dataset.handle = `p${i}`;
-    c.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      c.setPointerCapture(e.pointerId);
-      const move = (ev: PointerEvent) => {
-        const r = svg.getBoundingClientRect();
-        const p: Vec2 = [Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height))];
-        const next = quad.map((q, j) => (j === i ? p : q)) as unknown as Quad;
-        if (!convex(next)) return;
-        quad = next;
-        update();
-        onChange(quad);
-      };
-      const stop = () => {
-        c.removeEventListener('pointermove', move);
-        c.removeEventListener('pointerup', stop);
-        c.removeEventListener('pointercancel', stop);
-      };
-      c.addEventListener('pointermove', move);
-      c.addEventListener('pointerup', stop);
-      c.addEventListener('pointercancel', stop);
+    makeDraggable(c, svg, () => (u, v) => {
+      const p: Vec2 = [Math.min(1, Math.max(0, u)), Math.min(1, Math.max(0, v))];
+      const next = quad.map((q, j) => (j === i ? p : q)) as unknown as Quad;
+      if (!convex(next)) return;
+      quad = next;
+      update();
+      onChange(quad);
     });
     return c;
   });
