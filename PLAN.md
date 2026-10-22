@@ -97,7 +97,7 @@ Tiers: **A** = MVP, **B** = second wave, **C** = once the rest is solid.
 - **B** non-linear: median, bilateral, guided filter, Kuwahara
 - **B** morphology: erode, dilate, open, close, gradient, top-hat; configurable structuring element
 - **B** histogram (computation + display), equalization, **CLAHE**
-- **B** geometry: resize (bilinear, bicubic, Lanczos), rotate, flip, crop, straighten, perspective / homography, lens distortion correction
+- **B** geometry: rotate, flip, crop, straighten, perspective / homography (*done*, as a frame before the chain), export size (*done*); lens distortion correction and higher-quality resampling (bicubic, Lanczos) later
 - **C** **Hough** lines and circles, Harris / Shi-Tomasi, connected components, distance transform, denoise (non-local means), FFT and frequency-domain filters
 
 ### 4.4 Stylization and creative
