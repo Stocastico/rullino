@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyGeometryCpu, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, validateGeometry, type Geometry } from './geometry';
+import { applyGeometryCpu, flipGeometry, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, turnGeometry, validateGeometry, type Geometry } from './geometry';
 import { createImage, type LinearImage } from './image';
 
 /** A w x h image whose red channel encodes the pixel index (distinct values), alpha 1. */
@@ -93,5 +93,34 @@ describe('geometry', () => {
     expect(isIdentityGeometry(g({ perspective: [[0, 0], [1, 0], [1, 1], [0, 1]] }))).toBe(true);
     for (const patch of [{ rotate: 90 }, { flipH: true }, { straighten: 0.5 }, { crop: { x: 0, y: 0, width: 0.9, height: 1 } }, { perspective: [[0.1, 0], [1, 0], [1, 1], [0, 1]] }] as const)
       expect(isIdentityGeometry(g(patch as Partial<Geometry>))).toBe(false);
+  });
+
+  describe('turning and flipping what is shown', () => {
+    const img = indexed(13, 9);
+    const full: Geometry = {
+      rotate: 90,
+      flipH: false,
+      flipV: false,
+      straighten: 7,
+      perspective: [[0.05, 0.1], [0.9, 0], [1, 0.95], [0, 0.85]],
+      crop: { x: 0.1, y: 0.2, width: 0.6, height: 0.7 },
+    };
+    const starts = [full, { ...full, flipH: true }, { ...full, flipV: true }, { ...full, flipH: true, flipV: true, rotate: 270 as const }];
+    const near = (a: LinearImage, b: LinearImage) => {
+      expect([a.width, a.height]).toEqual([b.width, b.height]);
+      for (let i = 0; i < a.data.length; i++) expect(a.data[i]).toBeCloseTo(b.data[i]!, 5);
+    };
+
+    it.each(starts.map((s, i) => [i, s] as const))('turning start %i clockwise / counter-clockwise turns the result', (_, start) => {
+      const shown = applyGeometryCpu(img, start);
+      near(applyGeometryCpu(img, turnGeometry(start, 'cw')), applyGeometryCpu(shown, g({ rotate: 90 })));
+      near(applyGeometryCpu(img, turnGeometry(start, 'ccw')), applyGeometryCpu(shown, g({ rotate: 270 })));
+    });
+
+    it.each(starts.map((s, i) => [i, s] as const))('flipping start %i mirrors the result', (_, start) => {
+      const shown = applyGeometryCpu(img, start);
+      near(applyGeometryCpu(img, flipGeometry(start, 'h')), applyGeometryCpu(shown, g({ flipH: true })));
+      near(applyGeometryCpu(img, flipGeometry(start, 'v')), applyGeometryCpu(shown, g({ flipV: true })));
+    });
   });
 });
