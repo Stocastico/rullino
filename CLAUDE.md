@@ -38,6 +38,8 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
 - `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch; `scripts/smoke.mjs` is the e2e smoke test.
 
+- `.claude/skills/` — repo skills: `add-filter` (the recipe for a new filter, tests to mutation check) and `finish-step` (verification, CLAUDE.md upkeep, PR and CI). `.claude/settings.json` enables two official plugins: `claude-md-management` and `skill-creator`.
+
 ## Rules
 
 - **Red/green.** Write the test first, run it, see it fail, then implement. For GPU code, also check that the parity test catches a deliberately broken shader before trusting it.
@@ -163,6 +165,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Coverage: v8 over unit + browser projects together, thresholds per area (packages, playground) just below the measured values; `main.ts` excluded (entry wiring, exercised by the e2e smoke test) | Thresholds catch untested new code without flaking on rounding. Raise them as coverage improves, never lower them to pass a PR. The e2e test is not instrumented (minified build), hence the one exclusion. |
 | Playground UI modules have browser tests driven by synthetic pointer events; `drag.ts` `capture()` tolerates pointers that cannot be captured | Synthetic pointers cannot be captured (`setPointerCapture` throws); real ones always can, and a drag still works without capture while events reach the handle. |
 | CI runs on pull requests, pushes to main and manual dispatch; one job, `test`, is the required check for merging | Running on every branch push as well gave PRs a second, skipped `test` check, which branch protection counts as passed: a PR could be merged before the real run ended. |
+| Repo skills for the recurring workflows; official Anthropic plugins only (`claude-md-management`, `skill-creator`) | The add-filter and finish-step recipes were being re-derived every time; third-party skills were reviewed and rejected (overlap, or unvetted install scripts). |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
