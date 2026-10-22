@@ -22,7 +22,9 @@ export const emptyBrush = (): Mask => ({ kind: 'raster', raster: createRasterMas
 
 /** Tool settings, shared by every brush mask (tools, not part of the mask). */
 export const tools = {
-  tool: 'paint' as 'paint' | 'erase' | 'wand',
+  tool: 'paint' as 'paint' | 'erase' | 'wand' | 'object',
+  /** Changes when a new object selection starts (the Object tool's points begin again). */
+  objectSession: 0,
   radius: 0.04,
   hardness: 0.5,
   tolerance: 0.1,
@@ -119,8 +121,9 @@ export function renderMaskControls(root: HTMLElement, get: () => Mask | undefine
       };
       const mode = document.createElement('div');
       mode.className = 'brush-mode';
-      for (const [tool, text] of [['paint', 'Paint'], ['erase', 'Erase'], ['wand', 'Wand']] as const) {
+      for (const [tool, text] of [['paint', 'Paint'], ['erase', 'Erase'], ['wand', 'Wand'], ['object', 'Object']] as const) {
         const b = button(text, `tool-${tool}`, () => {
+          if (tool === 'object') tools.objectSession++;
           tools.tool = tool;
           draw();
         });
@@ -138,7 +141,12 @@ export function renderMaskControls(root: HTMLElement, get: () => Mask | undefine
       );
       const hint = (text: string) => Object.assign(document.createElement('p'), { className: 'hint', textContent: text });
       root.append(mode);
-      if (tools.tool === 'wand') {
+      if (tools.tool === 'object') {
+        root.append(
+          button('New object', 'object-new', () => tools.objectSession++),
+          hint('Click an object to select it; Alt+click excludes a part. The first use downloads a model (14–40 MB).'),
+        );
+      } else if (tools.tool === 'wand') {
         const contiguous = Object.assign(document.createElement('input'), { type: 'checkbox', checked: tools.contiguous });
         contiguous.addEventListener('change', () => (tools.contiguous = contiguous.checked));
         const contiguousLabel = document.createElement('label');

@@ -15,6 +15,8 @@
     "test:coverage": "vitest run --project unit --project browser --coverage",
     "dev": "pnpm --filter @rullino/playground dev",
     "test:e2e": "pnpm --filter @rullino/playground smoke",
+    "test:ml": "node scripts/fetch-models.mjs && vitest run --project ml",
+    "test:e2e:ml": "node scripts/fetch-models.mjs && pnpm --filter @rullino/playground smoke:ml",
     "bench": "vitest run --project bench && cat packages/filters/bench/results.txt"
   },
   "devDependencies": {
@@ -22,6 +24,7 @@
     "@vitest/browser-playwright": "5.0.5",
     "@vitest/coverage-v8": "5.0.5",
     "@webgpu/types": "0.1.74",
+    "onnxruntime-web": "1.30.0",
     "playwright": "1.56.1",
     "typescript": "7.0.2",
     "vite": "8.3.5",

@@ -29,6 +29,14 @@ export default defineConfig({
         },
       },
       {
+        // The ML models themselves (downloaded by scripts/fetch-models.mjs): `pnpm test:ml`.
+        test: {
+          name: 'ml',
+          environment: 'node',
+          include: ['packages/ml/test/**/*.integration.test.ts'],
+        },
+      },
+      {
         test: {
           name: 'bench',
           include: ['packages/*/bench/**/*.bench.browser.ts'],

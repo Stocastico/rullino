@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('mask overlay', () => {
-  const setup = (mask: Mask | undefined, wandCalls: [Vec2, boolean][] = []) => {
+  const setup = (mask: Mask | undefined, wandCalls: [Vec2, boolean][] = [], objectCalls: [Vec2, boolean][] = []) => {
     const svg = svgBox(200, 100);
     const changes: Mask[] = [];
     let drags = 0;
@@ -21,6 +21,7 @@ describe('mask overlay', () => {
       tool: () => tools.tool,
       brush: () => ({ radius: 0.05, hardness: 1, erase: false }),
       wand: (uv, subtract) => wandCalls.push([uv, subtract]),
+      object: (uv, subtract) => objectCalls.push([uv, subtract]),
       fit: (m) => m,
     });
     overlay.show(mask, 400, 200);
@@ -71,6 +72,13 @@ describe('mask overlay', () => {
     expect(svg.classList.contains('wand')).toBe(true);
     press(svg, ...at(svg, 0.5, 0.5), { altKey: true });
     expect(round(wandCalls)).toEqual([[[0.5, 0.5], true]]);
+    const objectCalls: [Vec2, boolean][] = [];
+    const other = setup({ kind: 'raster', raster: createRasterMask(40, 20) }, [], objectCalls);
+    tools.tool = 'object';
+    press(other.svg, ...at(other.svg, 0.25, 0.75));
+    press(other.svg, ...at(other.svg, 0.5, 0.5), { altKey: true });
+    expect(round(objectCalls)).toEqual([[[0.25, 0.75], false], [[0.5, 0.5], true]]);
+    expect(other.changes).toHaveLength(0); // no painting in object mode
     // Switching kind rebuilds: no more brush handlers.
     overlay.show(undefined, 400, 200);
     expect([svg.children.length, svg.classList.contains('painting'), svg.onpointerdown]).toEqual([0, false, null]);
@@ -106,6 +114,15 @@ describe('mask panel', () => {
     expect(mask()).toBeUndefined();
     const required = setup(emptyBrush(), true);
     expect([...required.q<HTMLSelectElement>('[data-action=mask-kind]')!.options].map((o) => o.value)).toEqual(['linear', 'radial', 'brush']);
+  });
+
+  it('the Object tool starts a new object session when chosen and on "New object"', () => {
+    const { q } = setup({ kind: 'raster', raster: createRasterMask(4, 4) });
+    const before = tools.objectSession;
+    q<HTMLButtonElement>('[data-action=tool-object]')!.click();
+    expect([tools.tool, tools.objectSession]).toEqual(['object', before + 1]);
+    q<HTMLButtonElement>('[data-action=object-new]')!.click();
+    expect(tools.objectSession).toBe(before + 2);
   });
 
   it('brush masks have tools, size / hardness / tolerance settings, clear and refine', async () => {
