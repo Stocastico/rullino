@@ -31,10 +31,11 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `png.ts` dependency-free PNG encoder (8/16-bit RGBA); `encode.ts` `encodeImage` (PNG / JPEG / WebP from a `LinearImage`); `gpu/export.ts` `exportImage` from a texture.
   - `mask.ts` masks (linear, radial, raster), CPU `maskValue` / `maskImage` / `blendMasked` / `resampleRaster`; `gpu/mask.ts` the WGSL twin, `blendMask` and `renderMask`; `paint.ts` `paintStroke` (brush on raster masks); `wand.ts` `magicWand`; `refine.ts` `refineMask` (guided filter).
   - `geometry.ts` `Geometry` (orientation, perspective, straighten, crop) composed into one homography, `geometryFrame`, CPU `applyGeometryCpu`; `gpu/geometry.ts` `applyGeometry`.
+  - `serialize.ts` `serializeChain` / `parseChain` (chain + geometry as JSON).
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
@@ -141,6 +142,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Masks and the crop live in the framed image's coordinates | Masks are drawn on what is shown. Changing the crop or straighten after drawing a mask moves it relative to the content (it keeps its normalised position). |
 | Crop / perspective edited on the image with the frame shown without them; applied on Done | You need to see what is outside the crop or before the correction to place the handles. |
 | Export size = long side, linear-light area downscale after the full-resolution chain; never enlarges | Pixel-unit params keep their full-resolution meaning; shrinking after the chain is the correct order. |
+| Chains serialise to plain JSON (`serializeChain` / `parseChain`): defaults omitted, raster masks as 8-bit base64, LUTs by reference only | Short share links and saved presets; a LUT table (430 KB at 33³) cannot travel in a link, so callers name LUTs (the playground: `look:<id>`) and a chain with a loaded .cube file cannot be shared. |
+| Undo / redo over immutable snapshots (chain + geometry), recorded when a gesture ends (not while dragging or editing the crop) | States are already immutable, so a snapshot is two references; one slider drag or brush stroke is one undo step. Selection changes are not edits. |
+| Share links in the URL fragment: JSON, `deflate-raw`, base64url; they name a sample image, never include the user's own | The fragment never reaches a server; the user's photo stays on their machine. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps

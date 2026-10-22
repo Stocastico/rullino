@@ -13,6 +13,9 @@ import {
   geometryFrame,
   histogramSrgb8,
   IDENTITY_GEOMETRY,
+  defaultParams,
+  parseChain,
+  serializeChain,
   isIdentityGeometry,
   importImage,
   readImage,
@@ -28,7 +31,7 @@ import {
   type Step,
 } from '@rullino/core';
 import { filters } from '@rullino/filters';
-import { looks, lookSteps } from '@rullino/presets';
+import { lookLut, looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
 import { renderGeometryControls, type Aspect, type EditMode } from './geometry-ui';
@@ -37,6 +40,8 @@ import { drawHistogram } from './histogram-view';
 import { createMaskOverlay } from './mask-overlay';
 import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
 import { samples } from './samples';
+import { History } from './history';
+import { decodeState, encodeState } from './share';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
 const DISPLAY_SIDE = 2048;
@@ -64,6 +69,9 @@ const ui = {
   exportQuality: $<HTMLInputElement>('export-quality'),
   exportSize: $<HTMLInputElement>('export-size'),
   exportButton: $<HTMLButtonElement>('export'),
+  undo: $<HTMLButtonElement>('undo'),
+  redo: $<HTMLButtonElement>('redo'),
+  share: $<HTMLButtonElement>('share'),
 };
 const beforeCtx = ui.before.getContext('2d')!;
 const afterCtx = ui.after.getContext('2d')!;
@@ -283,6 +291,8 @@ function cpuRenderer(): Renderer {
 let renderer: Renderer;
 let imageInfo = '';
 let imageName = 'image';
+/** The sample shown, or undefined for the user's own image (share links name samples only). */
+let imageSample: string | undefined;
 let loaded = false;
 let dragging = false;
 let busy = false;
@@ -291,6 +301,7 @@ let frames = 0;
 
 async function render() {
   if (!loaded) return;
+  recordHistory();
   if (busy) return void (dirty = true);
   busy = true;
   do {
@@ -400,7 +411,7 @@ ui.geometry.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
 });
 
-function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
+function loadImage(source: ImageBitmapSource, name: string, sample?: string): Promise<void> {
   const id = ++latestLoad;
   loads = loads.then(async () => {
     if (id !== latestLoad) return;
@@ -416,6 +427,7 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
       showOverlay();
       showCrop();
       imageName = name.replace(/\.[^.]+$/, '') || 'image';
+      imageSample = sample;
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
       image.close();
       loaded = true;
@@ -530,7 +542,7 @@ window.addEventListener('pointerup', () => {
 for (const s of samples) ui.sample.append(new Option(s.label, s.id));
 ui.sample.addEventListener('change', () => {
   const s = samples.find((s) => s.id === ui.sample.value)!;
-  void loadImage(s.make(), s.label);
+  void loadImage(s.make(), s.label, s.id);
 });
 
 ui.file.addEventListener('change', () => {
@@ -579,6 +591,112 @@ ui.before.style.pointerEvents = 'none';
 setSplit(0.5);
 
 // ---------------------------------------------------------------------------------------------
+// Undo / redo and share links.
+
+interface Snapshot {
+  readonly chain: ChainState;
+  readonly geometry: Geometry;
+}
+// States are immutable, so a snapshot is two references. The selection is not an edit.
+const history = new History<Snapshot>(
+  { chain, geometry },
+  { same: (a, b) => a.chain.steps === b.chain.steps && a.geometry === b.geometry },
+);
+const updateHistoryButtons = () => {
+  ui.undo.disabled = !history.canUndo;
+  ui.redo.disabled = !history.canRedo;
+};
+/** Records the current state once a gesture is over (not while dragging or editing the crop). */
+function recordHistory(): void {
+  if (dragging || editMode !== 'none') return;
+  history.record({ chain, geometry });
+  updateHistoryButtons();
+}
+function applySnapshot(s: Snapshot): void {
+  // Keep the selected step if it still exists.
+  const selected = s.chain.steps.some((st) => st.uid === chain.selected) ? chain.selected : s.chain.selected;
+  chain = { ...s.chain, selected };
+  chainUi.set(chain, true);
+  if (s.geometry !== geometry) {
+    setGeometry(s.geometry);
+    geometryControls.refresh();
+  }
+  showOverlay();
+  updateHistoryButtons();
+  void render();
+}
+const undo = () => {
+  const s = history.undo();
+  if (s) applySnapshot(s);
+};
+const redo = () => {
+  const s = history.redo();
+  if (s) applySnapshot(s);
+};
+ui.undo.addEventListener('click', undo);
+ui.redo.addEventListener('click', redo);
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  // Text fields keep their own undo.
+  const t = e.target as HTMLElement;
+  if (t instanceof HTMLInputElement && ['text', 'number'].includes(t.type)) return;
+  const key = e.key.toLowerCase();
+  if (key === 'z' && !e.shiftKey) undo();
+  else if ((key === 'z' && e.shiftKey) || key === 'y') redo();
+  else return;
+  e.preventDefault();
+});
+
+// LUTs travel by name: only the looks' baked LUTs can be referenced.
+const lutRef = (lut: unknown) => {
+  const look = looks.find((l) => lookLut(l) === lut);
+  return look && `look:${look.id}`;
+};
+const resolveLut = (ref: string) => {
+  const look = looks.find((l) => `look:${l.id}` === ref);
+  return look && lookLut(look);
+};
+
+ui.share.addEventListener('click', async () => {
+  try {
+    const doc = serializeChain(toSteps(chain), { geometry, lutRef });
+    const sample = imageSample;
+    const text = await encodeState({ chain: doc, ...(sample ? { sample } : {}) });
+    const url = `${location.origin}${location.pathname}#s=${text}`;
+    window.history.replaceState(null, '', url);
+    await navigator.clipboard?.writeText(url).catch(() => undefined);
+    ui.status.textContent = `Link copied (${(url.length / 1024).toFixed(1)} KB)${sample ? '' : ' · it applies the edits to a sample image: your own image is not included'}`;
+  } catch (e) {
+    ui.status.textContent = `Cannot share: ${(e as Error).message}`;
+  }
+});
+
+/** The edits and sample image in the URL fragment, if any. */
+async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } | undefined> {
+  const text = new URLSearchParams(location.hash.slice(1)).get('s');
+  if (!text) return undefined;
+  try {
+    const state = (await decodeState(text)) as { chain?: unknown; sample?: unknown };
+    const { steps, geometry: g } = parseChain(state.chain, { filters, resolveLut });
+    const states = steps.map((st) => ({
+      ...newStep(st.filter),
+      params: { ...defaultParams(st.filter.params), ...st.params },
+      enabled: st.enabled !== false,
+      ...(st.mask ? { mask: st.mask } : {}),
+    }));
+    // A mask-aware step from a link without a mask keeps the empty brush newStep gave it.
+    return {
+      snapshot: { chain: { steps: states, selected: states[0]?.uid }, geometry: g ?? IDENTITY_GEOMETRY },
+      ...(typeof state.sample === 'string' ? { sample: state.sample } : {}),
+    };
+  } catch (e) {
+    ui.status.textContent = `Invalid link: ${(e as Error).message}`;
+    console.error(e);
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 
 try {
   renderer = gpuRenderer(await createGpuContext());
@@ -587,5 +705,12 @@ try {
   renderer = cpuRenderer();
   ui.status.textContent = `WebGPU unavailable (${(e as Error).message}); using the CPU reference.`;
 }
-const first = samples[0]!;
-await loadImage(first.make(), first.label);
+const shared = await readShareLink();
+const first = samples.find((s) => s.id === shared?.sample) ?? samples[0]!;
+ui.sample.value = first.id;
+await loadImage(first.make(), first.label, first.id);
+if (shared) {
+  // The linked state is where history starts, not an undoable edit of the default chain.
+  history.replace(shared.snapshot);
+  applySnapshot(shared.snapshot);
+}

@@ -61,6 +61,28 @@ try {
   const changed = await differs();
   check(changed > 0.3, `exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
 
+  // Undo / redo: Ctrl+Z goes back to 0 EV (one step for the whole change), the Redo button forward again.
+  const ev = () => page.$eval('#chain [name=ev]', (el) => el.value);
+  await after(() => page.keyboard.press('Control+z'));
+  check((await ev()) === '0' && (await differs()) < 0.01, `undo should restore 0 EV, slider ${await ev()}`);
+  await after(() => page.click('#redo'));
+  check((await ev()) === '1.5' && (await differs()) > 0.3, `redo should restore +1.5 EV, slider ${await ev()}`);
+
+  // A share link opens the same edits in a fresh page.
+  await page.click('#share');
+  await page.waitForFunction(() => location.hash.startsWith('#s='));
+  const link = await page.evaluate(() => location.href);
+  {
+    const other = await browser.newPage();
+    other.on('pageerror', (e) => failures.push(`page error (shared link): ${e.message}`));
+    await other.goto(link);
+    await other.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+    const sharedEv = await other.$eval('#chain [name=ev]', (el) => el.value);
+    check(sharedEv === '1.5', `shared link should open with +1.5 EV, slider ${sharedEv}`);
+    check(await other.$eval('#undo', (b) => b.disabled), 'a shared link should not start with an undo step');
+    await other.close();
+  }
+
   // A linear-gradient mask (top to bottom by default) restricts the step to the bottom of the image.
   const rowDiff = () =>
     page.evaluate(() => {
