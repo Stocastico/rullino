@@ -85,4 +85,70 @@ describe('renderChain', () => {
   it('shows a hint for an empty chain', () => {
     expect(setup().root.textContent).toMatch(/add a filter/i);
   });
+
+  it('removing the selected step selects its neighbour (previous first)', () => {
+    const { last, add, click } = setup();
+    add('alpha');
+    add('beta');
+    add('gamma');
+    click(1, 'select');
+    click(1, 'remove');
+    expect(last().selected).toBe(last().steps[0]!.uid);
+    click(0, 'select');
+    click(0, 'remove');
+    expect(last().selected).toBe(last().steps[0]!.uid); // no previous: the next one
+    click(0, 'remove');
+    expect(last()).toEqual({ steps: [], selected: undefined });
+  });
+
+  it('moving past the ends does nothing (buttons disabled)', () => {
+    const { root, states, add } = setup();
+    add('alpha');
+    add('beta');
+    const [first, second] = [...root.querySelectorAll('[data-step]')];
+    expect(first!.querySelector<HTMLButtonElement>('[data-action=up]')!.disabled).toBe(true);
+    expect(second!.querySelector<HTMLButtonElement>('[data-action=down]')!.disabled).toBe(true);
+    const n = states.length;
+    first!.querySelector<HTMLButtonElement>('[data-action=up]')!.click();
+    expect(states.length).toBe(n);
+  });
+
+  it('adds a look as a group of steps, selecting its first step', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const states: ChainState[] = [];
+    renderChain(root, filters, { steps: [], selected: undefined }, (s) => states.push(s), [
+      { id: 'pair', label: 'Pair', steps: () => [{ filter: filters[0]! }, { filter: filters[1]!, params: { k: 2 } }] },
+    ]);
+    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add-look]')!;
+    sel.value = 'unknown';
+    sel.dispatchEvent(new Event('change'));
+    expect(states).toHaveLength(0);
+    sel.value = 'pair';
+    sel.dispatchEvent(new Event('change'));
+    const last = states.at(-1)!;
+    expect(last.steps.map((s) => [s.filterId, s.params.k])).toEqual([['alpha', 1], ['beta', 2]]);
+    expect(last.selected).toBe(last.steps[0]!.uid);
+  });
+
+  it('mask-aware filters start with a brush mask that cannot be removed; descriptions show as hints', () => {
+    const needsMask = { ...filters[0]!, id: 'needs', kind: 'multipass', usesMask: true, description: 'Paints over things.', passes: [] } as never;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const states: ChainState[] = [];
+    const chain = renderChain(root, [needsMask], { steps: [], selected: undefined }, (s) => states.push(s));
+    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
+    sel.value = 'needs';
+    sel.dispatchEvent(new Event('change'));
+    expect(states.at(-1)!.steps[0]!.mask?.kind).toBe('raster');
+    expect(root.querySelector('.hint')!.textContent).toBe('Paints over things.');
+    expect([...root.querySelector<HTMLSelectElement>('[data-action=mask-kind]')!.options].map((o) => o.value)).not.toContain('none');
+    // The mask panel reads the current state: a change made elsewhere shows after set().
+    chain.set({ ...states.at(-1)!, steps: states.at(-1)!.steps.map((s) => ({ ...s, mask: { kind: 'linear', from: [0, 0], to: [1, 1] } })) }, true);
+    expect(root.querySelector<HTMLSelectElement>('[data-action=mask-kind]')!.value).toBe('linear');
+    const opacity = root.querySelector<HTMLInputElement>('[data-action=mask-opacity]')!;
+    opacity.value = '0.3';
+    opacity.dispatchEvent(new Event('input'));
+    expect(states.at(-1)!.steps[0]!.mask).toMatchObject({ kind: 'linear', opacity: 0.3 });
+  });
 });

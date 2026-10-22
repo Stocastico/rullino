@@ -1,5 +1,5 @@
-import { defaultParams } from '@rullino/core';
-import { describe, expect, it } from 'vitest';
+import { defaultParams, identityLut } from '@rullino/core';
+import { describe, expect, it, vi } from 'vitest';
 import { renderControls } from './controls';
 
 const schema = {
@@ -129,5 +129,56 @@ describe('renderControls', () => {
     expect(tint.value).toBe('#ff8000');
     fire(tint, '#336699');
     expect(changes.at(-1)!.tint).toEqual([0x33 / 255, 0x66 / 255, 0x99 / 255]);
+  });
+
+  it('toggles booleans, resets a slider by double-click and shows descriptions as tooltips', () => {
+    const described = { ...schema, amount: { ...schema.amount, description: 'How much.' } } as const;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const changes: Record<string, unknown>[] = [];
+    renderControls(root, described, defaultParams(described), (v) => changes.push(v));
+    fire(root.querySelector<HTMLInputElement>('[name=invert]')!, true, 'change');
+    expect(changes.at(-1)!.invert).toBe(true);
+    const amount = root.querySelector<HTMLInputElement>('[name=amount]')!;
+    fire(amount, '0.7');
+    amount.dispatchEvent(new Event('dblclick'));
+    expect([changes.at(-1)!.amount, amount.value]).toEqual([0, '0']);
+    expect(amount.closest<HTMLElement>('.control')!.title).toBe('How much.');
+  });
+
+  it('ignores invalid kernel cells', () => {
+    const k = { kernel: { type: 'kernel', size: 3, default: [0, 0, 0, 0, 1, 0, 0, 0, 0], label: 'Kernel' } } as const;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const changes: unknown[] = [];
+    renderControls(root, k, defaultParams(k), (v) => changes.push(v));
+    const cell = root.querySelector<HTMLInputElement>('[data-kernel-index="4"]')!;
+    fire(cell, '');
+    expect(changes).toHaveLength(0);
+  });
+
+  it('loads a LUT file, reports a broken one, and shows the identity by default', async () => {
+    const l = { look: { type: 'lut', default: identityLut(2), label: 'Look' } } as const;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const changes: Record<string, unknown>[] = [];
+    renderControls(root, l, defaultParams(l), (v) => changes.push(v));
+    const info = root.querySelector('.lut-info')!;
+    expect(info.textContent).toBe('None (identity)');
+    const input = root.querySelector<HTMLInputElement>('[name=look]')!;
+    const pick = async (file: File) => {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change'));
+      await vi.waitFor(() => expect(input.value).toBe(''));
+    };
+    await pick(new File(['LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n'], 'mine.cube'));
+    expect(info.textContent).toBe('mine · 2³');
+    expect((changes.at(-1)!.look as { size: number }).size).toBe(2);
+    await pick(new File(['not a lut'], 'bad.cube'));
+    expect(info.classList.contains('error')).toBe(true);
+    expect(info.textContent).toMatch(/Could not read bad\.cube/);
+    expect(changes).toHaveLength(1);
   });
 });
