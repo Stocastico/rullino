@@ -27,7 +27,7 @@ describe('autoAdjust', () => {
     expect(a.levels.gamma).toBeLessThan(1.15);
   });
 
-  it('reduces a colour cast on near-neutral content (70%: less than half remains)', () => {
+  it('reduces a colour cast on near-neutral content, conservatively', () => {
     // A warm cast: linear gains on a neutral scene.
     const img = encoded(64, 64, neutral);
     for (let i = 0; i < img.data.length; i += 4) {
@@ -43,7 +43,8 @@ describe('autoAdjust', () => {
       for (let i = 0; i < d.length; i += 4) [r, b] = [r + d[i]!, b + d[i + 2]!];
       return r / b;
     };
-    expect(Math.log(ratio(out.data))).toBeLessThan(0.5 * Math.log(ratio(img.data)));
+    expect(a.whiteBalance.temperature).toBeGreaterThanOrEqual(-0.25);
+    expect(Math.log(ratio(out.data))).toBeLessThan(0.7 * Math.log(ratio(img.data)));
     expect(Math.log(ratio(out.data))).toBeGreaterThan(0);
   });
 
@@ -75,8 +76,8 @@ describe('autoAdjust', () => {
       return [v, v, v];
     });
     const a = autoAdjust(img);
-    expect(a.levels.gamma).toBeGreaterThan(1.2);
-    expect(a.levels.gamma).toBeLessThanOrEqual(1.5);
+    expect(a.levels.gamma).toBeGreaterThan(1.1);
+    expect(a.levels.gamma).toBeLessThanOrEqual(1.3);
   });
 
   it('ignores transparent pixels', () => {

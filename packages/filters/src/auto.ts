@@ -10,18 +10,24 @@ export interface AutoAdjustment {
 
 /** Pixels with less OKLab chroma than this are taken as (tinted) neutrals for the white balance. */
 const NEUTRAL_CHROMA = 0.08;
-/** Fraction of the estimated cast that is corrected: grey pixels are a guess, so stay conservative. */
-const WB_STRENGTH = 0.7;
+/**
+ * Fraction of the estimated cast that is corrected: grey pixels are a guess (warm hay or dusk
+ * light look like a cast), so stay conservative.
+ */
+const WB_STRENGTH = 0.5;
+/** Largest suggested temperature / tint: Auto nudges, the user decides. */
+const MAX_WB = 0.25;
 /** Percentiles of luminance that become black and white. */
 const CLIP = 0.005;
 /** The stretch never moves the black point above / the white point below these. */
 const MAX_BLACK = 0.35;
 const MIN_WHITE = 0.6;
 /** Gamma pulls the median (within the stretched range) into this band, at most by this factor. */
-const MEDIAN_BAND = [0.4, 0.6] as const;
-const MAX_GAMMA = 1.5;
+const MEDIAN_BAND = [0.3, 0.6] as const;
+const MAX_GAMMA = 1.3;
 
-const round = (x: number, step: number) => Math.round(x / step) * step;
+/** Rounded to a slider step, without float noise (0.95, not 0.9500000000000001). */
+const round = (x: number, step: number) => Number((Math.round(x / step) * step).toFixed(3));
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
 export function autoAdjust(image: LinearImage): AutoAdjustment {
@@ -42,8 +48,8 @@ export function autoAdjust(image: LinearImage): AutoAdjustment {
   let tint = 0;
   if (n > 0.01 * (data.length / 4) && sr > 0 && sg > 0 && sb > 0) {
     const t = Math.log2(sb / sr);
-    temperature = clamp(round(WB_STRENGTH * t, 0.01), -1, 1);
-    tint = clamp(round(WB_STRENGTH * (t - 2 * Math.log2(sb / sg)), 0.01), -1, 1);
+    temperature = clamp(round(WB_STRENGTH * t, 0.01), -MAX_WB, MAX_WB);
+    tint = clamp(round(WB_STRENGTH * (t - 2 * Math.log2(sb / sg)), 0.01), -MAX_WB, MAX_WB);
   }
 
   // Levels on the white-balanced luminance, in sRGB-encoded units like the levels filter.
