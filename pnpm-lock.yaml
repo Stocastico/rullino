@@ -20,6 +20,9 @@ importers:
       '@webgpu/types':
         specifier: 0.1.74
         version: 0.1.74
+      onnxruntime-web:
+        specifier: 1.30.0
+        version: 1.30.0
       playwright:
         specifier: 1.56.1
         version: 1.56.1
