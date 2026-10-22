@@ -70,7 +70,9 @@ export function validateGeometry(g: Geometry): void {
   if (![0, 90, 180, 270].includes(g.rotate)) fail('rotate must be 0, 90, 180 or 270');
   if (!(Math.abs(g.straighten) <= 45)) fail('straighten must be in [-45, 45] degrees');
   const { x, y, width, height } = g.crop;
-  if (![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > 1 + 1e-9 || y + height > 1 + 1e-9) {
+  // A small epsilon on the bounds: UI arithmetic can land a hair outside [0, 1].
+  const eps = 1e-9;
+  if (![x, y, width, height].every(Number.isFinite) || x < -eps || y < -eps || width <= 0 || height <= 0 || x + width > 1 + eps || y + height > 1 + eps) {
     fail('crop must be a non-empty rectangle inside [0, 1]²');
   }
   if (g.perspective) {

@@ -75,6 +75,11 @@ describe('geometry', () => {
     expect(red(left, 2, 4)).toBeCloseTo((4 * 20 + 0.75) / 200, 6);
   });
 
+  it('accepts a crop that touches the edge up to float rounding', () => {
+    // UI arithmetic (scaling a crop to an aspect ratio) can land a hair outside [0, 1].
+    expect(() => validateGeometry(g({ crop: { x: -1.1e-16, y: 0, width: 0.5, height: 1 + 1e-12 } }))).not.toThrow();
+  });
+
   it('rejects malformed geometry', () => {
     expect(() => validateGeometry(g({ rotate: 45 as never }))).toThrow(/rotate/);
     expect(() => validateGeometry(g({ crop: { x: 0.5, y: 0, width: 0.6, height: 1 } }))).toThrow(/crop/);
