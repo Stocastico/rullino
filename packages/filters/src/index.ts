@@ -1,6 +1,7 @@
 import type { Filter } from '@rullino/core';
 import { adaptiveThreshold } from './adaptiveThreshold';
 import { applyLut } from './applyLut';
+import { bilateral } from './bilateral';
 import { blackPoint } from './blackPoint';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
@@ -16,6 +17,8 @@ import { grayscale } from './grayscale';
 import { inpaint } from './inpaint';
 import { invert } from './invert';
 import { levels } from './levels';
+import { median } from './median';
+import { morphology } from './morphology';
 import { otsu } from './otsu';
 import { posterize } from './posterize';
 import { saturation } from './saturation';
@@ -31,6 +34,7 @@ import { whiteBalance } from './whiteBalance';
 export {
   adaptiveThreshold,
   applyLut,
+  bilateral,
   blackPoint,
   boxBlur,
   brightness,
@@ -46,6 +50,8 @@ export {
   inpaint,
   invert,
   levels,
+  median,
+  morphology,
   otsu,
   posterize,
   saturation,
@@ -88,5 +94,8 @@ export const filters: readonly Filter<any>[] = [
   unsharpMask,
   convolve,
   canny,
+  morphology,
+  median,
+  bilateral,
   inpaint,
 ];

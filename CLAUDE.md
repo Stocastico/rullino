@@ -123,6 +123,10 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Wand subtract and eraser remove coverage: `max(0, m − v)` | Adding then subtracting the same soft selection must be a no-op; `min(m, 1 − v)` left soft borders half selected. Dab values are computed in f32 so they cancel exactly. |
 | Mask-aware filters (`usesMask`): passes read `mask`, the CPU reference gets it per pixel; the step still blends with its mask | Inpainting must know which pixels to rebuild; one generic mechanism instead of a special stage. Using one without a mask is an error; the playground gives such steps an empty brush mask. |
 | Inpainting = normalised convolution + Jacobi diffusion, single resolution | Fits the static multipass model and gives near-invisible results on thin strokes; wide areas need a reach ≥ half their width. Multi-scale / patch-based (PatchMatch) inpainting is a later step. |
+| Morphology and median per channel (as OpenCV), on premultiplied values, alpha included; gradient / top-hat / black-hat keep the input's alpha | Simple, familiar semantics and exact parity (min / max / selection never round). Per-channel ordering can create colours that were not in the image; a luminance-ordered (vector) variant can come later. |
+| Morphology: one 2-D pass per operation for every element shape (no separable square) | One code path for square / disk / cross; O(r²) per pixel, so radius is capped at 15. A separable square (O(r)) is a performance-review candidate. |
+| Median: radius ≤ 3, selection by counting over a `vec4` array | No sort and no data-dependent branching on the GPU; 49² compares per pixel is fine at that size, larger windows need a histogram method. |
+| Bilateral range distance = OKLab ΔE + alpha, OKLab precomputed in a first pass | Perceptual edges like the other OKLab tools; computing OKLab once per pixel instead of once per tap avoids a cube root per neighbour. Window 2σs, max 40 px. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -154,6 +158,7 @@ Things that already bit us. Add new ones as they come up.
 - **Browser-mode `console.log` does not reach the terminal** here; use `commands.writeFile` from `vitest/browser` (paths are relative to the repo root).
 - **`sampleCurve` caches its LUT per points array**: never mutate a points array after sampling it (the curve editor samples a copy).
 - **The registry parity test varies one param at a time**: interactions between params (curve order, combined settings) need a dedicated GPU test.
+- **WGSL rejects mixing `&` / `|` with comparisons without parentheses** (`a <= k & k < b` does not compile): write `(a <= k) & (k < b)`. Like any shader error, it shows up as an all-zero output.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.

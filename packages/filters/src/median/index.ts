@@ -1,0 +1,66 @@
+import { createImage, defineFilter } from '@rullino/core';
+import { clampLoad } from '../convolution';
+
+const MAX_RADIUS = 3;
+const MAX_TAPS = (2 * MAX_RADIUS + 1) ** 2;
+
+/**
+ * Per-channel median over a (2r + 1)² window (clamp to edge), alpha included: removes isolated
+ * specks and keeps edges. The result is always one of the window's values, so GPU and CPU agree
+ * exactly. On the GPU the median is found by counting (for each candidate, how many values are
+ * smaller or equal), vectorised over the four channels: no sort, no data-dependent branches.
+ */
+export const median = defineFilter({
+  id: 'median',
+  label: 'Median',
+  category: 'classic',
+  kind: 'multipass',
+  params: {
+    radius: { type: 'int', min: 1, max: MAX_RADIUS, default: 1, unit: 'px', label: 'Radius (px)' },
+  },
+  passes: [
+    {
+      name: 'out',
+      inputs: ['input'],
+      wgsl: /* wgsl */ `
+fn run(xy: vec2i, p: Params) -> vec4f {
+  var v: array<vec4f, ${MAX_TAPS}>;
+  let r = p.radius;
+  var n = 0;
+  for (var dy = -r; dy <= r; dy++) {
+    for (var dx = -r; dx <= r; dx++) {
+      v[n] = load_input(xy + vec2i(dx, dy));
+      n++;
+    }
+  }
+  let k = vec4f(f32(n / 2));
+  var result = v[0];
+  for (var i = 0; i < n; i++) {
+    var less = vec4f(0.0);
+    var leq = vec4f(0.0);
+    for (var j = 0; j < n; j++) {
+      less += select(vec4f(0.0), vec4f(1.0), v[j] < v[i]);
+      leq += select(vec4f(0.0), vec4f(1.0), v[j] <= v[i]);
+    }
+    // v[i] is the median of a channel when fewer than k values are below it and more than k
+    // are at or below it (ties give the same value whichever index wins).
+    result = select(result, v[i], (less <= k) & (k < leq));
+  }
+  return result;
+}`,
+    },
+  ],
+  cpu: (src, { radius }) => {
+    const out = createImage(src.width, src.height);
+    for (let y = 0; y < src.height; y++)
+      for (let x = 0; x < src.width; x++)
+        for (let c = 0; c < 4; c++) {
+          const values: number[] = [];
+          for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) values.push(clampLoad(src, x + dx, y + dy, c));
+          values.sort((a, b) => a - b);
+          out.data[(y * src.width + x) * 4 + c] = values[values.length >> 1]!;
+        }
+    return out;
+  },
+  tolerance: { abs: 0, rel: 0 },
+});
