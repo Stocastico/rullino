@@ -146,3 +146,7 @@ button.primary { border-color: var(--accent); color: var(--accent); }
 .group-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .group-tabs button { padding: 2px 8px; font-size: 12px; }
 .group-tabs button[aria-selected=true] { border-color: var(--accent); color: var(--accent); }
+.looks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.look-card { display: flex; flex-direction: column; gap: 3px; padding: 3px; font-size: 11px; cursor: pointer; }
+.look-card canvas { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 3px; background: rgb(255 255 255 / 0.05); }
+.look-card:hover { border-color: var(--accent); }
