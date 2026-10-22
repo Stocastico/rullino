@@ -60,6 +60,7 @@ const ui = {
   geometryOverlay: document.getElementById('geometry-overlay') as unknown as SVGSVGElement,
   exportFormat: $<HTMLSelectElement>('export-format'),
   exportQuality: $<HTMLInputElement>('export-quality'),
+  exportSize: $<HTMLInputElement>('export-size'),
   exportButton: $<HTMLButtonElement>('export'),
 };
 const beforeCtx = ui.before.getContext('2d')!;
@@ -104,8 +105,11 @@ interface Renderer {
   /** Reframes the loaded image; returns the new display size. */
   setGeometry(geometry: Geometry): Promise<[number, number]>;
   render(steps: Step[], preview: boolean): Promise<void>;
-  /** Runs the chain at the largest resolution available and encodes the result. */
-  export(steps: Step[], options: ExportOptions): Promise<Blob>;
+  /**
+   * Runs the chain at the largest resolution available and encodes the result, shrunk (in linear
+   * light) so its long side is at most `longSide` if given. Never enlarges.
+   */
+  export(steps: Step[], options: ExportOptions, longSide?: number): Promise<Blob>;
   /** The original image at w x h on the CPU, for mask tools (wand, edge refinement). */
   maskSource(w: number, h: number): Promise<LinearImage>;
 }
@@ -188,14 +192,22 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       }
       return p;
     },
-    async export(steps, options) {
+    async export(steps, options, longSide) {
       if (!raw) throw new Error('no image loaded');
       // A throwaway Pipeline: full-resolution intermediates are freed as soon as the file is encoded.
       const pipeline = new Pipeline(gpu);
       const source = reframe(raw.fullRes);
       try {
         pipeline.setSource(source, { scale: raw.fullScale });
-        return await exportImage(gpu, pipeline.run(steps), options);
+        const out = pipeline.run(steps);
+        const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
+        if (w === out.width) return await exportImage(gpu, out, options);
+        const small = downscale(gpu, out, w, h);
+        try {
+          return await exportImage(gpu, small, options);
+        } finally {
+          releaseTexture(gpu, small);
+        }
       } finally {
         pipeline.destroy();
         if (source !== raw.fullRes) releaseTexture(gpu, source);
@@ -237,10 +249,12 @@ function cpuRenderer(): Renderer {
       if (!source) throw new Error('no image loaded');
       return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
     },
-    async export(steps, options) {
+    async export(steps, options, longSide) {
       if (!source) throw new Error('no image loaded');
       // The CPU fallback only ever has the reduced image.
-      return encodeImage(runChainCpu(steps, source, { scale }), options);
+      const out = runChainCpu(steps, source, { scale });
+      const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
+      return encodeImage(w === out.width ? out : downscaleCpu(out, w, h), options);
     },
   };
 }
@@ -408,7 +422,8 @@ function exportFile(): Promise<void> {
   const done = loads.then(async () => {
     const t0 = performance.now();
     try {
-      const blob = await renderer.export(steps, { ...options, quality });
+      const longSide = Number(ui.exportSize.value) || undefined;
+      const blob = await renderer.export(steps, { ...options, quality }, longSide);
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${imageName}-rullino.${ext}` });
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);

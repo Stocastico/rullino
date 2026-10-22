@@ -229,6 +229,13 @@ try {
     check(bytes[24] === 16, `expected a 16-bit PNG, bit depth ${bytes[24]}`);
   }
   {
+    // Output size: the long side is reduced to 1000 px, proportions kept.
+    await page.fill('#export-size', '1000');
+    const { bytes } = await exported('png');
+    check(bytes.readUInt32BE(16) === 1000 && bytes.readUInt32BE(20) === 500, `export at long side 1000: ${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`);
+    await page.fill('#export-size', '');
+  }
+  {
     const { name, bytes } = await exported('jpeg');
     check(name === 'big-rullino.jpg' && bytes[0] === 0xff && bytes[1] === 0xd8, `expected a JPEG download, got ${name}`);
   }

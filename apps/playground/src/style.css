@@ -119,3 +119,4 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 /* While cropping, only the uncropped result and its crop rectangle are shown. */
 #stage.cropping #before, #stage.cropping #handle, #stage.cropping #overlay { display: none; }
 button.primary { border-color: var(--accent); color: var(--accent); }
+#export-size { width: 7em; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
