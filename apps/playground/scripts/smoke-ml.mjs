@@ -1,7 +1,9 @@
-// End-to-end check of the Object mask tool with the real SlimSAM model: serves dist/, answers the
-// model requests from .cache/models (scripts/fetch-models.mjs; no network), clicks a tiger cub and
-// checks that a masked exposure step brightens the cub and not the hay. Slow on SwiftShader (the
-// app picks WASM there): ~30 s of inference.
+// End-to-end check of the ML tools with the real models: serves dist/, answers the model requests
+// from .cache/models (scripts/fetch-models.mjs; no network).
+//  1. Object tool (SlimSAM): clicks a tiger cub; a masked exposure step brightens the cub, not the hay.
+//  2. Remove object (MI-GAN): selects the cub with the Object tool and fills it; the cub's pixels
+//     change a lot, the hay far away does not.
+// Slow on SwiftShader (the app picks WASM there): about a minute of inference in all.
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
@@ -53,6 +55,45 @@ try {
   check(gain.cub > 60, `the cub should be brighter: ${JSON.stringify(gain)}`);
   check(Math.abs(gain.hay) < 10, `the hay should be unchanged: ${JSON.stringify(gain)}`);
   console.log(`smoke-ml: ${said}; brightness change ${JSON.stringify(gain)}`);
+
+  // 2. Remove object, on a fresh page.
+  const removal = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  removal.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
+  await removal.route('https://huggingface.co/**', (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').at(-1);
+    route.fulfill({ status: 200, body: readFileSync(new URL(name, models)), headers: { 'content-type': 'application/octet-stream' } });
+  });
+  await removal.goto(`${url}?sample=tiger-cubs`);
+  await removal.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 60000 });
+  await removal.selectOption('#chain select[data-action=add]', 'patch');
+  await removal.click('#chain [data-action=tool-object]');
+  const box2 = await removal.locator('#after').boundingBox();
+  await removal.mouse.click(box2.x + box2.width * 0.78, box2.y + box2.height * 0.62);
+  await removal.waitForFunction(() => /Object selected|failed/.test(document.getElementById('announce').textContent), null, { timeout: 300000 });
+  check(/Object selected/.test(await removal.textContent('#announce')), `object selection (removal): ${await removal.textContent('#announce')}`);
+  await removal.click('#chain [data-action=fill]');
+  await removal.waitForFunction(() => /Area filled|failed/.test(document.getElementById('announce').textContent), null, { timeout: 300000 });
+  const filled = await removal.textContent('#announce');
+  check(/Area filled/.test(filled), `fill: ${filled}`);
+  // Frames are not proof that the latest state is shown: wait for the cub's pixels to change.
+  const measure = () =>
+    removal.evaluate(() => {
+      const px = (id, u, v) => {
+        const c = document.getElementById(id);
+        const d = c.getContext('2d').getImageData(Math.floor(u * c.width), Math.floor(v * c.height), 1, 1).data;
+        return [d[0], d[1], d[2]];
+      };
+      const diff = (u, v) => px('after', u, v).reduce((s, x, i) => s + Math.abs(x - px('before', u, v)[i]), 0);
+      return { cub: diff(0.78, 0.62), hay: diff(0.97, 0.95) };
+    });
+  let change = await measure();
+  for (let i = 0; i < 40 && change.cub <= 40; i++) {
+    await removal.waitForTimeout(500);
+    change = await measure();
+  }
+  check(change.cub > 40, `the cub should be gone: ${JSON.stringify(change)}`);
+  check(change.hay < 10, `the hay should be unchanged: ${JSON.stringify(change)}`);
+  console.log(`smoke-ml: ${filled}; pixel change ${JSON.stringify(change)}`);
 } finally {
   await browser.close();
   await server.close();

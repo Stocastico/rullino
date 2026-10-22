@@ -13,8 +13,8 @@ pnpm test:all         # both
 pnpm test:coverage    # both, with v8 coverage and per-area thresholds (report in coverage/index.html)
 pnpm build            # builds the playground (Vite)
 pnpm test:e2e         # smoke-tests the built playground in headless Chromium (run after build)
-pnpm test:ml          # the real SlimSAM model on ONNX Runtime WASM (downloads 14 MB once into .cache/models)
-pnpm test:e2e:ml      # the playground's Object tool with the real model (after build; models served locally)
+pnpm test:ml          # the real SlimSAM and MI-GAN models on ONNX Runtime WASM (downloads 42 MB once into .cache/models)
+pnpm test:e2e:ml      # the playground's Object and Remove object tools with the real models (after build; models served locally)
 pnpm bench            # GPU timings per filter + a chain at 1024x768 (SwiftShader numbers: compare runs, not machines)
 pnpm dev              # playground dev server
 npx vitest run path/to/file.test.ts   # single file
@@ -24,11 +24,11 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 ## Layout
 
 - `packages/core`
-  - `params.ts` parameter schema (float/int/bool/enum/kernel/curve/lut/color, optional `unit: 'px'` and UI `group`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
+  - `params.ts` parameter schema (float/int/bool/enum/kernel/curve/lut/image/color, optional `unit: 'px'` and UI `group`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
   - `filter.ts` / `define.ts` filter contracts and `defineFilter()`: `pointwise` (CPU reference derived from `pixel()`) and `multipass` (fixed list of passes + whole-image CPU reference).
   - `curve.ts` monotone tone curves sampled to a 256-entry LUT, CPU sampler and WGSL sampler generator.
   - `color.ts`, `oklab.ts` CPU colour maths; `wgsl.ts` the `rl_*` WGSL twins prepended to every shader.
-  - `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runMultipass`, `runFilter` (any kind).
+  - `image.ts` `LinearImage`, `sampleImage` and its WGSL twin (image params); `gpu/` context, rgba16float upload/readback, `importImage` / `encodeToTexture` / `readSrgb8` (sRGB edges), area `downscale`, `runMultipass`, `runFilter` (any kind).
   - `pipeline/` `Step` chains: `fuse.ts` (namespacing + fused shader), `pipeline.ts` (cached incremental `Pipeline`), `chain.ts` (`runChainCpu` reference).
   - `resize.ts` CPU area downscale and `fitWithin`.
   - `png.ts` dependency-free PNG encoder (8/16-bit RGBA); `encode.ts` `encodeImage` (PNG / JPEG / WebP from a `LinearImage`); `gpu/export.ts` `exportImage` from a texture.
@@ -37,9 +37,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `serialize.ts` `serializeChain` / `parseChain` (chain + geometry as JSON).
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes. `auto.ts` `autoAdjust` (suggested white balance + levels).
-- `packages/ml` — optional ML on top of core, ONNX Runtime *injected* (`OrtModule`), never imported: `sam.ts` SAM input / mask post-processing (pure TS), `segmenter.ts` `createSamSegmenter` (encode once per image, decode per click), `models.ts` model descriptors at pinned revisions (`SLIMSAM_77`) and `fetchModel` (progress, Cache API). `test/` holds the real-model integration test (`ml` Vitest project).
+- `packages/ml` — optional ML on top of core, ONNX Runtime *injected* (`OrtModule`), never imported: `sam.ts` SAM input / mask post-processing (pure TS), `segmenter.ts` `createSamSegmenter` (encode once per image, decode per click), `migan.ts` `createMiganInpainter` (object removal) and `growMask`; `models.ts` model descriptors at pinned revisions (`SLIMSAM_77`, `MIGAN`) and `fetchModel` (progress, Cache API). `test/` holds the real-model integration test (`ml` Vitest project).
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch, `object-select.ts` the Object mask tool (backend choice, lazy model, per-image encoding); `scripts/smoke.mjs` is the e2e smoke test, `scripts/smoke-ml.mjs` the Object tool's. `scripts/fetch-models.mjs` (repo root) downloads the test models.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch, `object-select.ts` the Object mask tool (backend choice, lazy model, per-image encoding), `object-remove.ts` Remove object (lazy MI-GAN); `scripts/smoke.mjs` is the e2e smoke test, `scripts/smoke-ml.mjs` the Object tool's. `scripts/fetch-models.mjs` (repo root) downloads the test models.
 
 - `.claude/skills/` — repo skills: `add-filter` (the recipe for a new filter, tests to mutation check) and `finish-step` (verification, CLAUDE.md upkeep, PR and CI). `.claude/settings.json` enables two official plugins: `claude-md-management` and `skill-creator`.
 
@@ -175,6 +175,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Model weights fetched from Hugging Face on first use (pinned revision), cached with the Cache API; ORT's WASM shipped by Vite next to its lazy chunk | Nothing ML-related loads until the Object tool is used; a pinned URL never changes, so caching by URL is safe; same-origin WASM avoids a CDN at run time (dist grows by 27 MB, downloaded only on use). |
 | Object tool: points accumulate into one object (Alt = exclude), "New object" starts the next on top of the current mask (max) | One SAM prompt per object refines it; several objects add up like wand selections. The image is encoded once per raster size (WeakMap on the mask source image). |
 | Real-model tests in their own Vitest project and CI job (`ml`), models cached by revision; not part of the required `test` check | They download from Hugging Face and need about a minute of CPU inference; the required check must not depend on a third-party host. |
+| Image params (`type: 'image'`): a `LinearImage` kept by identity, bound as an `rgba32float` texture, read through `image_<name>(uv)` (manual bilinear, normalised coordinates); no uniform space; multipass filters only, not serialisable | Same contract as LUTs (identity-keyed cache, immutable). Lets a result computed outside the pipeline (an ML patch) take part in the chain at any preview / display / export size. Links cannot carry a patch: `serializeChain` throws, like an unreferenced LUT. |
+| `patch` filter ("Remove object") = the image over the input (premultiplied over); the step's mask decides where it shows; patch steps go first in the chain and always have a brush mask | The default (empty) image is a no-op. The fill is made from the *original* framed image, so adjustments belong after it; the mask is the grown selection, so the fill covers an object's edge. |
+| Object removal = MI-GAN `migan_pipeline_v2.onnx` (MIT code and weights, 28 MB, pinned revision), uint8 NCHW image + mask (255 known, 0 hole) at the mask raster's size (≤ 1024), hole = mask > 0.5 after `growMask(3)` | Smallest recent-enough inpainter with a clear licence (Moebius is 1.2 GB and fixed 512², LaMa 208 MB). The pipeline export resizes to 512 internally and keeps the original outside the hole. Result is 512-class quality inside the hole, upsampled; a full-resolution crop around the hole is a later step. Real-GPU timings not measured (fp32 on WebGPU there, WASM on software GPUs). |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -231,3 +234,6 @@ Things that already bit us. Add new ones as they come up.
 - **ORT's WebGPU EP on SwiftShader is ~25× slower than WASM** (SlimSAM encode 480 s vs 19 s): never benchmark ML on WebGPU in CI or cloud sessions; the app picks WASM on software adapters.
 - **A SAM click on a uniform background is ambiguous**: the best-scored mask is often the whole image. Test point prompts on objects, and labels with positive + negative pairs.
 - **Node's `fetch` ignores `HTTPS_PROXY`** in CI / cloud sessions: scripts that download (models) use `curl`.
+- **MI-GAN's mask is inverted** (255 = known, 0 = hole), and the other ONNX file in the repo (`migan.onnx`) is the same signature; try both conventions on a rectangle before trusting a wrapper (outside the hole must come back unchanged).
+- **A frame advancing is not proof that a later state is shown** (again): the Remove object e2e check polls for the changed pixels instead of waiting for `frame > n`; the Object selection's own render had already advanced it.
+
