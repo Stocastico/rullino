@@ -104,5 +104,30 @@ describe('renderControls', () => {
     expect(root.querySelector('circle[data-point]')!.getAttribute('cy')).toBe('0.5');
     expect(root.querySelectorAll('input[name=k]')).toHaveLength(1);
   });
-});
 
+  it('shows grouped params under tabs, one group at a time; ungrouped params stay visible', () => {
+    const grouped = {
+      balance: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Balance' },
+      redHue: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Red hue', group: 'Hue' },
+      blueHue: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Blue hue', group: 'Hue' },
+      redSat: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Red saturation', group: 'Saturation' },
+      tint: { type: 'color', default: [1, 0.5, 0], label: 'Tint' },
+    } as const;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const changes: Record<string, unknown>[] = [];
+    renderControls(root, grouped, defaultParams(grouped), (v) => changes.push(v));
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role=tab]')];
+    expect(tabs.map((t) => t.textContent)).toEqual(['Hue', 'Saturation']);
+    const visible = (name: string) => !root.querySelector(`[name=${name}]`)!.closest<HTMLElement>('.control')!.hidden;
+    expect([visible('balance'), visible('redHue'), visible('blueHue'), visible('redSat'), visible('tint')]).toEqual([true, true, true, false, true]);
+    tabs[1]!.click();
+    expect([visible('redHue'), visible('redSat')]).toEqual([false, true]);
+    expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+    // The colour picker speaks 8-bit hex and emits sRGB triples.
+    const tint = root.querySelector<HTMLInputElement>('[name=tint]')!;
+    expect(tint.value).toBe('#ff8000');
+    fire(tint, '#336699');
+    expect(changes.at(-1)!.tint).toEqual([0x33 / 255, 0x66 / 255, 0x99 / 255]);
+  });
+});

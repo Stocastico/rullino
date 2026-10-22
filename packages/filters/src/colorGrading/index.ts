@@ -32,12 +32,12 @@ export const colorGrading = defineFilter({
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    shadows: { type: 'color', default: [0.2, 0.45, 0.6], label: 'Shadows' },
-    shadowsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Shadows strength' },
-    midtones: { type: 'color', default: [0.75, 0.6, 0.45], label: 'Midtones' },
-    midtonesStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Midtones strength' },
-    highlights: { type: 'color', default: [1, 0.7, 0.35], label: 'Highlights' },
-    highlightsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Highlights strength' },
+    shadows: { type: 'color', default: [0.2, 0.45, 0.6], label: 'Colour', group: 'Shadows' },
+    shadowsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Shadows' },
+    midtones: { type: 'color', default: [0.75, 0.6, 0.45], label: 'Colour', group: 'Midtones' },
+    midtonesStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Midtones' },
+    highlights: { type: 'color', default: [1, 0.7, 0.35], label: 'Colour', group: 'Highlights' },
+    highlightsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Highlights' },
     balance: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Balance' },
   },
   wgsl: /* wgsl */ `

@@ -1,6 +1,6 @@
 import { defineFilter } from '@rullino/core';
 
-const mix = (label: string, def: number) => ({ type: 'float', min: -2, max: 2, step: 0.01, default: def, label }) as const;
+const mix = (group: string, label: string, def: number) => ({ type: 'float', min: -2, max: 2, step: 0.01, default: def, label, group }) as const;
 
 /**
  * Each output channel as a weighted sum of the input channels, on linear light. Linear in colour,
@@ -13,15 +13,15 @@ export const channelMixer = defineFilter({
   kind: 'pointwise',
   alpha: 'premultiplied',
   params: {
-    rr: mix('Red from red', 1),
-    rg: mix('Red from green', 0),
-    rb: mix('Red from blue', 0),
-    gr: mix('Green from red', 0),
-    gg: mix('Green from green', 1),
-    gb: mix('Green from blue', 0),
-    br: mix('Blue from red', 0),
-    bg: mix('Blue from green', 0),
-    bb: mix('Blue from blue', 1),
+    rr: mix('Red output', 'From red', 1),
+    rg: mix('Red output', 'From green', 0),
+    rb: mix('Red output', 'From blue', 0),
+    gr: mix('Green output', 'From red', 0),
+    gg: mix('Green output', 'From green', 1),
+    gb: mix('Green output', 'From blue', 0),
+    br: mix('Blue output', 'From red', 0),
+    bg: mix('Blue output', 'From green', 0),
+    bb: mix('Blue output', 'From blue', 1),
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

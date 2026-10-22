@@ -8,6 +8,8 @@ import { MAX_LUT_SIZE, type Lut } from './lut';
 interface ParamBase {
   readonly label?: string;
   readonly description?: string;
+  /** UI grouping: params sharing a group are shown together (as tabs in the playground). */
+  readonly group?: string;
 }
 
 export interface FloatParam extends ParamBase {

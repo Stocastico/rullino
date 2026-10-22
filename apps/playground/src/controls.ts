@@ -17,6 +17,33 @@ function format(p: Param, v: unknown): string {
   return p.type === 'float' ? (v as number).toFixed(decimals(p.step)) : String(v);
 }
 
+/** The group last shown per schema, so rebuilding a filter's controls keeps the open tab. */
+const openGroup = new WeakMap<ParamSchema, string>();
+
+/** A tab bar before the first grouped row; only the selected group's rows are shown. */
+function addGroupTabs(root: HTMLElement, schema: ParamSchema): void {
+  const rows = [...root.querySelectorAll<HTMLElement>(':scope > [data-group]')];
+  const groups = [...new Set(rows.map((r) => r.dataset.group!))];
+  if (groups.length === 0) return;
+  const bar = el('div', { className: 'group-tabs' });
+  bar.setAttribute('role', 'tablist');
+  const tabs = groups.map((g) => {
+    const tab = el('button', { type: 'button' }, g);
+    tab.setAttribute('role', 'tab');
+    tab.addEventListener('click', () => show(g));
+    return tab;
+  });
+  const show = (g: string) => {
+    openGroup.set(schema, g);
+    tabs.forEach((t, i) => t.setAttribute('aria-selected', String(groups[i] === g)));
+    for (const r of rows) r.hidden = r.dataset.group !== g;
+  };
+  bar.append(...tabs);
+  rows[0]!.before(bar);
+  const last = openGroup.get(schema);
+  show(last && groups.includes(last) ? last : groups[0]!);
+}
+
 export interface Controls<S extends ParamSchema> {
   /** Updates the widgets without emitting a change. */
   set(values: ParamValues<S>): void;
@@ -184,8 +211,10 @@ export function renderControls<S extends ParamSchema>(
       }
     }
     if (p.description) row.title = p.description;
+    if (p.group) row.dataset.group = p.group;
     root.append(row);
   }
+  addGroupTabs(root, schema);
 
   const set = (v: ParamValues<S>) => {
     values = { ...v };

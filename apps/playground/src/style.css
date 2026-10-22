@@ -143,3 +143,6 @@ button.primary { border-color: var(--accent); color: var(--accent); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #stage.busy::after { animation-duration: 3s; } }
+.group-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.group-tabs button { padding: 2px 8px; font-size: 12px; }
+.group-tabs button[aria-selected=true] { border-color: var(--accent); color: var(--accent); }

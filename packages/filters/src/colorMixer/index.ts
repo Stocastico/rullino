@@ -30,9 +30,9 @@ const gaps = BANDS.map((b, i) => {
 
 const params: Record<string, FloatParam> = {};
 for (const b of BANDS) {
-  params[`${b.id}Hue`] = { type: 'float', min: -30, max: 30, step: 1, default: 0, label: `${b.label} hue (°)` };
-  params[`${b.id}Sat`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: `${b.label} saturation` };
-  params[`${b.id}Lum`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: `${b.label} luminance` };
+  params[`${b.id}Hue`] = { type: 'float', min: -30, max: 30, step: 1, default: 0, label: `${b.label} (°)`, group: 'Hue' };
+  params[`${b.id}Sat`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: b.label, group: 'Saturation' };
+  params[`${b.id}Lum`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: b.label, group: 'Luminance' };
 }
 
 /** Signed angle from a to b in degrees, in [-180, 180). */
