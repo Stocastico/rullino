@@ -56,10 +56,9 @@ export interface SegmenterOptions {
 }
 
 export async function createSamSegmenter(ort: OrtModule, files: SamModelFiles, options: SegmenterOptions = {}): Promise<SamSegmenter> {
-  const [encoder, decoder] = await Promise.all([
-    ort.InferenceSession.create(files.encoder, options.sessionOptions),
-    ort.InferenceSession.create(files.decoder, options.sessionOptions),
-  ]);
+  // One after the other: ONNX Runtime's WebGPU backend refuses concurrent session creation.
+  const encoder = await ort.InferenceSession.create(files.encoder, options.sessionOptions);
+  const decoder = await ort.InferenceSession.create(files.decoder, options.sessionOptions);
   return {
     async encode(image) {
       const input = samInput(image);

@@ -16,10 +16,16 @@ function fakeOrt() {
   const calls: { model: string; feeds: Record<string, OrtTensor> }[] = [];
   const created: unknown[] = [];
   let released = 0;
+  let creating = false;
   const ort: OrtModule = {
     Tensor: FakeTensor as never,
     InferenceSession: {
       async create(model, options) {
+        // Like ONNX Runtime's WebGPU backend: one session creation at a time.
+        if (creating) throw new Error('another WebGPU EP inference session is being created');
+        creating = true;
+        await new Promise((r) => setTimeout(r, 1));
+        creating = false;
         const name = new TextDecoder().decode(model as Uint8Array);
         created.push([name, options]);
         return {
