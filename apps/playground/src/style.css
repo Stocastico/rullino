@@ -46,6 +46,8 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .control-float output, .control-int output { grid-column: 2; grid-row: 1; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .control-float input, .control-int input { grid-column: 1 / span 2; }
 .control-enum label { justify-content: space-between; }
+.control-color { display: flex; justify-content: space-between; align-items: center; }
+.control-color input { width: 3em; height: 1.8em; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
 .reset { align-self: flex-start; cursor: pointer; }
 /* Anchored to the top (and sticky), so a long sidebar does not push the image down. */
 figure { margin: 0; padding: 24px; display: grid; justify-items: center; align-items: start; overflow: hidden; position: relative; }
@@ -141,3 +143,6 @@ button.primary { border-color: var(--accent); color: var(--accent); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #stage.busy::after { animation-duration: 3s; } }
+.group-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.group-tabs button { padding: 2px 8px; font-size: 12px; }
+.group-tabs button[aria-selected=true] { border-color: var(--accent); color: var(--accent); }

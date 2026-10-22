@@ -30,7 +30,7 @@ import {
   type LinearImage,
   type Step,
 } from '@rullino/core';
-import { filters } from '@rullino/filters';
+import { autoAdjust, filters } from '@rullino/filters';
 import { lookLut, looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
@@ -74,6 +74,7 @@ const ui = {
   undo: $<HTMLButtonElement>('undo'),
   redo: $<HTMLButtonElement>('redo'),
   share: $<HTMLButtonElement>('share'),
+  auto: $<HTMLButtonElement>('auto'),
   viewport: $<HTMLElement>('viewport'),
   zoomIn: $<HTMLButtonElement>('zoom-in'),
   zoomOut: $<HTMLButtonElement>('zoom-out'),
@@ -652,6 +653,42 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '+' || e.key === '=') zoom.zoomBy(ZOOM_STEP);
   else if (e.key === '-') zoom.zoomBy(1 / ZOOM_STEP);
   else if (e.key === '0') zoom.set(FIT);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Auto: suggested white balance and levels for the (framed) original, as ordinary editable steps.
+
+/** Long side of the image Auto analyses: statistics need few pixels. */
+const AUTO_SIDE = 256;
+ui.auto.addEventListener('click', async () => {
+  if (!loaded) return;
+  ui.auto.disabled = true;
+  try {
+    const [w, h] = fitWithin(displaySize[0], displaySize[1], AUTO_SIDE);
+    // After any queued load, so it reads the current image.
+    const a = autoAdjust(await loads.then(() => renderer.maskSource(w, h)));
+    const patch = { whiteBalance: a.whiteBalance, levels: a.levels } as Record<string, Record<string, number>>;
+    let steps = [...chain.steps];
+    // Update the first existing step of each kind; insert missing ones at the start of the chain
+    // (Auto looks at the original, before any other step).
+    const missing: typeof steps = [];
+    for (const id of ['whiteBalance', 'levels']) {
+      const i = steps.findIndex((st) => st.filterId === id);
+      if (i >= 0) steps[i] = { ...steps[i]!, params: { ...steps[i]!.params, ...patch[id] }, enabled: true };
+      else missing.push({ ...newStep(byId.get(id)!), params: { ...defaultParams(byId.get(id)!.params), ...patch[id] } });
+    }
+    steps = [...missing, ...steps];
+    chain = { steps, selected: steps.find((st) => st.filterId === 'levels')!.uid };
+    chainUi.set(chain, true);
+    showOverlay();
+    void render();
+    announce(`Auto: temperature ${a.whiteBalance.temperature}, tint ${a.whiteBalance.tint}, levels ${a.levels.inBlack}–${a.levels.inWhite}, gamma ${a.levels.gamma}`);
+  } catch (e) {
+    announce(`Auto failed: ${(e as Error).message}`);
+    console.error(e);
+  } finally {
+    ui.auto.disabled = false;
+  }
 });
 
 // ---------------------------------------------------------------------------------------------

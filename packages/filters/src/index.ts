@@ -1,4 +1,5 @@
 import type { Filter } from '@rullino/core';
+export { autoAdjust, type AutoAdjustment } from './auto';
 import { adaptiveThreshold } from './adaptiveThreshold';
 import { applyLut } from './applyLut';
 import { bilateral } from './bilateral';
@@ -6,7 +7,10 @@ import { blackPoint } from './blackPoint';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
 import { canny } from './canny';
+import { channelMixer } from './channelMixer';
 import { clahe } from './clahe';
+import { colorGrading } from './colorGrading';
+import { colorMixer } from './colorMixer';
 import { contrast } from './contrast';
 import { convolve } from './convolve';
 import { curves } from './curves';
@@ -16,6 +20,7 @@ import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
 import { grain } from './grain';
 import { grayscale } from './grayscale';
+import { hue } from './hue';
 import { inpaint } from './inpaint';
 import { invert } from './invert';
 import { levels } from './levels';
@@ -41,7 +46,10 @@ export {
   boxBlur,
   brightness,
   canny,
+  channelMixer,
   clahe,
+  colorGrading,
+  colorMixer,
   contrast,
   convolve,
   curves,
@@ -51,6 +59,7 @@ export {
   gaussianBlur,
   grain,
   grayscale,
+  hue,
   inpaint,
   invert,
   levels,
@@ -83,6 +92,10 @@ export const filters: readonly Filter<any>[] = [
   gamma,
   saturation,
   vibrance,
+  hue,
+  colorMixer,
+  colorGrading,
+  channelMixer,
   whiteBalance,
   transparency,
   grayscale,

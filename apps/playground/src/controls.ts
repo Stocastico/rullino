@@ -17,6 +17,33 @@ function format(p: Param, v: unknown): string {
   return p.type === 'float' ? (v as number).toFixed(decimals(p.step)) : String(v);
 }
 
+/** The group last shown per schema, so rebuilding a filter's controls keeps the open tab. */
+const openGroup = new WeakMap<ParamSchema, string>();
+
+/** A tab bar before the first grouped row; only the selected group's rows are shown. */
+function addGroupTabs(root: HTMLElement, schema: ParamSchema): void {
+  const rows = [...root.querySelectorAll<HTMLElement>(':scope > [data-group]')];
+  const groups = [...new Set(rows.map((r) => r.dataset.group!))];
+  if (groups.length === 0) return;
+  const bar = el('div', { className: 'group-tabs' });
+  bar.setAttribute('role', 'tablist');
+  const tabs = groups.map((g) => {
+    const tab = el('button', { type: 'button' }, g);
+    tab.setAttribute('role', 'tab');
+    tab.addEventListener('click', () => show(g));
+    return tab;
+  });
+  const show = (g: string) => {
+    openGroup.set(schema, g);
+    tabs.forEach((t, i) => t.setAttribute('aria-selected', String(groups[i] === g)));
+    for (const r of rows) r.hidden = r.dataset.group !== g;
+  };
+  bar.append(...tabs);
+  rows[0]!.before(bar);
+  const last = openGroup.get(schema);
+  show(last && groups.includes(last) ? last : groups[0]!);
+}
+
 export interface Controls<S extends ParamSchema> {
   /** Updates the widgets without emitting a change. */
   set(values: ParamValues<S>): void;
@@ -159,6 +186,18 @@ export function renderControls<S extends ParamSchema>(
         row.append(el('label', { htmlFor: input.id }, label), input, info);
         break;
       }
+      case 'color': {
+        // <input type=color> speaks #rrggbb, i.e. 8-bit sRGB: the param's own encoding.
+        const input = el('input', { type: 'color', name: key, id: `param-${key}` });
+        const hex = (c: readonly number[]) => `#${c.map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('')}`;
+        input.addEventListener('input', () => {
+          values[key] = [1, 3, 5].map((i) => parseInt(input.value.slice(i, i + 2), 16) / 255);
+          emit();
+        });
+        widgets.set(key, { write: (v) => (input.value = hex(v as readonly number[])) });
+        row.append(el('label', { htmlFor: input.id }, label), input);
+        break;
+      }
       case 'enum': {
         const select = el('select', { name: key, id: `param-${key}` });
         for (const [value, text] of Object.entries(p.options)) select.append(el('option', { value }, text));
@@ -172,8 +211,10 @@ export function renderControls<S extends ParamSchema>(
       }
     }
     if (p.description) row.title = p.description;
+    if (p.group) row.dataset.group = p.group;
     root.append(row);
   }
+  addGroupTabs(root, schema);
 
   const set = (v: ParamValues<S>) => {
     values = { ...v };
