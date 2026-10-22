@@ -238,6 +238,20 @@ try {
       input.dispatchEvent(new Event('change'));
     }),
   );
+  // On an image larger than the preview: dragging straighten reframes only the preview; releasing must bring the display image (and
+  // the before canvas, redrawn only on a full reframe) up to date.
+  await after(async () => {
+    await page.$eval('#geometry [data-action=straighten]', (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    await page.$eval('#geometry [data-action=straighten]', (el) => { el.value = '-25'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+  });
+  check((await status()).includes('preview'), `straighten drag should render the preview, status: ${await status()}`);
+  await after(() => page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup'))));
+  await page.waitForFunction(() => !document.getElementById('status').textContent.includes('preview'), null, { timeout: 20000 }).catch(() => {});
+  const beforeCorner = await page.$eval('#before', (c) => c.getContext('2d').getImageData(c.width - 1, 0, 1, 1).data[3]);
+  check(beforeCorner === 0 && !(await status()).includes('preview'), `after releasing straighten: before-canvas corner alpha ${beforeCorner}, status ${await status()}`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await page.waitForFunction(() => document.getElementById('before').getContext('2d').getImageData(0, 0, 1, 1).data[3] > 0, null, { timeout: 20000 }).catch(() => {});
+
   const exported = async (format) => {
     await page.selectOption('#export-format', format);
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#export')]);

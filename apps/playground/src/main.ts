@@ -10,6 +10,7 @@ import {
   encodeSrgb8,
   exportImage,
   fitWithin,
+  geometryFrame,
   histogramSrgb8,
   IDENTITY_GEOMETRY,
   isIdentityGeometry,
@@ -103,8 +104,11 @@ interface Renderer {
   readonly name: string;
   /** Loads an image framed by `geometry`; returns the (framed) display size. */
   load(image: ImageBitmap, geometry: Geometry): Promise<[number, number]>;
-  /** Reframes the loaded image; returns the new display size. */
-  setGeometry(geometry: Geometry): Promise<[number, number]>;
+  /**
+   * Reframes the loaded image; returns the new display size. `previewOnly` (while dragging)
+   * reframes just the reduced preview; a later full call brings the display image up to date.
+   */
+  setGeometry(geometry: Geometry, previewOnly?: boolean): Promise<[number, number]>;
   render(steps: Step[], preview: boolean): Promise<void>;
   /**
    * Runs the chain at the largest resolution available and encodes the result, shrunk (in linear
@@ -124,23 +128,34 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   let textures: GPUTexture[] = [];
   let raw: { fullRes: GPUTexture; display: GPUTexture; preview: GPUTexture; fullScale: number; displayScale: number; previewScale: number } | undefined;
   let geometry: Geometry = IDENTITY_GEOMETRY;
-  /** Geometry-applied textures owned here (the raw ones when the geometry is the identity). */
-  let framed: GPUTexture[] = [];
+  /** Geometry-applied display and preview textures (the raw ones when the geometry is the identity). */
+  let framedDisplay: GPUTexture | undefined;
+  let framedPreview: GPUTexture | undefined;
+  const owned = (t: GPUTexture | undefined) => t && t !== raw?.display && t !== raw?.preview;
   let displayTex: GPUTexture | undefined;
   const maskSources = new Map<string, Promise<LinearImage>>();
   const reframe = (t: GPUTexture) => (isIdentityGeometry(geometry) ? t : applyGeometry(gpu, t, geometry));
 
   /** Applies the geometry to the display and preview images and makes them the pipelines' sources. */
-  async function frame(g: Geometry): Promise<[number, number]> {
+  async function frame(g: Geometry, previewOnly = false): Promise<[number, number]> {
     if (!raw) throw new Error('no image loaded');
     geometry = g;
+    if (previewOnly && raw.preview !== raw.display) {
+      // While dragging only the preview is shown: skip the display-size resample and readback.
+      const preview = reframe(raw.preview);
+      small.setSource(preview, { scale: raw.previewScale });
+      if (owned(framedPreview) && framedPreview !== framedDisplay) releaseTexture(gpu, framedPreview!);
+      framedPreview = preview;
+      const f = geometryFrame(g, raw.display.width, raw.display.height);
+      return [f.width, f.height];
+    }
     const display = reframe(raw.display);
     const preview = raw.preview === raw.display ? display : reframe(raw.preview);
     full.setSource(display, { scale: raw.displayScale });
     small.setSource(preview, { scale: raw.previewScale });
-    const previous = framed;
-    framed = [...new Set([display, preview])].filter((t) => t !== raw!.display && t !== raw!.preview);
-    for (const t of previous) releaseTexture(gpu, t);
+    for (const t of new Set([framedDisplay, framedPreview])) if (owned(t)) releaseTexture(gpu, t!);
+    framedDisplay = display;
+    framedPreview = preview;
     displayTex = display;
     maskSources.clear();
     ui.before.width = display.width;
@@ -175,7 +190,7 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       for (const t of previous) t.destroy();
       return size;
     },
-    setGeometry: (g) => frame(g),
+    setGeometry: (g, previewOnly) => frame(g, previewOnly),
     async render(steps, preview) {
       const out = (preview ? small : full).run(steps);
       await present(await readSrgb8(gpu, out), out.width, out.height);
@@ -303,6 +318,8 @@ let latestLoad = 0;
 
 let geometry: Geometry = IDENTITY_GEOMETRY;
 let geometryQueued = false;
+/** The display image lags behind the geometry (it was reframed for the preview only). */
+let displayStale = false;
 /**
  * While the crop is edited the frame is shown uncropped; while the perspective is edited, the
  * oriented image is shown without perspective, straighten or crop. Changes apply on Done.
@@ -343,7 +360,9 @@ function setGeometry(g: Geometry): void {
     geometryQueued = false;
     if (!loaded) return;
     try {
-      const [w, h] = await renderer.setGeometry(shownGeometry());
+      const previewOnly = dragging;
+      const [w, h] = await renderer.setGeometry(shownGeometry(), previewOnly);
+      displayStale = previewOnly;
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
@@ -503,7 +522,9 @@ ui.chain.addEventListener('pointerdown', (e) => {
 window.addEventListener('pointerup', () => {
   if (!dragging) return;
   dragging = false;
-  void render(); // full resolution on release
+  // Full resolution on release; a geometry dragged in preview reframes the display image first.
+  if (displayStale) setGeometry(geometry);
+  else void render();
 });
 
 for (const s of samples) ui.sample.append(new Option(s.label, s.id));
