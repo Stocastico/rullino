@@ -53,6 +53,10 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
       // Non-separable and non-linear, on a grid that does not divide the test values evenly.
       out.push([`${k}=look`, { [k]: lutFromFunction(17, (r, g, b) => [g * g, 0.2 + 0.6 * Math.sqrt(b), Math.abs(r - b)]) }]);
     }
+    if (p.type === 'color') {
+      // Saturated primaries plus a dark, desaturated colour: hue and lightness handling both show.
+      out.push([`${k}=red`, { [k]: [1, 0, 0] }], [`${k}=blue`, { [k]: [0, 0.2, 1] }], [`${k}=dark`, { [k]: [0.2, 0.15, 0.1] }]);
+    }
     if (p.type === 'kernel') {
       // A non-symmetric kernel catches transposed or mirrored indexing.
       const n = p.size * p.size;

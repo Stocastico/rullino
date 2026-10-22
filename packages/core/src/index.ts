@@ -49,6 +49,7 @@ export {
   scaleParams,
   validateSchema,
   type BoolParam,
+  type ColorParam,
   type CurveParam,
   type LutParam,
   type EnumParam,

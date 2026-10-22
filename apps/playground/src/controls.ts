@@ -159,6 +159,18 @@ export function renderControls<S extends ParamSchema>(
         row.append(el('label', { htmlFor: input.id }, label), input, info);
         break;
       }
+      case 'color': {
+        // <input type=color> speaks #rrggbb, i.e. 8-bit sRGB: the param's own encoding.
+        const input = el('input', { type: 'color', name: key, id: `param-${key}` });
+        const hex = (c: readonly number[]) => `#${c.map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('')}`;
+        input.addEventListener('input', () => {
+          values[key] = [1, 3, 5].map((i) => parseInt(input.value.slice(i, i + 2), 16) / 255);
+          emit();
+        });
+        widgets.set(key, { write: (v) => (input.value = hex(v as readonly number[])) });
+        row.append(el('label', { htmlFor: input.id }, label), input);
+        break;
+      }
       case 'enum': {
         const select = el('select', { name: key, id: `param-${key}` });
         for (const [value, text] of Object.entries(p.options)) select.append(el('option', { value }, text));

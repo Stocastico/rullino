@@ -67,7 +67,16 @@ export interface LutParam extends ParamBase {
   readonly default: Lut;
 }
 
-export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam | LutParam;
+/**
+ * A colour picked by the user: straight sRGB-encoded [r, g, b] in [0, 1], as colour pickers show
+ * it. In WGSL a vec4f (r, g, b, 1) with the same encoded values; filters convert to linear themselves.
+ */
+export interface ColorParam extends ParamBase {
+  readonly type: 'color';
+  readonly default: readonly [number, number, number];
+}
+
+export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam | LutParam | ColorParam;
 export type ParamSchema = Readonly<Record<string, Param>>;
 
 export type ParamValue<P extends Param> = P extends { readonly type: 'float' | 'int' }
@@ -82,7 +91,9 @@ export type ParamValue<P extends Param> = P extends { readonly type: 'float' | '
           ? CurvePoints
           : P extends { readonly type: 'lut' }
             ? Lut
-            : never;
+            : P extends { readonly type: 'color' }
+              ? readonly [number, number, number]
+              : never;
 
 export type ParamValues<S extends ParamSchema> = { readonly [K in keyof S]: ParamValue<S[K]> };
 
@@ -146,6 +157,10 @@ export function validateSchema(schema: ParamSchema): void {
         if (problem) fail(`lut default: ${problem}`);
         break;
       }
+      case 'color':
+        if (!Array.isArray(p.default) || p.default.length !== 3) fail('colour default needs three components');
+        if (!p.default.every((c) => c >= 0 && c <= 1)) fail('colour components must lie in [0, 1]');
+        break;
     }
   }
 }
@@ -191,6 +206,10 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
         if (lutProblem(v)) throw new TypeError(`parameter "${key}" (lut): ${lutProblem(v)}`);
         out[key] = v; // not copied: GPU textures are cached by object identity
         break;
+      case 'color':
+        if (!Array.isArray(v) || v.length !== 3 || !v.every((c) => typeof c === 'number' && Number.isFinite(c))) throw bad();
+        out[key] = v.map((c: number) => Math.min(1, Math.max(0, c)));
+        break;
     }
   }
   return out as unknown as ParamValues<S>;
@@ -222,7 +241,11 @@ export function paramsLayout(schema: ParamSchema): { fields: Field[]; size: numb
   const fields: Field[] = [];
   let offset = 0;
   for (const [key, p] of Object.entries(schema)) {
-    if (p.type === 'kernel' || p.type === 'curve' || p.type === 'lut') {
+    if (p.type === 'color') {
+      offset = roundUp(offset, 16);
+      fields.push({ key, param: p, offset, wgsl: `@align(16) ${key}: vec4f` });
+      offset += 16;
+    } else if (p.type === 'kernel' || p.type === 'curve' || p.type === 'lut') {
       const n = p.type === 'lut' ? 2 : Math.ceil((p.type === 'kernel' ? p.size * p.size : CURVE_SAMPLES) / 4);
       offset = roundUp(offset, 16);
       fields.push({ key, param: p, offset, wgsl: `@align(16) ${key}: array<vec4f, ${n}>` });
@@ -267,6 +290,10 @@ export function packParams<S extends ParamSchema>(schema: S, values: ParamValues
         break;
       case 'curve':
         curveLut(v as CurvePoints).forEach((x, i) => view.setFloat32(offset + i * 4, x, true));
+        break;
+      case 'color':
+        (v as readonly number[]).forEach((x, i) => view.setFloat32(offset + i * 4, x, true));
+        view.setFloat32(offset + 12, 1, true);
         break;
       case 'lut':
         for (let i = 0; i < 3; i++) {

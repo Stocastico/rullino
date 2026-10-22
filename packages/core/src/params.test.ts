@@ -138,5 +138,20 @@ describe('parameter schema', () => {
     expect([view.getFloat32(0, true), view.getFloat32(16, true), view.getFloat32(20, true)]).toEqual([0, 2, 2]);
     expect(view.getFloat32(32, true)).toBe(0.5);
   });
-});
 
+  it('validates colour params, resolves them to sRGB triples and packs them as a vec4f', () => {
+    const c = { k: { type: 'float', min: 0, max: 1, step: 0.1, default: 0.5, label: 'K' }, tint: { type: 'color', default: [1, 0.5, 0], label: 'Tint' } } as const;
+    expect(() => validateSchema(c)).not.toThrow();
+    expect(() => validateSchema({ c: { type: 'color', default: [1, 2, 0], label: 'C' } })).toThrow(/\[0, 1\]/);
+    expect(() => validateSchema({ c: { type: 'color', default: [1, 0] as never, label: 'C' } })).toThrow(/three/);
+    expectTypeOf<ParamValues<typeof c>['tint']>().toEqualTypeOf<readonly [number, number, number]>();
+    expect(resolveParams(c, { tint: [0.2, 0.4, 0.6] }).tint).toEqual([0.2, 0.4, 0.6]);
+    // Out-of-range components are clamped like numbers; malformed values are rejected.
+    expect(resolveParams(c, { tint: [-1, 0.5, 2] }).tint).toEqual([0, 0.5, 1]);
+    expect(() => resolveParams(c, { tint: [0, 0] as never })).toThrow(/tint/);
+    expect(() => resolveParams(c, { tint: [0, NaN, 0] })).toThrow(/tint/);
+    expect(paramsStructWgsl('P', c)).toBe('struct P {\n  k: f32,\n  @align(16) tint: vec4f,\n}');
+    const view = new DataView(packParams(c, defaultParams(c)));
+    expect([0, 1, 2, 3].map((i) => view.getFloat32(16 + i * 4, true))).toEqual([1, 0.5, 0, 1]);
+  });
+});
