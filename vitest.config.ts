@@ -3,6 +3,22 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // `pnpm test:coverage`: unit + browser projects together (v8 coverage works in Chromium too).
+    coverage: {
+      provider: 'v8',
+      include: ['packages/*/src/**/*.ts', 'apps/playground/src/**/*.ts'],
+      // main.ts is the playground's entry wiring: the e2e smoke test (scripts/smoke.mjs) exercises it.
+      exclude: ['**/*.test.ts', '**/test-utils.ts', '**/*.d.ts', 'apps/playground/src/main.ts'],
+      reporter: ['text-summary', 'json-summary', 'html'],
+      reportsDirectory: 'coverage',
+      // Just below what is measured, per area (the whole area's total, not each file): a drop
+      // fails CI, rounding noise does not. Raise them when coverage improves; never lower them to
+      // make a PR pass.
+      thresholds: {
+        'packages/*/src/**': { lines: 99, statements: 97.5, functions: 99, branches: 94, perFile: false },
+        'apps/playground/src/**': { lines: 98.5, statements: 97.5, functions: 97, branches: 86, perFile: false },
+      },
+    },
     projects: [
       {
         test: {

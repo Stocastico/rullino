@@ -4,7 +4,7 @@ import { paintStroke, type BrushOptions, type LinearMask, type Mask, type Radial
 // display image's pixel coordinates (viewBox = image size), so ellipses and the gradient's
 // perpendicular lines look the way the mask is computed (distances in units of the longer side).
 
-import { makeDraggable } from './drag';
+import { capture, makeDraggable } from './drag';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -143,7 +143,7 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
         tools.wand(toUv(e), e.altKey);
         return;
       }
-      svg.setPointerCapture(e.pointerId);
+      capture(svg, e.pointerId);
       onDragStart();
       last = undefined;
       mask = tools.fit(mask as RasterMask);

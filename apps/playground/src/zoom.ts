@@ -1,3 +1,5 @@
+import { capture } from './drag';
+
 // Zoom and pan of the image stage: a CSS transform `translate(x, y) scale(zoom)` (origin top
 // left) on the stage, inside a viewport that clips it. Zoom 1 is "fit". Every on-image editor maps
 // pointers through getBoundingClientRect, which includes the transform, so they keep working.
@@ -109,7 +111,7 @@ export function attachZoom(viewport: HTMLElement, stage: HTMLElement, onChange: 
       }
       if (e.button === 1 || (space && e.button === 0)) {
         pan = { id: e.pointerId, x: e.clientX, y: e.clientY };
-        stage.setPointerCapture(e.pointerId);
+        capture(stage, e.pointerId);
         e.stopPropagation();
         e.preventDefault();
       }

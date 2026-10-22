@@ -1,6 +1,18 @@
 // Pointer dragging for on-image handles: capture the pointer on the handle, report moves in
 // coordinates normalised to `frame` (the overlay SVG), and clean up on release or cancel.
 
+/**
+ * Captures the pointer so a fast drag keeps reporting moves outside the handle. Synthetic pointers
+ * (tests) cannot be captured; the drag then works while events reach the handle.
+ */
+export function capture(node: Element, pointerId: number): void {
+  try {
+    node.setPointerCapture(pointerId);
+  } catch {
+    // not an active pointer (synthetic event)
+  }
+}
+
 export type DragMove = (u: number, v: number, event: PointerEvent) => void;
 
 /**
@@ -18,7 +30,7 @@ export function makeDraggable(node: Element, frame: Element, start: (u: number, 
     if (!move) return;
     e.preventDefault();
     e.stopPropagation();
-    node.setPointerCapture(e.pointerId);
+    capture(node, e.pointerId);
     const onMove = (ev: Event) => move(...uv(ev as PointerEvent), ev as PointerEvent);
     const stop = () => {
       node.removeEventListener('pointermove', onMove);
