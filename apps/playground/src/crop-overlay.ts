@@ -108,7 +108,8 @@ export function createCropOverlay(svg: SVGSVGElement, onChange: (crop: Crop) => 
         width *= k;
         height *= k;
       }
-      return { x: left ? ax - width : ax, y: top ? ay - height : ay, width, height };
+      // Clamped: the rescale above can land a hair below 0.
+      return { x: Math.max(0, left ? ax - width : ax), y: Math.max(0, top ? ay - height : ay), width, height };
     });
   }
 

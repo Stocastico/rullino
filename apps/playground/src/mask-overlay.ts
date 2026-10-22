@@ -30,8 +30,8 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export interface OverlayTools {
   readonly tool: () => 'paint' | 'erase' | 'wand';
   readonly brush: () => BrushOptions;
-  /** Wand click: the mask with the region at `uv` added (or removed, with `subtract`). */
-  readonly wand: (mask: RasterMask, uv: Vec2, subtract: boolean) => Promise<Mask | undefined>;
+  /** Wand click at `uv` (removing with `subtract`); the caller updates the mask (asynchronously). */
+  readonly wand: (uv: Vec2, subtract: boolean) => void;
   /** The mask with its raster at the current image's resolution (called when a stroke starts). */
   readonly fit: (mask: RasterMask) => RasterMask;
 }
@@ -150,11 +150,7 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
     svg.onpointerdown = (e) => {
       e.preventDefault();
       if (tools.tool() === 'wand') {
-        void tools.wand(mask as RasterMask, toUv(e), e.altKey).then((next) => {
-          if (!next) return;
-          mask = next;
-          onChange(next);
-        });
+        tools.wand(toUv(e), e.altKey);
         return;
       }
       svg.setPointerCapture(e.pointerId);

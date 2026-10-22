@@ -21,6 +21,7 @@ import {
   runChainCpu,
   type ExportOptions,
   type Geometry,
+  type Vec2,
   type GpuContext,
   type LinearImage,
   type Step,
@@ -109,7 +110,7 @@ interface Renderer {
    * Runs the chain at the largest resolution available and encodes the result, shrunk (in linear
    * light) so its long side is at most `longSide` if given. Never enlarges.
    */
-  export(steps: Step[], options: ExportOptions, longSide?: number): Promise<Blob>;
+  export(steps: Step[], options: ExportOptions, longSide: number | undefined, geometry: Geometry): Promise<Blob>;
   /** The original image at w x h on the CPU, for mask tools (wand, edge refinement). */
   maskSource(w: number, h: number): Promise<LinearImage>;
 }
@@ -192,11 +193,12 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       }
       return p;
     },
-    async export(steps, options, longSide) {
+    async export(steps, options, longSide, g) {
       if (!raw) throw new Error('no image loaded');
       // A throwaway Pipeline: full-resolution intermediates are freed as soon as the file is encoded.
+      // The geometry is the committed one, not the one shown (which drops the crop while editing it).
       const pipeline = new Pipeline(gpu);
-      const source = reframe(raw.fullRes);
+      const source = isIdentityGeometry(g) ? raw.fullRes : applyGeometry(gpu, raw.fullRes, g);
       try {
         pipeline.setSource(source, { scale: raw.fullScale });
         const out = pipeline.run(steps);
@@ -249,10 +251,10 @@ function cpuRenderer(): Renderer {
       if (!source) throw new Error('no image loaded');
       return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
     },
-    async export(steps, options, longSide) {
-      if (!source) throw new Error('no image loaded');
+    async export(steps, options, longSide, g) {
+      if (!raw) throw new Error('no image loaded');
       // The CPU fallback only ever has the reduced image.
-      const out = runChainCpu(steps, source, { scale });
+      const out = runChainCpu(steps, isIdentityGeometry(g) ? raw : applyGeometryCpu(raw, g), { scale });
       const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
       return encodeImage(w === out.width ? out : downscaleCpu(out, w, h), options);
     },
@@ -423,7 +425,7 @@ function exportFile(): Promise<void> {
     const t0 = performance.now();
     try {
       const longSide = Number(ui.exportSize.value) || undefined;
-      const blob = await renderer.export(steps, { ...options, quality }, longSide);
+      const blob = await renderer.export(steps, { ...options, quality }, longSide, geometry);
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${imageName}-rullino.${ext}` });
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
@@ -455,9 +457,32 @@ const overlay = createMaskOverlay(
     void render();
   },
   () => (dragging = true),
-  { tool: () => tools.tool, brush: brushOptions, wand: wandAt, fit: fitRaster },
+  { tool: () => tools.tool, brush: brushOptions, wand: wandClick, fit: fitRaster },
 );
 const showOverlay = () => overlay.show(selectedMask(), displaySize[0], displaySize[1]);
+
+/**
+ * Wand clicks run one after another, each from the step's current mask (two quick clicks used to
+ * start from the same mask, the second overwriting the first), and the result goes to the step
+ * that was selected when clicking, even if the selection changed meanwhile.
+ */
+let wandQueue: Promise<void> = Promise.resolve();
+function wandClick(uv: Vec2, subtract: boolean): void {
+  const uid = chain.selected;
+  wandQueue = wandQueue.then(async () => {
+    const mask = chain.steps.find((s) => s.uid === uid)?.mask;
+    if (mask?.kind !== 'raster') return;
+    const next = await wandAt(mask, uv, subtract).catch((e: Error) => {
+      ui.status.textContent = `Wand failed: ${e.message}`;
+      return undefined;
+    });
+    if (!next) return;
+    chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? withMask(s, next) : s)) };
+    chainUi.set(chain, false);
+    showOverlay();
+    void render();
+  });
+}
 // After any queued load, so the textures it reads are the current image's.
 setMaskSource((w, h) => loads.then(() => renderer.maskSource(w, h)));
 
