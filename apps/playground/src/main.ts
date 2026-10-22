@@ -28,7 +28,8 @@ import {
 import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
-import { renderGeometryControls } from './geometry-ui';
+import { createCropOverlay, fitAspect } from './crop-overlay';
+import { renderGeometryControls, type Aspect } from './geometry-ui';
 import { drawHistogram } from './histogram-view';
 import { createMaskOverlay } from './mask-overlay';
 import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
@@ -55,6 +56,7 @@ const ui = {
   overlay: document.getElementById('overlay') as unknown as SVGSVGElement,
   histogram: $<HTMLCanvasElement>('histogram'),
   geometry: $<HTMLDivElement>('geometry'),
+  geometryOverlay: document.getElementById('geometry-overlay') as unknown as SVGSVGElement,
   exportFormat: $<HTMLSelectElement>('export-format'),
   exportQuality: $<HTMLInputElement>('export-quality'),
   exportButton: $<HTMLButtonElement>('export'),
@@ -284,6 +286,24 @@ let latestLoad = 0;
 
 let geometry: Geometry = IDENTITY_GEOMETRY;
 let geometryQueued = false;
+/** While the crop is edited the frame is shown uncropped; the crop applies on Done. */
+let cropEditing = false;
+let cropAspect: Aspect = 'free';
+const FULL_CROP: Geometry['crop'] = { x: 0, y: 0, width: 1, height: 1 };
+const shownGeometry = (): Geometry => (cropEditing ? { ...geometry, crop: FULL_CROP } : geometry);
+const aspectRatio = (): number | undefined => {
+  if (cropAspect === 'free') return undefined;
+  if (cropAspect === 'original') return displaySize[0] / displaySize[1];
+  const [a, b] = cropAspect.split(':').map(Number);
+  return a! / b!;
+};
+const cropOverlay = createCropOverlay(ui.geometryOverlay, (crop) => (geometry = { ...geometry, crop }));
+const showCrop = () => {
+  ui.stage.classList.toggle('cropping', cropEditing);
+  ui.geometryOverlay.style.pointerEvents = cropEditing ? 'auto' : 'none';
+  if (cropEditing) cropOverlay.show(geometry.crop, displaySize[0], displaySize[1], aspectRatio());
+  else cropOverlay.hide();
+};
 
 /** Reframes the image. Changes made while one is queued collapse into it (latest geometry wins). */
 function setGeometry(g: Geometry): void {
@@ -294,10 +314,11 @@ function setGeometry(g: Geometry): void {
     geometryQueued = false;
     if (!loaded) return;
     try {
-      const [w, h] = await renderer.setGeometry(geometry);
+      const [w, h] = await renderer.setGeometry(shownGeometry());
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
+      showCrop();
     } catch (e) {
       ui.status.textContent = `Geometry failed: ${(e as Error).message}`;
       console.error(e);
@@ -306,10 +327,27 @@ function setGeometry(g: Geometry): void {
   void loads.then(render);
 }
 
-const geometryControls = renderGeometryControls(ui.geometry, () => geometry, (g, drag) => {
-  if (drag) dragging = true;
-  setGeometry(g);
-});
+const geometryControls = renderGeometryControls(
+  ui.geometry,
+  () => geometry,
+  (g, drag) => {
+    if (drag) dragging = true;
+    setGeometry(g);
+  },
+  {
+    editing: () => cropEditing,
+    setEditing(on) {
+      cropEditing = on;
+      setGeometry(geometry);
+    },
+    setAspect(aspect) {
+      cropAspect = aspect;
+      const ratio = aspectRatio();
+      if (ratio !== undefined && cropEditing) geometry = { ...geometry, crop: fitAspect(geometry.crop, displaySize[0], displaySize[1], ratio) };
+      showCrop();
+    },
+  },
+);
 ui.geometry.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
 });
@@ -322,11 +360,13 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
       const image = await createImageBitmap(source);
       // A new image starts unframed, as in photo editors.
       geometry = IDENTITY_GEOMETRY;
+      cropEditing = false;
       geometryControls.refresh();
       const [w, h] = await renderer.load(image, geometry);
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
+      showCrop();
       imageName = name.replace(/\.[^.]+$/, '') || 'image';
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
       image.close();

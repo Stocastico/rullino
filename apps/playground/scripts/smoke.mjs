@@ -237,15 +237,43 @@ try {
   // Geometry: a quarter turn swaps the canvases' size; straightening leaves transparent corners;
   // reset brings the original frame back.
   const canvasSizes = () => page.evaluate(() => ['before', 'after'].map((id) => { const c = document.getElementById(id); return `${c.width}x${c.height}`; }).join(' '));
+  // Geometry changes coalesce while a frame is in flight, so a new frame is not proof that the
+  // latest geometry is shown: wait for the expected canvas sizes instead.
+  const sizesBecome = (want) => page.waitForFunction((want) => ['before', 'after'].map((id) => { const c = document.getElementById(id); return `${c.width}x${c.height}`; }).join(' ') === want, want, { timeout: 20000 }).catch(() => {});
   const sizeBefore = await canvasSizes();
   const [cw, ch] = sizeBefore.split(' ')[0].split('x');
   await after(() => page.click('#geometry button[data-action=rotate-right]'));
+  await sizesBecome(`${ch}x${cw} ${ch}x${cw}`);
   check((await canvasSizes()) === `${ch}x${cw} ${ch}x${cw}`, `after a quarter turn: ${await canvasSizes()} (was ${sizeBefore})`);
   await after(() => page.$eval('#geometry [data-action=straighten]', (el) => { el.value = '20'; el.dispatchEvent(new Event('input', { bubbles: true })); }));
+  await page.waitForFunction(() => document.getElementById('after').getContext('2d').getImageData(0, 0, 1, 1).data[3] === 0, null, { timeout: 20000 }).catch(() => {});
   const cornerAlpha = await page.$eval('#after', (c) => c.getContext('2d').getImageData(0, 0, 1, 1).data[3]);
   check(cornerAlpha === 0, `straightened corner should be transparent, alpha ${cornerAlpha}`);
   await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await sizesBecome(sizeBefore);
   check((await canvasSizes()) === sizeBefore, `after reset: ${await canvasSizes()}, expected ${sizeBefore}`);
+
+  // Crop on the image: in crop mode the frame is shown uncropped; dragging the bottom-right
+  // corner to the middle and pressing Done halves both sides.
+  await page.click('#geometry button[data-action=crop-mode]');
+  // Entering crop mode reframes asynchronously: wait for the handles.
+  await page.waitForSelector('#geometry-overlay [data-handle=br]', { timeout: 20000 }).catch(() => {});
+  check((await page.$$('#geometry-overlay [data-handle]')).length >= 4, 'crop mode should show the crop handles');
+  {
+    const handle = await page.locator('#geometry-overlay [data-handle=br]').boundingBox();
+    const stage = await page.locator('#after').boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(stage.x + stage.width * 0.5, stage.y + stage.height * 0.5, { steps: 5 });
+    await page.mouse.up();
+  }
+  await after(() => page.click('#geometry button[data-action=crop-done]'));
+  await page.waitForFunction((cw) => document.getElementById('after').width < cw * 0.75, cw, { timeout: 20000 }).catch(() => {});
+  const cropped = (await canvasSizes()).split(' ')[1].split('x').map(Number);
+  check(Math.abs(cropped[0] - cw / 2) <= 2 && Math.abs(cropped[1] - ch / 2) <= 2, `crop to the middle gave ${cropped.join('x')}, expected about ${cw / 2}x${ch / 2}`);
+  check((await page.$$('#geometry-overlay [data-handle]')).length === 0, 'the crop handles should go away after Done');
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await sizesBecome(sizeBefore);
 
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
