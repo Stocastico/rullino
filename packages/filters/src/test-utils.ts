@@ -1,4 +1,4 @@
-import { createImage, linearToOklab, type PointwiseFilter, type Rgba } from '@rullino/core';
+import { createImage, linearToOklab, oklabToLinear, type PointwiseFilter, type Rgba } from '@rullino/core';
 
 /** Runs a filter's CPU reference on a single premultiplied pixel. */
 export function px<F extends PointwiseFilter<any>>(f: F, c: Rgba, params?: Parameters<F['cpu']>[1]): Rgba {
@@ -30,3 +30,13 @@ export const sum = (img: { data: Float32Array }, c = 0) => {
   for (let i = c; i < img.data.length; i += 4) s += img.data[i]!;
   return s;
 };
+
+/** An image from OKLab lightness per pixel, with a fixed hue and chroma; alpha 1. */
+export function fromLightness(w: number, h: number, L: (x: number, y: number) => number, a = 0.03, b = -0.02) {
+  const img = createImage(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) img.data.set([...oklabToLinear(L(x, y), a, b), 1], (y * w + x) * 4);
+  return img;
+}
+
+/** OKLab of pixel i of an opaque image. */
+export const lab = (img: { data: Float32Array }, i: number) => linearToOklab(img.data[i * 4]!, img.data[i * 4 + 1]!, img.data[i * 4 + 2]!);
