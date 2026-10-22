@@ -202,3 +202,5 @@ Things that already bit us. Add new ones as they come up.
 - **Handles on the image edge are half clipped** by an `overflow: hidden` overlay: the crop / perspective overlay uses `overflow: visible`.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.
 - **Synthetic `PointerEvent`s cannot be captured**: `setPointerCapture` throws "No active pointer". Dispatch fake touches where no handler captures (the smoke test pinches on `#stage`).
+- **WGSL shift amounts must be `u32`** (`4 << (2 * level)` with an `i32` level does not compile): `4 << u32(2 * level)`. As always, an all-zero output.
+- **A generous `outliers` allowance hides subtle mutations**: dither at 1% let a shifted threshold (~0.6% flips) pass 14 of 16 cases. Measure with `outliers: 0` first, then allow just above what you measured.

@@ -14,6 +14,7 @@ import { colorMixer } from './colorMixer';
 import { contrast } from './contrast';
 import { convolve } from './convolve';
 import { curves } from './curves';
+import { dither } from './dither';
 import { equalize } from './equalize';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
@@ -55,6 +56,7 @@ export {
   contrast,
   convolve,
   curves,
+  dither,
   equalize,
   exposure,
   gamma,
@@ -123,4 +125,5 @@ export const filters: readonly Filter<any>[] = [
   inpaint,
   pixelate,
   halftone,
+  dither,
 ];
