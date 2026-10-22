@@ -25,6 +25,20 @@ export const SLIMSAM_77 = {
   },
 } as const satisfies { id: string; licence: string; source: string; variants: Record<string, ModelFiles> };
 
+const MIGAN_REVISION = '406830d0fa60666da0071c342ad2fbc8f30c5c64';
+
+/**
+ * MI-GAN (Picsart AI Research, ICCV 2023; code and weights MIT): object removal. The "pipeline"
+ * ONNX export takes an 8-bit image and mask of any size and handles resizing and blending itself.
+ */
+export const MIGAN = {
+  id: 'migan-pipeline-v2',
+  licence: 'MIT',
+  source: 'https://huggingface.co/andraniksargsyan/migan',
+  model: `https://huggingface.co/andraniksargsyan/migan/resolve/${MIGAN_REVISION}/migan_pipeline_v2.onnx`,
+  bytes: 28_079_181,
+} as const;
+
 export interface FetchModelOptions {
   /** Called as bytes arrive: (received, total); total is 0 when the server does not say. */
   readonly onProgress?: (received: number, total: number) => void;
