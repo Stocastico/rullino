@@ -67,7 +67,7 @@ export function samInput(image: LinearImage): SamInput {
  * samples the logits bilinearly at its position in the image part of the 1024 frame (`frame` is
  * the image's size there), then a sigmoid turns logits into coverage.
  */
-export function samMask(logits: Float32Array, frame: { width: number; height: number }, width: number, height: number): Float32Array {
+export function samMask(logits: Float32Array, frame: { width: number; height: number }, width: number, height: number): Float32Array<ArrayBuffer> {
   const out = new Float32Array(width * height);
   const k = SAM_MASK / SAM_INPUT;
   const at = (x: number, y: number) => logits[Math.min(SAM_MASK - 1, Math.max(0, y)) * SAM_MASK + Math.min(SAM_MASK - 1, Math.max(0, x))]!;
