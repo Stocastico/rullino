@@ -20,6 +20,10 @@
           <p class="hint">or drop an image anywhere</p>
         </section>
         <section>
+          <h2>Geometry</h2>
+          <div id="geometry" class="geometry"></div>
+        </section>
+        <section>
           <h2>Histogram</h2>
           <canvas id="histogram" class="histogram" aria-label="Histogram of the result"></canvas>
         </section>
@@ -38,6 +42,7 @@
             </select>
           </label>
           <label>Quality <input id="export-quality" type="range" min="0.5" max="1" step="0.01" value="0.92" /></label>
+          <label>Long side <input id="export-size" type="number" min="16" step="1" placeholder="original" /> px</label>
           <button id="export" type="button">Export full resolution</button>
           <p class="hint">JPEG is flattened onto white.</p>
         </section>
@@ -53,6 +58,7 @@
           <canvas id="before" aria-label="Original image"></canvas>
           <div id="handle" aria-hidden="true"><span>before</span><span>after</span></div>
           <svg id="overlay" preserveAspectRatio="none" aria-label="Mask handles"></svg>
+          <svg id="geometry-overlay" preserveAspectRatio="none" aria-label="Crop handles"></svg>
         </div>
       </figure>
     </main>

@@ -64,6 +64,13 @@ figure { margin: 0; padding: 24px; display: grid; justify-items: center; align-i
 #handle span:first-child { right: calc(100% - var(--split, 50%) + 8px); }
 #handle span:last-child { left: calc(var(--split, 50%) + 8px); }
 body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
+/* Side by side, the page itself does not scroll: the sidebar scrolls on its own, so the image
+   stays in view while working on controls far down the chain. */
+@media (min-width: 721px) {
+  body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  main { flex: 1; min-height: 0; }
+  aside { overflow-y: auto; }
+}
 @media (max-width: 720px) {
   main { grid-template-columns: 1fr; }
   aside { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -103,3 +110,13 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 .brush-mode button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
 #overlay.painting.wand { cursor: crosshair; }
 .histogram { width: 100%; height: 100px; background: rgb(0 0 0 / 0.25); border-radius: 6px; image-rendering: pixelated; }
+.geometry { display: flex; flex-direction: column; gap: 8px; }
+.geometry-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Visible overflow: corner handles sit on the image edge and must be fully grabbable. */
+#geometry-overlay { grid-area: 1 / 1; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.crop-shade { fill: rgb(0 0 0 / 0.55); fill-rule: evenodd; pointer-events: none; }
+.crop-body { fill: transparent; stroke: rgb(255 255 255 / 0.9); stroke-width: calc(1.5px * var(--px, 1)); pointer-events: all; cursor: move; }
+/* While cropping, only the uncropped result and its crop rectangle are shown. */
+#stage.cropping #before, #stage.cropping #handle, #stage.cropping #overlay { display: none; }
+button.primary { border-color: var(--accent); color: var(--accent); }
+#export-size { width: 7em; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }

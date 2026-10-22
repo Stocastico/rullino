@@ -31,10 +31,12 @@ export { createImage, type LinearImage } from './image';
 export { applyLutCpu, createLut, identityLut, lutFromFunction, lutSamplerWgsl, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { lutTexture } from './gpu/lut';
 export { blendMask, renderMask } from './gpu/mask';
+export { applyGeometry } from './gpu/geometry';
 export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
 export { paintStroke, type BrushOptions } from './paint';
 export { magicWand, type WandOptions } from './wand';
 export { histogramSrgb8, type Histogram } from './histogram';
+export { applyGeometryCpu, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, validateGeometry, type Geometry, type GeometryFrame } from './geometry';
 export { refineMask, type RefineOptions } from './refine';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {

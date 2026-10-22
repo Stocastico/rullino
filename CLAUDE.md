@@ -30,10 +30,11 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `resize.ts` CPU area downscale and `fitWithin`.
   - `png.ts` dependency-free PNG encoder (8/16-bit RGBA); `encode.ts` `encodeImage` (PNG / JPEG / WebP from a `LinearImage`); `gpu/export.ts` `exportImage` from a texture.
   - `mask.ts` masks (linear, radial, raster), CPU `maskValue` / `maskImage` / `blendMasked` / `resampleRaster`; `gpu/mask.ts` the WGSL twin, `blendMask` and `renderMask`; `paint.ts` `paintStroke` (brush on raster masks); `wand.ts` `magicWand`; `refine.ts` `refineMask` (guided filter).
+  - `geometry.ts` `Geometry` (orientation, perspective, straighten, crop) composed into one homography, `geometryFrame`, CPU `applyGeometryCpu`; `gpu/geometry.ts` `applyGeometry`.
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
@@ -130,6 +131,11 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Histogram of the output computed on the CPU from the displayed frame's bytes (`histogramSrgb8`) | The playground already reads every frame back; a GPU reduction would add work for no gain. Luminosity = Rec. 709 weights on encoded values, as photo editors show it. |
 | Equalisation (global and CLAHE) on OKLab lightness, CDF interpolated linearly inside each bin | Hue and chroma stay put; the continuous mapping keeps GPU (f32) and CPU (f64) within tolerance even when a pixel lands in a neighbouring bin. Transparent pixels are ignored. |
 | CLAHE: tiles × tiles grid (≤ 16), clip at `clipLimit` × mean bin with one even redistribution of the excess, bilinear blend of the 4 nearest tiles' mappings | OpenCV-like semantics without seams. One invocation per tile builds its CDF (reusing the pixel dispatch); tiles are capped at the image size so none is empty. A single redistribution can still give slopes up to ~(clip + 1), so clip 1 is not the identity. |
+| Geometry is a frame applied to the source before the chain (Lightroom model), not a chain step | The chain keeps one size throughout, so caching, masks, fusion and the CPU reference are untouched. Geometry produces the Pipeline's source texture; preview, display, the before image, the wand's image and export all use it. |
+| Geometry = orientation (quarter turns, flips) → perspective (4 points onto the frame) → straighten (±45°, clockwise positive) → crop, all normalised, composed into one homography; bilinear resampling of premultiplied values, transparent outside | One shader and one CPU path for every transform; normalised parameters mean the same at every resolution. Uncovered corners stay visible (transparent) so the user crops them deliberately; an auto-constrained crop can come later. |
+| Masks and the crop live in the framed image's coordinates | Masks are drawn on what is shown. Changing the crop or straighten after drawing a mask moves it relative to the content (it keeps its normalised position). |
+| Crop / perspective edited on the image with the frame shown without them; applied on Done | You need to see what is outside the crop or before the correction to place the handles. |
+| Export size = long side, linear-light area downscale after the full-resolution chain; never enlarges | Pixel-unit params keep their full-resolution meaning; shrinking after the chain is the correct order. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -172,4 +178,6 @@ Things that already bit us. Add new ones as they come up.
 - **UI modules that keep their own copy of shared state go stale** once a second editor exists (panel vs on-image handles): read the current state through a getter.
 - **A mask outlives image changes** (normalised coordinates), so a raster can have another image's proportions: refit it (`fitRaster` / `resampleRaster`) before tools that need the image at the raster's size.
 - **Playwright's `mouse.click` has no `modifiers` option** (only `page.click` does): hold keys with `keyboard.down` / `up`.
+- **A new frame is not proof the latest state is shown**: changes made while a frame is in flight coalesce into the next one. E2E checks of geometry wait for the expected result (sizes, pixels), not for a frame count.
+- **Handles on the image edge are half clipped** by an `overflow: hidden` overlay: the crop / perspective overlay uses `overflow: visible`.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.

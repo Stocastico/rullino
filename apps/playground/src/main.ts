@@ -2,6 +2,8 @@ import {
   activeSteps,
   createGpuContext,
   decodeSrgb8,
+  applyGeometry,
+  applyGeometryCpu,
   downscale,
   downscaleCpu,
   encodeImage,
@@ -9,6 +11,8 @@ import {
   exportImage,
   fitWithin,
   histogramSrgb8,
+  IDENTITY_GEOMETRY,
+  isIdentityGeometry,
   importImage,
   readImage,
   releaseTexture,
@@ -16,6 +20,7 @@ import {
   readSrgb8,
   runChainCpu,
   type ExportOptions,
+  type Geometry,
   type GpuContext,
   type LinearImage,
   type Step,
@@ -23,6 +28,9 @@ import {
 import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
+import { createCropOverlay, fitAspect } from './crop-overlay';
+import { renderGeometryControls, type Aspect, type EditMode } from './geometry-ui';
+import { createPerspectiveOverlay, UNIT_QUAD } from './perspective-overlay';
 import { drawHistogram } from './histogram-view';
 import { createMaskOverlay } from './mask-overlay';
 import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
@@ -48,8 +56,11 @@ const ui = {
   after: $<HTMLCanvasElement>('after'),
   overlay: document.getElementById('overlay') as unknown as SVGSVGElement,
   histogram: $<HTMLCanvasElement>('histogram'),
+  geometry: $<HTMLDivElement>('geometry'),
+  geometryOverlay: document.getElementById('geometry-overlay') as unknown as SVGSVGElement,
   exportFormat: $<HTMLSelectElement>('export-format'),
   exportQuality: $<HTMLInputElement>('export-quality'),
+  exportSize: $<HTMLInputElement>('export-size'),
   exportButton: $<HTMLButtonElement>('export'),
 };
 const beforeCtx = ui.before.getContext('2d')!;
@@ -89,11 +100,16 @@ async function present(bytes: Uint8ClampedArray<ArrayBuffer>, w: number, h: numb
 
 interface Renderer {
   readonly name: string;
-  /** Loads an image and returns the display size. */
-  load(image: ImageBitmap): Promise<[number, number]>;
+  /** Loads an image framed by `geometry`; returns the (framed) display size. */
+  load(image: ImageBitmap, geometry: Geometry): Promise<[number, number]>;
+  /** Reframes the loaded image; returns the new display size. */
+  setGeometry(geometry: Geometry): Promise<[number, number]>;
   render(steps: Step[], preview: boolean): Promise<void>;
-  /** Runs the chain at the largest resolution available and encodes the result. */
-  export(steps: Step[], options: ExportOptions): Promise<Blob>;
+  /**
+   * Runs the chain at the largest resolution available and encodes the result, shrunk (in linear
+   * light) so its long side is at most `longSide` if given. Never enlarges.
+   */
+  export(steps: Step[], options: ExportOptions, longSide?: number): Promise<Blob>;
   /** The original image at w x h on the CPU, for mask tools (wand, edge refinement). */
   maskSource(w: number, h: number): Promise<LinearImage>;
 }
@@ -105,13 +121,36 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   const full = new Pipeline(gpu);
   const small = new Pipeline(gpu);
   let textures: GPUTexture[] = [];
-  let original: GPUTexture | undefined;
-  let originalScale = 1;
+  let raw: { fullRes: GPUTexture; display: GPUTexture; preview: GPUTexture; fullScale: number; displayScale: number; previewScale: number } | undefined;
+  let geometry: Geometry = IDENTITY_GEOMETRY;
+  /** Geometry-applied textures owned here (the raw ones when the geometry is the identity). */
+  let framed: GPUTexture[] = [];
   let displayTex: GPUTexture | undefined;
   const maskSources = new Map<string, Promise<LinearImage>>();
+  const reframe = (t: GPUTexture) => (isIdentityGeometry(geometry) ? t : applyGeometry(gpu, t, geometry));
+
+  /** Applies the geometry to the display and preview images and makes them the pipelines' sources. */
+  async function frame(g: Geometry): Promise<[number, number]> {
+    if (!raw) throw new Error('no image loaded');
+    geometry = g;
+    const display = reframe(raw.display);
+    const preview = raw.preview === raw.display ? display : reframe(raw.preview);
+    full.setSource(display, { scale: raw.displayScale });
+    small.setSource(preview, { scale: raw.previewScale });
+    const previous = framed;
+    framed = [...new Set([display, preview])].filter((t) => t !== raw!.display && t !== raw!.preview);
+    for (const t of previous) releaseTexture(gpu, t);
+    displayTex = display;
+    maskSources.clear();
+    ui.before.width = display.width;
+    ui.before.height = display.height;
+    beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), display.width, display.height), 0, 0);
+    return [display.width, display.height];
+  }
+
   return {
     name: 'WebGPU',
-    async load(image) {
+    async load(image, g) {
       // Beyond the device's texture limit the browser has to shrink it first (in sRGB, unavoidably).
       const limit = gpu.device.limits.maxTextureDimension2D;
       let fitted = image;
@@ -126,21 +165,16 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       const display = dw < fullRes.width ? downscale(gpu, fullRes, dw, dh) : fullRes;
       const [pw, ph] = fitWithin(fullRes.width, fullRes.height, PREVIEW_SIDE);
       const preview = pw < dw ? downscale(gpu, display, pw, ph) : display;
-      // Pixel-unit params (blur radii...) are defined at the original resolution.
-      full.setSource(display, { scale: dw / image.width });
-      small.setSource(preview, { scale: pw / image.width });
-      // Only now are the previous textures unreferenced (destruction waits for queued GPU work).
-      for (const t of textures) t.destroy();
+      const previous = textures;
       textures = [...new Set([fullRes, display, preview])];
-      original = fullRes;
-      originalScale = fullRes.width / image.width;
-      displayTex = display;
-      maskSources.clear();
-      ui.before.width = dw;
-      ui.before.height = dh;
-      beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, display), dw, dh), 0, 0);
-      return [dw, dh];
+      // Pixel-unit params (blur radii...) are defined at the original resolution.
+      raw = { fullRes, display, preview, fullScale: fullRes.width / image.width, displayScale: dw / image.width, previewScale: pw / image.width };
+      const size = await frame(g);
+      // Only now are the previous textures unreferenced (destruction waits for queued GPU work).
+      for (const t of previous) t.destroy();
+      return size;
     },
+    setGeometry: (g) => frame(g),
     async render(steps, preview) {
       const out = (preview ? small : full).run(steps);
       await present(await readSrgb8(gpu, out), out.width, out.height);
@@ -158,38 +192,54 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       }
       return p;
     },
-    async export(steps, options) {
-      if (!original) throw new Error('no image loaded');
+    async export(steps, options, longSide) {
+      if (!raw) throw new Error('no image loaded');
       // A throwaway Pipeline: full-resolution intermediates are freed as soon as the file is encoded.
       const pipeline = new Pipeline(gpu);
+      const source = reframe(raw.fullRes);
       try {
-        pipeline.setSource(original, { scale: originalScale });
-        return await exportImage(gpu, pipeline.run(steps), options);
+        pipeline.setSource(source, { scale: raw.fullScale });
+        const out = pipeline.run(steps);
+        const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
+        if (w === out.width) return await exportImage(gpu, out, options);
+        const small = downscale(gpu, out, w, h);
+        try {
+          return await exportImage(gpu, small, options);
+        } finally {
+          releaseTexture(gpu, small);
+        }
       } finally {
         pipeline.destroy();
+        if (source !== raw.fullRes) releaseTexture(gpu, source);
       }
     },
   };
 }
 
 function cpuRenderer(): Renderer {
+  let raw: LinearImage | undefined;
   let source: LinearImage | undefined;
   let scale = 1;
+  const frame = async (g: Geometry): Promise<[number, number]> => {
+    if (!raw) throw new Error('no image loaded');
+    source = isIdentityGeometry(g) ? raw : applyGeometryCpu(raw, g);
+    ui.before.width = source.width;
+    ui.before.height = source.height;
+    beforeCtx.putImageData(new ImageData(encodeSrgb8(source) as Uint8ClampedArray<ArrayBuffer>, source.width, source.height), 0, 0);
+    return [source.width, source.height];
+  };
   return {
     name: 'CPU reference',
-    async load(image) {
+    async load(image, g) {
       // Canvas resize happens in sRGB; acceptable for the fallback path.
       const [w, h] = fitWithin(image.width, image.height, CPU_SIDE);
       const tmp = new OffscreenCanvas(w, h).getContext('2d')!;
       tmp.drawImage(image, 0, 0, w, h);
-      const data = tmp.getImageData(0, 0, w, h);
-      source = decodeSrgb8(data.data, w, h);
+      raw = decodeSrgb8(tmp.getImageData(0, 0, w, h).data, w, h);
       scale = w / image.width;
-      ui.before.width = w;
-      ui.before.height = h;
-      beforeCtx.putImageData(data, 0, 0);
-      return [w, h];
+      return frame(g);
     },
+    setGeometry: frame,
     async render(steps) {
       if (!source) return;
       const out = runChainCpu(steps, source, { scale });
@@ -199,10 +249,12 @@ function cpuRenderer(): Renderer {
       if (!source) throw new Error('no image loaded');
       return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
     },
-    async export(steps, options) {
+    async export(steps, options, longSide) {
       if (!source) throw new Error('no image loaded');
       // The CPU fallback only ever has the reduced image.
-      return encodeImage(runChainCpu(steps, source, { scale }), options);
+      const out = runChainCpu(steps, source, { scale });
+      const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
+      return encodeImage(w === out.width ? out : downscaleCpu(out, w, h), options);
     },
   };
 }
@@ -247,16 +299,101 @@ async function render() {
 let loads: Promise<void> = Promise.resolve();
 let latestLoad = 0;
 
+let geometry: Geometry = IDENTITY_GEOMETRY;
+let geometryQueued = false;
+/**
+ * While the crop is edited the frame is shown uncropped; while the perspective is edited, the
+ * oriented image is shown without perspective, straighten or crop. Changes apply on Done.
+ */
+let editMode: EditMode = 'none';
+let cropAspect: Aspect = 'free';
+const FULL_CROP: Geometry['crop'] = { x: 0, y: 0, width: 1, height: 1 };
+const shownGeometry = (): Geometry => {
+  if (editMode === 'crop') return { ...geometry, crop: FULL_CROP };
+  if (editMode === 'perspective') {
+    const { perspective: _, ...rest } = geometry;
+    return { ...rest, straighten: 0, crop: FULL_CROP };
+  }
+  return geometry;
+};
+const aspectRatio = (): number | undefined => {
+  if (cropAspect === 'free') return undefined;
+  if (cropAspect === 'original') return displaySize[0] / displaySize[1];
+  const [a, b] = cropAspect.split(':').map(Number);
+  return a! / b!;
+};
+const cropOverlay = createCropOverlay(ui.geometryOverlay, (crop) => (geometry = { ...geometry, crop }));
+const perspectiveOverlay = createPerspectiveOverlay(ui.geometryOverlay, (quad) => (geometry = { ...geometry, perspective: quad }));
+const showCrop = () => {
+  ui.stage.classList.toggle('cropping', editMode !== 'none');
+  ui.geometryOverlay.style.pointerEvents = editMode !== 'none' ? 'auto' : 'none';
+  if (editMode === 'crop') cropOverlay.show(geometry.crop, displaySize[0], displaySize[1], aspectRatio());
+  else if (editMode === 'perspective') perspectiveOverlay.show(geometry.perspective ?? UNIT_QUAD, displaySize[0], displaySize[1]);
+  else cropOverlay.hide();
+};
+
+/** Reframes the image. Changes made while one is queued collapse into it (latest geometry wins). */
+function setGeometry(g: Geometry): void {
+  geometry = g;
+  if (geometryQueued) return;
+  geometryQueued = true;
+  loads = loads.then(async () => {
+    geometryQueued = false;
+    if (!loaded) return;
+    try {
+      const [w, h] = await renderer.setGeometry(shownGeometry());
+      displaySize = [w, h];
+      setImageSize(w, h);
+      showOverlay();
+      showCrop();
+    } catch (e) {
+      ui.status.textContent = `Geometry failed: ${(e as Error).message}`;
+      console.error(e);
+    }
+  });
+  void loads.then(render);
+}
+
+const geometryControls = renderGeometryControls(
+  ui.geometry,
+  () => geometry,
+  (g, drag) => {
+    if (drag) dragging = true;
+    setGeometry(g);
+  },
+  {
+    mode: () => editMode,
+    setMode(mode) {
+      editMode = mode;
+      setGeometry(geometry);
+    },
+    setAspect(aspect) {
+      cropAspect = aspect;
+      const ratio = aspectRatio();
+      if (ratio !== undefined && editMode === 'crop') geometry = { ...geometry, crop: fitAspect(geometry.crop, displaySize[0], displaySize[1], ratio) };
+      showCrop();
+    },
+  },
+);
+ui.geometry.addEventListener('pointerdown', (e) => {
+  if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
+});
+
 function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
   const id = ++latestLoad;
   loads = loads.then(async () => {
     if (id !== latestLoad) return;
     try {
       const image = await createImageBitmap(source);
-      const [w, h] = await renderer.load(image);
+      // A new image starts unframed, as in photo editors.
+      geometry = IDENTITY_GEOMETRY;
+      editMode = 'none';
+      geometryControls.refresh();
+      const [w, h] = await renderer.load(image, geometry);
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
+      showCrop();
       imageName = name.replace(/\.[^.]+$/, '') || 'image';
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
       image.close();
@@ -285,7 +422,8 @@ function exportFile(): Promise<void> {
   const done = loads.then(async () => {
     const t0 = performance.now();
     try {
-      const blob = await renderer.export(steps, { ...options, quality });
+      const longSide = Number(ui.exportSize.value) || undefined;
+      const blob = await renderer.export(steps, { ...options, quality }, longSide);
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${imageName}-rullino.${ext}` });
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
