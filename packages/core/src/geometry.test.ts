@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyGeometryCpu, geometryFrame, IDENTITY_GEOMETRY, validateGeometry, type Geometry } from './geometry';
+import { applyGeometryCpu, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, validateGeometry, type Geometry } from './geometry';
 import { createImage, type LinearImage } from './image';
 
 /** A w x h image whose red channel encodes the pixel index (distinct values), alpha 1. */
@@ -81,5 +81,12 @@ describe('geometry', () => {
     expect(() => validateGeometry(g({ crop: { x: 0, y: 0, width: 0, height: 1 } }))).toThrow(/crop/);
     expect(() => validateGeometry(g({ straighten: 60 }))).toThrow(/straighten/);
     expect(() => validateGeometry(g({ perspective: [[0, 0], [1, 0], [0, 0], [0, 1]] }))).toThrow(/perspective/);
+  });
+
+  it('recognises the identity', () => {
+    expect(isIdentityGeometry(IDENTITY_GEOMETRY)).toBe(true);
+    expect(isIdentityGeometry(g({ perspective: [[0, 0], [1, 0], [1, 1], [0, 1]] }))).toBe(true);
+    for (const patch of [{ rotate: 90 }, { flipH: true }, { straighten: 0.5 }, { crop: { x: 0, y: 0, width: 0.9, height: 1 } }, { perspective: [[0.1, 0], [1, 0], [1, 1], [0, 1]] }] as const)
+      expect(isIdentityGeometry(g(patch as Partial<Geometry>))).toBe(false);
   });
 });

@@ -146,3 +146,11 @@ export function applyGeometryCpu(src: LinearImage, g: Geometry): LinearImage {
     }
   return out;
 }
+
+/** Whether `g` leaves every image as it is (so resampling can be skipped). */
+export function isIdentityGeometry(g: Geometry): boolean {
+  const q = g.perspective;
+  const square = !q || [[0, 0], [1, 0], [1, 1], [0, 1]].every(([u, v], i) => q[i]![0] === u && q[i]![1] === v);
+  const c = g.crop;
+  return g.rotate === 0 && !g.flipH && !g.flipV && g.straighten === 0 && square && c.x === 0 && c.y === 0 && c.width === 1 && c.height === 1;
+}
