@@ -54,6 +54,7 @@ const CPU_SIDE = 1024;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ui = {
   status: $<HTMLParagraphElement>('status'),
+  announce: $<HTMLParagraphElement>('announce'),
   sample: $<HTMLSelectElement>('sample'),
   file: $<HTMLInputElement>('file'),
   chain: $<HTMLDivElement>('chain'),
@@ -79,6 +80,30 @@ const ui = {
   zoomFit: $<HTMLButtonElement>('zoom-fit'),
 };
 const beforeCtx = ui.before.getContext('2d')!;
+
+/**
+ * Shows a message in the status line and announces it to screen readers. Per-frame timings go to
+ * the status line only: a live region updated on every frame would talk constantly.
+ */
+function announce(message: string): void {
+  ui.status.textContent = message;
+  ui.announce.textContent = message;
+}
+
+/** A spinner over the image while work takes longer than a moment (first shader compiles take seconds). */
+let pending = 0;
+let spinnerTimer: ReturnType<typeof setTimeout> | undefined;
+async function busyWhile<T>(work: Promise<T>): Promise<T> {
+  if (pending++ === 0) spinnerTimer = setTimeout(() => ui.stage.classList.add('busy'), 300);
+  try {
+    return await work;
+  } finally {
+    if (--pending === 0) {
+      clearTimeout(spinnerTimer);
+      ui.stage.classList.remove('busy');
+    }
+  }
+}
 const afterCtx = ui.after.getContext('2d')!;
 
 const byId = new Map(filters.map((f) => [f.id, f]));
@@ -294,6 +319,10 @@ function cpuRenderer(): Renderer {
 // While a control is being dragged, frames use the reduced-resolution pipeline.
 
 let renderer: Renderer;
+/** The GPU context in use, if any; device loss restarts it. */
+let gpuContext: GpuContext | undefined;
+/** The current image's source, to upload it again after a device loss. */
+let lastSource: ImageBitmapSource | undefined;
 let imageInfo = '';
 let imageName = 'image';
 /** The sample shown, or undefined for the user's own image (share links name samples only). */
@@ -315,11 +344,11 @@ async function render() {
     const t0 = performance.now();
     try {
       const steps = toSteps(chain);
-      await renderer.render(steps, preview);
+      await busyWhile(renderer.render(steps, preview));
       const n = activeSteps(steps).length;
       ui.status.textContent = `${renderer.name} · ${imageInfo} · ${n} step${n === 1 ? '' : 's'}${preview ? ' · preview' : ''} · ${(performance.now() - t0).toFixed(1)} ms`;
     } catch (e) {
-      ui.status.textContent = `Render failed: ${(e as Error).message}`;
+      announce(`Render failed: ${(e as Error).message}`);
       console.error(e);
     }
   } while (dirty);
@@ -384,7 +413,7 @@ function setGeometry(g: Geometry): void {
       showOverlay();
       showCrop();
     } catch (e) {
-      ui.status.textContent = `Geometry failed: ${(e as Error).message}`;
+      announce(`Geometry failed: ${(e as Error).message}`);
       console.error(e);
     }
   });
@@ -427,7 +456,7 @@ function loadImage(source: ImageBitmapSource, name: string, sample?: string): Pr
       editMode = 'none';
       zoom.set(FIT);
       geometryControls.refresh();
-      const [w, h] = await renderer.load(image, geometry);
+      const [w, h] = await busyWhile(renderer.load(image, geometry));
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
@@ -436,9 +465,11 @@ function loadImage(source: ImageBitmapSource, name: string, sample?: string): Pr
       imageSample = sample;
       imageInfo = `${name} ${image.width}×${image.height}${w < image.width ? ` → ${w}×${h}` : ''}`;
       image.close();
+      lastSource = source;
       loaded = true;
+      ui.announce.textContent = `Loaded ${imageInfo}`;
     } catch (e) {
-      ui.status.textContent = `Could not load ${name}: ${(e as Error).message}`;
+      announce(`Could not load ${name}: ${(e as Error).message}`);
       console.error(e);
     }
   });
@@ -462,13 +493,13 @@ function exportFile(): Promise<void> {
     const t0 = performance.now();
     try {
       const longSide = Number(ui.exportSize.value) || undefined;
-      const blob = await renderer.export(steps, { ...options, quality }, longSide, geometry);
+      const blob = await busyWhile(renderer.export(steps, { ...options, quality }, longSide, geometry));
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${imageName}-rullino.${ext}` });
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-      ui.status.textContent = `Exported ${a.download} (${(blob.size / 1024).toFixed(0)} KB) in ${(performance.now() - t0).toFixed(0)} ms`;
+      announce(`Exported ${a.download} (${(blob.size / 1024).toFixed(0)} KB) in ${(performance.now() - t0).toFixed(0)} ms`);
     } catch (e) {
-      ui.status.textContent = `Export failed: ${(e as Error).message}`;
+      announce(`Export failed: ${(e as Error).message}`);
       console.error(e);
     } finally {
       ui.exportButton.disabled = false;
@@ -510,7 +541,7 @@ function wandClick(uv: Vec2, subtract: boolean): void {
     const mask = chain.steps.find((s) => s.uid === uid)?.mask;
     if (mask?.kind !== 'raster') return;
     const next = await wandAt(mask, uv, subtract).catch((e: Error) => {
-      ui.status.textContent = `Wand failed: ${e.message}`;
+      announce(`Wand failed: ${e.message}`);
       return undefined;
     });
     if (!next) return;
@@ -691,9 +722,9 @@ ui.share.addEventListener('click', async () => {
     const url = `${location.origin}${location.pathname}#s=${text}`;
     window.history.replaceState(null, '', url);
     await navigator.clipboard?.writeText(url).catch(() => undefined);
-    ui.status.textContent = `Link copied (${(url.length / 1024).toFixed(1)} KB)${sample ? '' : ' · it applies the edits to a sample image: your own image is not included'}`;
+    announce(`Link copied (${(url.length / 1024).toFixed(1)} KB)${sample ? '' : ' · it applies the edits to a sample image: your own image is not included'}`);
   } catch (e) {
-    ui.status.textContent = `Cannot share: ${(e as Error).message}`;
+    announce(`Cannot share: ${(e as Error).message}`);
   }
 });
 
@@ -716,7 +747,7 @@ async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } 
       ...(typeof state.sample === 'string' ? { sample: state.sample } : {}),
     };
   } catch (e) {
-    ui.status.textContent = `Invalid link: ${(e as Error).message}`;
+    announce(`Invalid link: ${(e as Error).message}`);
     console.error(e);
     return undefined;
   }
@@ -724,13 +755,53 @@ async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } 
 
 // ---------------------------------------------------------------------------------------------
 
-try {
-  renderer = gpuRenderer(await createGpuContext());
-} catch (e) {
-  console.warn(e);
-  renderer = cpuRenderer();
-  ui.status.textContent = `WebGPU unavailable (${(e as Error).message}); using the CPU reference.`;
+async function startRenderer(): Promise<void> {
+  try {
+    const gpu = await createGpuContext();
+    gpuContext = gpu;
+    renderer = gpuRenderer(gpu);
+    void gpu.device.lost.then((info) => {
+      if (gpu === gpuContext) void recoverFromDeviceLoss(info);
+    });
+  } catch (e) {
+    console.warn(e);
+    gpuContext = undefined;
+    renderer = cpuRenderer();
+    announce(`WebGPU unavailable (${(e as Error).message}); using the CPU reference.`);
+  }
 }
+
+/**
+ * The GPU device can be lost (driver reset, GPU switch, tab in the background for long): start a
+ * new one, upload the current image again and re-render. Chain, masks and geometry are untouched.
+ */
+async function recoverFromDeviceLoss(info: GPUDeviceLostInfo): Promise<void> {
+  console.warn('GPU device lost', info.reason, info.message);
+  await startRenderer();
+  announce(`The GPU device was lost (${info.message || info.reason}); restarted with ${renderer.name}.`);
+  const source = lastSource;
+  if (!source) return;
+  loads = loads.then(async () => {
+    try {
+      const image = await createImageBitmap(source);
+      const [w, h] = await busyWhile(renderer.load(image, shownGeometry()));
+      image.close();
+      displaySize = [w, h];
+      setImageSize(w, h);
+      showOverlay();
+      showCrop();
+    } catch (e) {
+      announce(`Could not restore the image after a device loss: ${(e as Error).message}`);
+      console.error(e);
+    }
+  });
+  await loads;
+  void render();
+}
+// For the e2e smoke test: simulate a device loss.
+(window as unknown as { rullino: object }).rullino = { loseDevice: () => gpuContext?.device.destroy() };
+
+await startRenderer();
 const shared = await readShareLink();
 const first = samples.find((s) => s.id === shared?.sample) ?? samples[0]!;
 ui.sample.value = first.id;

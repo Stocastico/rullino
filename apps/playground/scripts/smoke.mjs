@@ -453,6 +453,25 @@ try {
   await sizesBecome(sizeBefore);
   await sizesBecome(sizeBefore);
 
+  // A lost GPU device is replaced: same chain, same pixels, no reload.
+  {
+    const pixels = await afterPixels();
+    await after(() => page.evaluate(() => window.rullino.loseDevice()));
+    await page.waitForFunction(() => /restarted with WebGPU/.test(document.getElementById('announce').textContent), null, { timeout: 30000 }).catch(() => {});
+    check(/restarted with WebGPU/.test(await page.textContent('#announce')), `device loss: announce says "${await page.textContent('#announce')}"`);
+    await page.waitForFunction(() => !document.getElementById('stage').classList.contains('busy'), null, { timeout: 30000 });
+    await page.waitForTimeout(200);
+    const restored = await afterPixels();
+    let off = 0;
+    for (let i = 0; i < pixels.length; i++) off += Math.abs(pixels[i] - restored[i]) > 1 ? 1 : 0;
+    check(restored.length === pixels.length && off / pixels.length < 0.001, `after a device loss ${(off / pixels.length * 100).toFixed(2)}% of channels differ`);
+  }
+
+  // Slow frames (first shader compiles take seconds on SwiftShader) show the busy spinner, and it goes away.
+  await page.evaluate(() => {
+    window.sawBusy = false;
+    new MutationObserver(() => (window.sawBusy ||= document.getElementById('stage').classList.contains('busy'))).observe(document.getElementById('stage'), { attributes: true });
+  });
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
@@ -461,6 +480,8 @@ try {
   await after(() => page.click('#chain button[data-action=select][aria-label="Edit Transparency"]'));
   await after(() => slider('amount', 0));
   check((await status()).includes(`${ids.length + 2} steps`), `expected ${ids.length + 2} steps, status: ${await status()}`);
+  check(await page.evaluate(() => window.sawBusy), 'the busy spinner never showed while compiling 30+ filters');
+  check(!(await page.$eval('#stage', (s) => s.classList.contains('busy'))), 'the busy spinner should be gone after the frame');
 
   for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {
     await after(() => page.selectOption('#sample', s));
