@@ -4,10 +4,12 @@ import { adaptiveThreshold } from './adaptiveThreshold';
 import { applyLut } from './applyLut';
 import { bilateral } from './bilateral';
 import { blackPoint } from './blackPoint';
+import { bloom } from './bloom';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
 import { canny } from './canny';
 import { channelMixer } from './channelMixer';
+import { chromaticAberration } from './chromaticAberration';
 import { clahe } from './clahe';
 import { colorGrading } from './colorGrading';
 import { colorMixer } from './colorMixer';
@@ -48,10 +50,12 @@ export {
   applyLut,
   bilateral,
   blackPoint,
+  bloom,
   boxBlur,
   brightness,
   canny,
   channelMixer,
+  chromaticAberration,
   clahe,
   colorGrading,
   colorMixer,
@@ -132,4 +136,6 @@ export const filters: readonly Filter<any>[] = [
   dither,
   emboss,
   sketch,
+  bloom,
+  chromaticAberration,
 ];
