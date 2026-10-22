@@ -52,7 +52,12 @@ try {
   // Initial chain is a single exposure step at 0 EV: identity.
   const identity = await differs();
   check(identity < 0.01, `exposure 0 EV should match the original, ${(identity * 100).toFixed(1)}% differs`);
+  // The histogram follows the output: more exposure moves its mean luminosity up.
+  const histMean = () => page.$eval('#histogram', (c) => Number(c.dataset.mean));
+  const meanBefore = await histMean();
+  check(meanBefore > 0, `histogram mean should be set, got ${meanBefore}`);
   await after(() => slider('ev', 1.5));
+  check((await histMean()) > meanBefore + 10, `histogram mean did not follow +1.5 EV: ${meanBefore} -> ${await histMean()}`);
   const changed = await differs();
   check(changed > 0.3, `exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
 

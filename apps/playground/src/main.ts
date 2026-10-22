@@ -8,6 +8,7 @@ import {
   encodeSrgb8,
   exportImage,
   fitWithin,
+  histogramSrgb8,
   importImage,
   readImage,
   releaseTexture,
@@ -22,6 +23,7 @@ import {
 import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
+import { drawHistogram } from './histogram-view';
 import { createMaskOverlay } from './mask-overlay';
 import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
 import { samples } from './samples';
@@ -45,6 +47,7 @@ const ui = {
   before: $<HTMLCanvasElement>('before'),
   after: $<HTMLCanvasElement>('after'),
   overlay: document.getElementById('overlay') as unknown as SVGSVGElement,
+  histogram: $<HTMLCanvasElement>('histogram'),
   exportFormat: $<HTMLSelectElement>('export-format'),
   exportQuality: $<HTMLInputElement>('export-quality'),
   exportButton: $<HTMLButtonElement>('export'),
@@ -67,6 +70,7 @@ let displaySize: [number, number] = [0, 0];
 
 /** Draws straight-alpha sRGB bytes onto the after canvas, scaling up if they are a preview. */
 async function present(bytes: Uint8ClampedArray<ArrayBuffer>, w: number, h: number) {
+  drawHistogram(ui.histogram, histogramSrgb8(bytes));
   const data = new ImageData(bytes, w, h);
   // Resizing clears a canvas, so it happens here, together with the new frame: the previous
   // image stays visible while a new one is loading.
