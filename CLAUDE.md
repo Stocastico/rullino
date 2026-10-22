@@ -79,7 +79,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | White balance = luminance-normalised RGB gains | Simple creative control; a proper chromatic adaptation (Bradford / CCT) can come with auto WB in tier B. |
 | Enum values are passed to WGSL as the option's index (u32) | Uniforms stay 4 bytes per param; WGSL `switch` on `0u, 1u, ...` in option declaration order. |
 | Playground output via `readSrgb8` + `putImageData` on a 2D canvas, not a WebGPU canvas | A WebGPU canvas loses the device in headless Chromium/SwiftShader, so direct presentation could not be tested in CI. Costs one readback per frame; revisit with M2's reduced preview. |
-| Sample images generated in code | No image assets to license. |
+| Sample photos: a few public-domain / CC0 photos in `apps/playground/public/samples` (≤ 2048 px JPEG, credits in its `NOTICE.md`); generated test images kept for the smoke test, which pins one with `?sample=ramps` | Real photos make the demo meaningful; only CC0 / public-domain files, so the MIT repo needs no licence juggling (was: everything generated in code). |
 | Fused shaders keyed on filter structure only; params live in a uniform block | Moving a slider re-uploads uniforms but never recompiles. |
 | `runPointwise` is the one-filter case of `runFused` | One codegen path; every per-filter parity test also exercises fusion. |
 | Pipeline caches each stage's output keyed on everything upstream | Changing a step recomputes from that stage on; with neighbourhood filters (next) the stages before a blur are reused. Fused GPU chains keep f32 between filters, so they are slightly *more* precise than the CPU reference applied in f16 steps would be; chain parity uses summed tolerances. |

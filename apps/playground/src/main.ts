@@ -445,11 +445,14 @@ ui.geometry.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
 });
 
-function loadImage(source: ImageBitmapSource, name: string, sample?: string): Promise<void> {
+function loadImage(pending: ImageBitmapSource | Promise<ImageBitmapSource>, name: string, sample?: string): Promise<void> {
   const id = ++latestLoad;
+  // A superseded load never awaits its source: keep a failed fetch from being an unhandled rejection.
+  Promise.resolve(pending).catch(() => undefined);
   loads = loads.then(async () => {
     if (id !== latestLoad) return;
     try {
+      const source = await pending;
       const image = await createImageBitmap(source);
       // A new image starts unframed, as in photo editors.
       geometry = IDENTITY_GEOMETRY;
@@ -576,7 +579,11 @@ window.addEventListener('pointerup', () => {
   else void render();
 });
 
-for (const s of samples) ui.sample.append(new Option(s.label, s.id));
+for (const group of new Set(samples.map((s) => s.group))) {
+  const optgroup = Object.assign(document.createElement('optgroup'), { label: group });
+  for (const s of samples.filter((s) => s.group === group)) optgroup.append(new Option(s.label, s.id));
+  ui.sample.append(optgroup);
+}
 ui.sample.addEventListener('change', () => {
   const s = samples.find((s) => s.id === ui.sample.value)!;
   void loadImage(s.make(), s.label, s.id);
@@ -803,7 +810,9 @@ async function recoverFromDeviceLoss(info: GPUDeviceLostInfo): Promise<void> {
 
 await startRenderer();
 const shared = await readShareLink();
-const first = samples.find((s) => s.id === shared?.sample) ?? samples[0]!;
+// A share link names its sample; `?sample=<id>` picks one too (the smoke test pins its test image).
+const requested = shared?.sample ?? new URLSearchParams(location.search).get('sample');
+const first = samples.find((s) => s.id === requested) ?? samples[0]!;
 ui.sample.value = first.id;
 await loadImage(first.make(), first.label, first.id);
 if (shared) {

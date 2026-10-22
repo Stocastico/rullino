@@ -45,7 +45,8 @@ try {
       return n / a.length;
     });
 
-  await page.goto(url);
+  // Pinned to a generated test image: the checks below rely on its layout.
+  await page.goto(`${url}?sample=ramps`);
   await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
   check((await status()).startsWith('WebGPU'), `expected the WebGPU renderer, status was: ${await status()}`);
 
@@ -483,8 +484,28 @@ try {
   check(await page.evaluate(() => window.sawBusy), 'the busy spinner never showed while compiling 30+ filters');
   check(!(await page.$eval('#stage', (s) => s.classList.contains('busy'))), 'the busy spinner should be gone after the frame');
 
-  for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {
+  // The generated test images load under the full chain; the 2048 px photos (below) would take
+  // ~40 s each with it on SwiftShader.
+  for (const s of await page.$$eval('#sample optgroup[label="Test images"] option', (o) => o.map((x) => x.value))) {
     await after(() => page.selectOption('#sample', s));
+  }
+  // Without a parameter the page opens on a photo; every photo loads (default chain).
+  {
+    const other = await browser.newPage();
+    other.on('pageerror', (e) => failures.push(`page error (photos): ${e.message}`));
+    other.on('console', (m) => m.type() === 'error' && failures.push(`console error (photos): ${m.text()}`));
+    const otherFrame = () => other.$eval('#status', (s) => Number(s.dataset.frame ?? 0));
+    await other.goto(url);
+    await other.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+    const text = await other.textContent('#status');
+    check(/River 2048×1365/.test(text), `default sample should be the River photo, status: ${text}`);
+    for (const s of await other.$$eval('#sample optgroup[label="Photos"] option', (o) => o.map((x) => [x.value, x.textContent]))) {
+      const n = await otherFrame();
+      await other.selectOption('#sample', s[0]);
+      await other.waitForFunction(([n, label]) => Number(document.getElementById('status').dataset.frame ?? 0) > n && document.getElementById('status').textContent.includes(label), [n, s[1]], { timeout: 30000 }).catch(() => {});
+      check((await other.textContent('#status')).includes(`${s[1]} 2048×`), `photo ${s[0]} did not load, status: ${await other.textContent('#status')}`);
+    }
+    await other.close();
   }
 
   // Loading an image while a frame is in flight must still end with the new image fully drawn.
