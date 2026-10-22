@@ -7,7 +7,7 @@ import { SAM_INPUT, SAM_MASK, samInput, samMask } from './sam';
 
 /** The parts of an ONNX Runtime tensor used here. */
 export interface OrtTensor {
-  readonly data: Float32Array | BigInt64Array;
+  readonly data: Float32Array | BigInt64Array | Uint8Array;
   readonly dims: readonly number[];
 }
 
@@ -19,7 +19,7 @@ export interface OrtSession {
 /** The parts of the `onnxruntime-web` module used here (pass the module itself). */
 export interface OrtModule {
   readonly InferenceSession: { create(model: Uint8Array, options?: Record<string, unknown>): Promise<OrtSession> };
-  readonly Tensor: new (type: 'float32' | 'int64', data: Float32Array | BigInt64Array, dims: readonly number[]) => OrtTensor;
+  readonly Tensor: new (type: 'float32' | 'int64' | 'uint8', data: Float32Array | BigInt64Array | Uint8Array, dims: readonly number[]) => OrtTensor;
 }
 
 /** The model's two ONNX files, as bytes (see `fetchModel`). */

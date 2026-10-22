@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { createImage, MAX_IMAGE_SIDE } from './image';
 import { createLut, identityLut } from './lut';
 import { defaultParams, packParams, paramsStructWgsl, resolveParams, scaleParams, validateSchema, type ParamValues } from './params';
 
@@ -137,6 +138,18 @@ describe('parameter schema', () => {
     const view = new DataView(packParams(l, resolveParams(l, { look: custom })));
     expect([view.getFloat32(0, true), view.getFloat32(16, true), view.getFloat32(20, true)]).toEqual([0, 2, 2]);
     expect(view.getFloat32(32, true)).toBe(0.5);
+  });
+
+  it('validates image params; they are kept by identity and take no uniform space', () => {
+    const l = { patch: { type: 'image', default: createImage(1, 1), label: 'Patch' }, k: { type: 'float', min: 0, max: 1, step: 0.1, default: 0.5, label: 'K' } } as const;
+    expect(() => validateSchema(l)).not.toThrow();
+    expect(() => validateSchema({ i: { type: 'image', default: { width: 1, height: 1, data: new Float32Array(3) } as never, label: 'I' } })).toThrow(/image/);
+    expect(() => resolveParams(l, { patch: { width: 2, height: 2, data: new Float32Array(4) } as never })).toThrow(/patch/);
+    expect(() => resolveParams(l, { patch: createImage(MAX_IMAGE_SIDE + 1, 1) })).toThrow(/patch/);
+    const img = createImage(2, 2);
+    expect(resolveParams(l, { patch: img }).patch).toBe(img); // same object: GPU textures are cached by identity
+    expect(paramsStructWgsl('P', l)).toBe('struct P {\n  k: f32,\n}');
+    expect(new DataView(packParams(l, resolveParams(l, { patch: img, k: 0.25 }))).getFloat32(0, true)).toBe(0.25);
   });
 
   it('validates colour params, resolves them to sRGB triples and packs them as a vec4f', () => {

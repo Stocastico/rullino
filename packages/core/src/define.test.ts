@@ -125,6 +125,12 @@ describe('defineFilter', () => {
     ).toThrow(/lut/);
   });
 
+  it('only allows image params in multipass filters (they need a texture binding)', () => {
+    expect(() =>
+      defineFilter({ ...halve(), id: 'imgPw', params: { patch: { type: 'image', default: createImage(1, 1), label: 'Patch' } } } as never),
+    ).toThrow(/image/);
+  });
+
   it('lets passes read the mask only in mask-aware filters, whose CPU reference then needs one', () => {
     const def = {
       id: 'maskAware',

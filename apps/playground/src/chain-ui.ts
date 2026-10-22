@@ -1,4 +1,4 @@
-import { defaultParams, type Filter, type Mask } from '@rullino/core';
+import { defaultParams, type Filter, type Mask, type ParamSchema } from '@rullino/core';
 import { renderControls } from './controls';
 import { emptyBrush, renderMaskControls } from './mask-ui';
 
@@ -19,6 +19,12 @@ export interface ChainState {
   readonly selected: string | undefined;
 }
 
+/** Things the chain editor cannot do itself. */
+export interface ChainActions {
+  /** Fills a patch step's image (object removal) from its mask. */
+  fill?(uid: string): Promise<void>;
+}
+
 export interface ChainUi {
   /** Replaces the state after an edit made elsewhere (e.g. on the image); redraws only if asked. */
   set(state: ChainState, redraw: boolean): void;
@@ -30,14 +36,17 @@ export function withMask(step: StepState, mask: Mask | undefined): StepState {
   return mask ? { ...rest, mask } : rest;
 }
 
+/** Filters that act where a mask says (inpainting) or show an image only there (patch): they always have a mask. */
+const wantsMask = (f: Filter<any>) => f.kind === 'multipass' && (!!f.usesMask || Object.values(f.params as ParamSchema).some((p) => p.type === 'image'));
+
 let nextUid = 0;
-/** A step with default params; mask-aware filters (inpainting) start with an empty brush mask to paint. */
+/** A step with default params; filters that need a mask start with an empty brush mask to paint. */
 export const newStep = (f: Filter<any>): StepState => ({
   uid: `step${++nextUid}`,
   filterId: f.id,
   params: defaultParams(f.params),
   enabled: true,
-  ...(f.kind === 'multipass' && f.usesMask ? { mask: emptyBrush() } : {}),
+  ...(wantsMask(f) ? { mask: emptyBrush() } : {}),
 });
 
 /** A named group of steps added in one go (a look). */
@@ -62,6 +71,7 @@ export function renderChain(
   initial: ChainState,
   onChange: (state: ChainState) => void,
   groups: readonly StepGroup[] = [],
+  actions: ChainActions = {},
 ): ChainUi {
   let state = initial;
   const byId = new Map(filters.map((f) => [f.id, f]));
@@ -139,9 +149,18 @@ export function renderChain(
           maskControls,
           () => state.steps.find((s) => s.uid === step.uid)?.mask,
           (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
-          filter.kind === 'multipass' && !!filter.usesMask,
+          wantsMask(filter),
         );
         body.append(controls, maskControls);
+        if (filter.id === 'patch' && actions.fill) {
+          const fill = button('Fill with AI', 'fill', 'Fill the masked area with AI');
+          fill.className = 'primary';
+          fill.addEventListener('click', () => {
+            fill.disabled = true;
+            void actions.fill!(step.uid).finally(() => (fill.disabled = false));
+          });
+          body.append(fill);
+        }
         item.append(body);
       }
       list.append(item);
@@ -161,7 +180,8 @@ export function renderChain(
       const f = byId.get(add.value);
       if (!f) return;
       const step = newStep(f);
-      commit({ steps: [...state.steps, step], selected: step.uid }, true);
+      // A patch is made from the original image, so it goes first (adjustments after it apply to the result).
+      commit({ steps: f.id === 'patch' ? [step, ...state.steps] : [...state.steps, step], selected: step.uid }, true);
     });
     root.append(add);
 

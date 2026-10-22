@@ -1,8 +1,10 @@
 import type { MultipassFilter, PassDef } from '../filter';
+import { imageSamplerWgsl, type LinearImage } from '../image';
 import { lutSamplerWgsl, type Lut } from '../lut';
 import { curveSamplersWgsl, packParams, paramsStructWgsl, resolveParams, type ParamSchema } from '../params';
 import { colorWgsl } from '../wgsl';
 import type { GpuContext } from './context';
+import { imageTexture } from './image';
 import { lutTexture } from './lut';
 import { cachedPipeline, objectKey } from './readback';
 import { releaseTexture } from './pool';
@@ -10,11 +12,13 @@ import { createWorkingTexture, WORKING_FORMAT } from './texture';
 
 const WORKGROUP = 8;
 
-const lutKeys = (schema: ParamSchema) => Object.keys(schema).filter((k) => schema[k]!.type === 'lut');
+const keysOf = (type: 'lut' | 'image') => (schema: ParamSchema) => Object.keys(schema).filter((k) => schema[k]!.type === type);
+const lutKeys = keysOf('lut');
+const imageKeys = keysOf('image');
 
 export function passShader(filter: Pick<MultipassFilter<any>, 'params' | 'buffers'>, pass: PassDef): string {
   const compute = pass.kind === 'compute';
-  // Bindings: [dst], params, inputs..., buffers..., luts...
+  // Bindings: [dst], params, inputs..., buffers..., luts..., images...
   let binding = compute ? 0 : 1;
   const params = `@group(0) @binding(${binding++}) var<uniform> params: Params;`;
   const inputs = pass.inputs.map(
@@ -30,6 +34,9 @@ fn load_${name}(xy: vec2i) -> vec4f {
   const luts = lutKeys(filter.params).map(
     (name) => `@group(0) @binding(${binding++}) var lutTex_${name}: texture_3d<f32>;${lutSamplerWgsl(`lut_${name}`, `lutTex_${name}`, `params.${name}`)}`,
   );
+  const images = imageKeys(filter.params).map(
+    (name) => `@group(0) @binding(${binding++}) var imageTex_${name}: texture_2d<f32>;${imageSamplerWgsl(`image_${name}`, `imageTex_${name}`)}`,
+  );
   // All textures of a filter run share one size; it is read once per invocation into rl_max_xy
   // instead of calling textureDimensions() on every load.
   const sizeSource = compute ? `tex_${pass.inputs[0]}` : 'dst';
@@ -41,6 +48,7 @@ ${params}
 ${inputs.join('\n')}
 ${buffers.join('\n')}
 ${luts.join('\n')}
+${images.join('\n')}
 
 fn size() -> vec2i { return rl_max_xy + 1; }
 ${curveSamplersWgsl(filter.params, 'params')}
@@ -79,7 +87,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 `;
 }
 
-/** Bind group layout matching {@link passShader}: [dst], params, inputs..., buffers..., luts... */
+/** Bind group layout matching {@link passShader}: [dst], params, inputs..., buffers..., luts..., images... */
 function passLayout(filter: Pick<MultipassFilter<any>, 'params'>, pass: PassDef): GPUBindGroupLayoutEntry[] {
   const visibility = GPUShaderStage.COMPUTE;
   const entries: GPUBindGroupLayoutEntry[] = [];
@@ -91,6 +99,7 @@ function passLayout(filter: Pick<MultipassFilter<any>, 'params'>, pass: PassDef)
   for (const _ of pass.buffers ?? []) entries.push({ binding: entries.length, visibility, buffer: { type: 'storage' } });
   for (const _ of lutKeys(filter.params))
     entries.push({ binding: entries.length, visibility, texture: { sampleType: 'unfilterable-float', viewDimension: '3d' } });
+  for (const _ of imageKeys(filter.params)) entries.push({ binding: entries.length, visibility, texture: { sampleType: 'unfilterable-float' } });
   return entries;
 }
 
@@ -120,6 +129,7 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
     Object.entries(filter.buffers ?? {}).map(([name, n]) => [name, device.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE })]),
   );
   const lutViews = lutKeys(filter.params).map((k) => lutTexture(ctx, resolved[k] as Lut).createView());
+  const imageViews = imageKeys(filter.params).map((k) => imageTexture(ctx, resolved[k] as LinearImage).createView());
   let compiled = 0;
   let passes = 0;
   const enc = device.createCommandEncoder();
@@ -141,10 +151,10 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
       },
       () => passLayout(filter, pass),
     );
-    // Buffers, then LUT textures, after the inputs.
+    // Buffers, then LUT and image textures, after the inputs.
     const bufferEntries = (first: number): GPUBindGroupEntry[] => [
       ...(pass.buffers ?? []).map((name, i) => ({ binding: first + i, resource: { buffer: buffers.get(name)! } })),
-      ...lutViews.map((view, i) => ({ binding: first + (pass.buffers ?? []).length + i, resource: view })),
+      ...[...lutViews, ...imageViews].map((view, i) => ({ binding: first + (pass.buffers ?? []).length + i, resource: view })),
     ];
 
     if (pass.kind === 'compute') {

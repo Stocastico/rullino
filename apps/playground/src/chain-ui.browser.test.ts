@@ -1,4 +1,4 @@
-import { defineFilter } from '@rullino/core';
+import { createImage, defineFilter } from '@rullino/core';
 import { describe, expect, it } from 'vitest';
 import { renderChain, type ChainState } from './chain-ui';
 
@@ -150,5 +150,29 @@ describe('renderChain', () => {
     opacity.value = '0.3';
     opacity.dispatchEvent(new Event('input'));
     expect(states.at(-1)!.steps[0]!.mask).toMatchObject({ kind: 'linear', opacity: 0.3 });
+  });
+
+  it('the patch filter starts first in the chain with a mask that cannot be removed, and offers "Fill with AI"', async () => {
+    const patch = { ...filters[0]!, id: 'patch', kind: 'multipass', params: { patch: { type: 'image', default: createImage(1, 1), label: 'Image' } }, passes: [] } as never;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const states: ChainState[] = [];
+    const filled: string[] = [];
+    renderChain(root, [filters[0]!, patch], { steps: [], selected: undefined }, (s) => states.push(s), [], {
+      fill: async (uid) => void filled.push(uid),
+    });
+    const add = (id: string) => {
+      const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
+      sel.value = id;
+      sel.dispatchEvent(new Event('change'));
+    };
+    add('alpha');
+    expect(root.querySelector('[data-action=fill]')).toBeNull();
+    add('patch');
+    expect(states.at(-1)!.steps.map((s) => s.filterId)).toEqual(['patch', 'alpha']);
+    expect(states.at(-1)!.steps[0]!.mask?.kind).toBe('raster');
+    expect([...root.querySelector<HTMLSelectElement>('[data-action=mask-kind]')!.options].map((o) => o.value)).not.toContain('none');
+    root.querySelector<HTMLButtonElement>('[data-action=fill]')!.click();
+    expect(filled).toEqual([states.at(-1)!.steps[0]!.uid]);
   });
 });

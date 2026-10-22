@@ -1,4 +1,4 @@
-import { defaultParams, resolveParams, type Lut, type Param, type ParamSchema, type ParamValues } from '@rullino/core';
+import { defaultParams, resolveParams, type LinearImage, type Lut, type Param, type ParamSchema, type ParamValues } from '@rullino/core';
 import { renderCurveEditor } from './curve-editor';
 import { describeLut, readLutFile } from './lut-file';
 
@@ -184,6 +184,26 @@ export function renderControls<S extends ParamSchema>(
         });
         widgets.set(key, { write: (v) => (info.textContent = v === p.default ? 'None (identity)' : describeLut(v as Lut)) });
         row.append(el('label', { htmlFor: input.id }, label), input, info);
+        break;
+      }
+      case 'image': {
+        // Produced elsewhere (e.g. by object removal), so only shown, and clearable.
+        const info = el('span', { className: 'image-info' });
+        const clear = el('button', { type: 'button', textContent: 'Clear' });
+        clear.dataset.clear = '';
+        clear.addEventListener('click', () => {
+          values[key] = p.default;
+          widgets.get(key)!.write(p.default);
+          emit();
+        });
+        widgets.set(key, {
+          write: (v) => {
+            const img = v as LinearImage;
+            info.textContent = v === p.default ? 'None' : `${img.width} × ${img.height} px`;
+            clear.disabled = v === p.default;
+          },
+        });
+        row.append(el('label', {}, label), info, clear);
         break;
       }
       case 'color': {

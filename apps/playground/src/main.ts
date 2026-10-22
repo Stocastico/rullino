@@ -32,7 +32,7 @@ import {
   type Step,
 } from '@rullino/core';
 import { autoAdjust, filters } from '@rullino/filters';
-import type { OrtModule, SamPoint } from '@rullino/ml';
+import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
 import { lookLut, looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
@@ -45,6 +45,7 @@ import { samples } from './samples';
 import { History } from './history';
 import { decodeState, encodeState } from './share';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
+import { createObjectRemover, REMOVE_GROW } from './object-remove';
 import { createObjectSelector, isSoftwareAdapter } from './object-select';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
@@ -593,15 +594,46 @@ setMaskSource(maskSourceImage);
 
 // ONNX Runtime is its own chunk, loaded on first use; Vite ships its WASM file next to it (same
 // origin, no CDN at run time).
-const objectSelector = createObjectSelector({
-  loadOrt: async () => (await import('onnxruntime-web/webgpu')) as unknown as OrtModule,
-  gpu: async () => {
-    const adapter = gpuContext ? await navigator.gpu?.requestAdapter() : null;
-    return adapter ? { software: isSoftwareAdapter(adapter) } : undefined;
-  },
-  image: maskSourceImage,
-  status: announce,
-});
+const loadOrt = async () => (await import('onnxruntime-web/webgpu')) as unknown as OrtModule;
+const gpuKind = async () => {
+  const adapter = gpuContext ? await navigator.gpu?.requestAdapter() : null;
+  return adapter ? { software: isSoftwareAdapter(adapter) } : undefined;
+};
+const objectSelector = createObjectSelector({ loadOrt, gpu: gpuKind, image: maskSourceImage, status: announce });
+const objectRemover = createObjectRemover({ loadOrt, gpu: gpuKind, status: announce });
+
+/**
+ * "Fill with AI" on a patch step: the masked area (grown a little) of the original image is
+ * filled by the model and kept as the step's image; the step's mask becomes the grown one so the
+ * fill covers the object's edge. Shares the wand's queue.
+ */
+function fillPatch(uid: string): Promise<void> {
+  const job = wandQueue.then(async () => {
+    const step = chain.steps.find((s) => s.uid === uid);
+    if (step?.mask?.kind !== 'raster') return;
+    const mask = fitRaster(step.mask);
+    if (!mask.raster.data.some((v) => v > 0.5)) {
+      announce('Select what to remove first (brush, wand or Object).');
+      return;
+    }
+    const t0 = performance.now();
+    try {
+      const grown = { ...mask, raster: growMask(mask.raster, REMOVE_GROW) };
+      const image = await maskSourceImage(grown.raster.width, grown.raster.height);
+      const patched = await busyWhile(objectRemover.fill(image, grown.raster));
+      chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? { ...withMask(s, grown), params: { ...s.params, patch: patched } } : s)) };
+      chainUi.set(chain, true);
+      showOverlay();
+      void render();
+      announce(`Area filled (${(performance.now() - t0).toFixed(0)} ms)`);
+    } catch (e) {
+      announce(`Fill failed: ${(e as Error).message}`);
+      console.error(e);
+    }
+  });
+  wandQueue = job;
+  return job;
+}
 
 /**
  * Object-selection clicks share the wand's queue. The points of one object accumulate (a click
@@ -646,6 +678,7 @@ const chainUi = renderChain(
     void render();
   },
   looks.map((l) => ({ id: l.id, label: l.label, steps: () => lookSteps(l) })),
+  { fill: fillPatch },
 );
 ui.chain.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;

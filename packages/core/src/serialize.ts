@@ -58,6 +58,8 @@ export function serializeChain(steps: readonly Step[], options: SerializeOptions
           const ref = options.lutRef?.(v as Lut);
           if (ref === undefined) throw new Error(`step "${step.filter.id}": its LUT "${(v as Lut).title ?? 'untitled'}" has no reference and cannot be serialised`);
           params[key] = { ref };
+        } else if (p.type === 'image') {
+          if (v !== p.default) throw new Error(`step "${step.filter.id}": its image param "${key}" cannot be serialised`);
         } else if (JSON.stringify(v) !== JSON.stringify(p.default)) params[key] = v as Json;
       }
       return {

@@ -53,6 +53,16 @@ function cases(schema: ParamSchema): [string, Record<string, unknown>][] {
       // Non-separable and non-linear, on a grid that does not divide the test values evenly.
       out.push([`${k}=look`, { [k]: lutFromFunction(17, (r, g, b) => [g * g, 0.2 + 0.6 * Math.sqrt(b), Math.abs(r - b)]) }]);
     }
+    if (p.type === 'image') {
+      // Another size than the input, partial alpha (premultiplied) and a gradient: stretching,
+      // interpolation and the "over" blend all show.
+      const img = createImage(5, 3);
+      for (let i = 0; i < 15; i++) {
+        const a = 0.2 + 0.2 * (i % 5);
+        img.data.set([(i / 15) * a, 0.5 * a, (1 - i / 15) * a, a], i * 4);
+      }
+      out.push([`${k}=img`, { [k]: img }]);
+    }
     if (p.type === 'color') {
       // Saturated primaries plus a dark, desaturated colour: hue and lightness handling both show.
       out.push([`${k}=red`, { [k]: [1, 0, 0] }], [`${k}=blue`, { [k]: [0, 0.2, 1] }], [`${k}=dark`, { [k]: [0.2, 0.15, 0.1] }]);
