@@ -45,7 +45,12 @@ const row = (name: string, r: { first: number; median: number }) =>
   rows.push(`${name.padEnd(28)} ${r.median.toFixed(1).padStart(8)} ms   (first ${r.first.toFixed(0)} ms)`);
 
 it('filters at defaults', async () => {
-  for (const f of filters) row(f.id, await measure(() => runFilter(ctx, f, source, defaultParams(f.params))));
+  // Mask-aware filters (inpainting) need a mask: a hole of about 10% of the image.
+  const hole = { kind: 'radial', center: [0.5, 0.5], radius: [0.15, 0.1], feather: 0.3 } as const;
+  for (const f of filters) {
+    const mask = f.kind === 'multipass' && f.usesMask ? hole : undefined;
+    row(f.id, await measure(() => runFilter(ctx, f, source, defaultParams(f.params), mask)));
+  }
 });
 
 it('readback', async () => {
