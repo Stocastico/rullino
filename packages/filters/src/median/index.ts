@@ -5,6 +5,14 @@ const MAX_RADIUS = 3;
 const MAX_TAPS = (2 * MAX_RADIUS + 1) ** 2;
 
 /**
+ * Median of 9 with a fixed exchange network (Paeth / Devillard's opt_med9): 19 min/max pairs on
+ * vec4, no loops and no dynamic indexing, which the generic counting loop needs. The result is
+ * still one of the inputs per channel, so it stays exact.
+ */
+const MED9 = [[1, 2], [4, 5], [7, 8], [0, 1], [3, 4], [6, 7], [1, 2], [4, 5], [7, 8], [0, 3], [5, 8], [4, 7], [3, 6], [1, 4], [2, 5], [4, 7], [4, 2], [6, 4], [4, 2]]
+  .map(([a, b], k) => `  let lo${k} = min(m${a}, m${b});\n  m${b} = max(m${a}, m${b});\n  m${a} = lo${k};`);
+
+/**
  * Per-channel median over a (2r + 1)² window (clamp to edge), alpha included: removes isolated
  * specks and keeps edges. The result is always one of the window's values, so GPU and CPU agree
  * exactly. On the GPU the median is found by counting (for each candidate, how many values are
@@ -23,7 +31,14 @@ export const median = defineFilter({
       name: 'out',
       inputs: ['input'],
       wgsl: /* wgsl */ `
+fn median9(xy: vec2i) -> vec4f {
+${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => `  var m${i} = load_input(xy + vec2i(${(i % 3) - 1}, ${Math.floor(i / 3) - 1}));`).join('\n')}
+${MED9.join('\n')}
+  return m4;
+}
+
 fn run(xy: vec2i, p: Params) -> vec4f {
+  if (p.radius == 1) { return median9(xy); }
   var v: array<vec4f, ${MAX_TAPS}>;
   let r = p.radius;
   var n = 0;

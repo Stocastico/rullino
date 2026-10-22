@@ -69,9 +69,12 @@ fn run(xy: vec2i, p: Params) -> vec4f {
       repeat: 'iterations',
       wgsl: /* wgsl */ `
 fn run(xy: vec2i, p: Params) -> vec4f {
-  let v = 0.25 * (load_fill(xy - vec2i(1, 0)) + load_fill(xy + vec2i(1, 0)) + load_fill(xy - vec2i(0, 1)) + load_fill(xy + vec2i(0, 1)));
   let c = load_input(xy);
-  return c + (v - c) * load_mask(xy).r;
+  let m = load_mask(xy).r;
+  // Outside the hole the result is the input: skip the four neighbour loads (most pixels).
+  if (m <= 0.0) { return c; }
+  let v = 0.25 * (load_fill(xy - vec2i(1, 0)) + load_fill(xy + vec2i(1, 0)) + load_fill(xy - vec2i(0, 1)) + load_fill(xy + vec2i(0, 1)));
+  return c + (v - c) * m;
 }`,
     },
   ],
