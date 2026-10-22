@@ -46,4 +46,8 @@ describe('inpaint', () => {
   it('needs a mask', () => {
     expect(() => inpaint.cpu(createImage(2, 2))).toThrow(/needs a mask/);
   });
+
+  it('defaults to 30 smoothing iterations (a deliberate speed / smoothness trade-off)', () => {
+    expect(inpaint.params.iterations.default).toBe(30);
+  });
 });

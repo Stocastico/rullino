@@ -45,7 +45,7 @@ export const inpaint = defineFilter({
   usesMask: true,
   params: {
     sigma: { type: 'float', min: 1, max: 100, step: 0.5, default: 12, unit: 'px', label: 'Reach (px)' },
-    iterations: { type: 'int', min: 0, max: 400, default: 60, label: 'Smoothing iterations' },
+    iterations: { type: 'int', min: 0, max: 400, default: 30, label: 'Smoothing iterations' },
   },
   passes: [
     { name: 'num', inputs: ['input', 'mask'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy) * (1.0 - load_mask(xy).r); }' },
