@@ -118,6 +118,8 @@ try {
   // refining the edges keeps it; Alt+click on the same patch removes it again.
   await after(() => page.selectOption('#sample', 'chart'));
   await page.click('#chain button[data-action=tool-wand]');
+  // The sidebar scrolls on its own: clicking controls far down must not scroll the image away.
+  check((await page.evaluate(() => window.scrollY)) === 0, `the page scrolled (scrollY ${await page.evaluate(() => window.scrollY)}): the image would leave the view`);
   const clickAt = async (fx, fy, alt = false) => {
     const box = await page.locator('#after').boundingBox();
     // mouse.click has no modifiers option: hold the key explicitly.
@@ -231,6 +233,19 @@ try {
     check(name === 'big-rullino.jpg' && bytes[0] === 0xff && bytes[1] === 0xd8, `expected a JPEG download, got ${name}`);
   }
   await after(() => page.selectOption('#sample', 'ramps'));
+
+  // Geometry: a quarter turn swaps the canvases' size; straightening leaves transparent corners;
+  // reset brings the original frame back.
+  const canvasSizes = () => page.evaluate(() => ['before', 'after'].map((id) => { const c = document.getElementById(id); return `${c.width}x${c.height}`; }).join(' '));
+  const sizeBefore = await canvasSizes();
+  const [cw, ch] = sizeBefore.split(' ')[0].split('x');
+  await after(() => page.click('#geometry button[data-action=rotate-right]'));
+  check((await canvasSizes()) === `${ch}x${cw} ${ch}x${cw}`, `after a quarter turn: ${await canvasSizes()} (was ${sizeBefore})`);
+  await after(() => page.$eval('#geometry [data-action=straighten]', (el) => { el.value = '20'; el.dispatchEvent(new Event('input', { bubbles: true })); }));
+  const cornerAlpha = await page.$eval('#after', (c) => c.getContext('2d').getImageData(0, 0, 1, 1).data[3]);
+  check(cornerAlpha === 0, `straightened corner should be transparent, alpha ${cornerAlpha}`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  check((await canvasSizes()) === sizeBefore, `after reset: ${await canvasSizes()}, expected ${sizeBefore}`);
 
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
