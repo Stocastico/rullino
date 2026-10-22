@@ -127,6 +127,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Morphology: one 2-D pass per operation for every element shape (no separable square) | One code path for square / disk / cross; O(r²) per pixel, so radius is capped at 15. A separable square (O(r)) is a performance-review candidate. |
 | Median: radius ≤ 3, selection by counting over a `vec4` array | No sort and no data-dependent branching on the GPU; 49² compares per pixel is fine at that size, larger windows need a histogram method. |
 | Bilateral range distance = OKLab ΔE + alpha, OKLab precomputed in a first pass | Perceptual edges like the other OKLab tools; computing OKLab once per pixel instead of once per tap avoids a cube root per neighbour. Window 2σs, max 40 px. |
+| Histogram of the output computed on the CPU from the displayed frame's bytes (`histogramSrgb8`) | The playground already reads every frame back; a GPU reduction would add work for no gain. Luminosity = Rec. 709 weights on encoded values, as photo editors show it. |
+| Equalisation (global and CLAHE) on OKLab lightness, CDF interpolated linearly inside each bin | Hue and chroma stay put; the continuous mapping keeps GPU (f32) and CPU (f64) within tolerance even when a pixel lands in a neighbouring bin. Transparent pixels are ignored. |
+| CLAHE: tiles × tiles grid (≤ 16), clip at `clipLimit` × mean bin with one even redistribution of the excess, bilinear blend of the 4 nearest tiles' mappings | OpenCV-like semantics without seams. One invocation per tile builds its CDF (reusing the pixel dispatch); tiles are capped at the image size so none is empty. A single redistribution can still give slopes up to ~(clip + 1), so clip 1 is not the identity. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -143,6 +146,7 @@ Things that already bit us. Add new ones as they come up.
 - **Integer downscale ratios hide weighting bugs** (every coverage weight is 1). Test resizes with fractional ratios.
 - **`layout: 'auto'` silently drops unused bindings**, so binding an unused input fails validation with an empty output and no exception. `cachedPipeline` takes explicit layout entries; multipass passes always use them.
 - **A failed pipeline/bind group shows up as an all-zero output** (alpha 0), not as an exception. When a GPU test gets zeros, suspect validation first.
+- **Only `run()` receives `p`**: helper functions in pass WGSL must read the global `params` uniform (shared pass builders take `params.<name>` expressions).
 - **WGSL cannot dynamically index an array held by value** (e.g. the `p` parameter). Index through the global `params` uniform instead (`params.kernel[n / 4][n % 4]`).
 - **Multi-pass GPU filters round intermediates to f16**; anything that amplifies a difference (unsharp `amount`) amplifies that rounding, so its tolerance must grow with the gain.
 - **Symmetric test kernels hide transposed indexing**: parity tests use an asymmetric kernel.

@@ -6,9 +6,11 @@ import { blackPoint } from './blackPoint';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
 import { canny } from './canny';
+import { clahe } from './clahe';
 import { contrast } from './contrast';
 import { convolve } from './convolve';
 import { curves } from './curves';
+import { equalize } from './equalize';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
@@ -39,9 +41,11 @@ export {
   boxBlur,
   brightness,
   canny,
+  clahe,
   contrast,
   convolve,
   curves,
+  equalize,
   exposure,
   gamma,
   gaussianBlur,
@@ -74,6 +78,8 @@ export const filters: readonly Filter<any>[] = [
   shadowsHighlights,
   curves,
   levels,
+  equalize,
+  clahe,
   gamma,
   saturation,
   vibrance,
