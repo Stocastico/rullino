@@ -13,6 +13,8 @@ pnpm test:all         # both
 pnpm test:coverage    # both, with v8 coverage and per-area thresholds (report in coverage/index.html)
 pnpm build            # builds the playground (Vite)
 pnpm test:e2e         # smoke-tests the built playground in headless Chromium (run after build)
+pnpm test:ml          # the real SlimSAM model on ONNX Runtime WASM (downloads 14 MB once into .cache/models)
+pnpm test:e2e:ml      # the playground's Object tool with the real model (after build; models served locally)
 pnpm bench            # GPU timings per filter + a chain at 1024x768 (SwiftShader numbers: compare runs, not machines)
 pnpm dev              # playground dev server
 npx vitest run path/to/file.test.ts   # single file
@@ -35,8 +37,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `serialize.ts` `serializeChain` / `parseChain` (chain + geometry as JSON).
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes. `auto.ts` `autoAdjust` (suggested white balance + levels).
+- `packages/ml` — optional ML on top of core, ONNX Runtime *injected* (`OrtModule`), never imported: `sam.ts` SAM input / mask post-processing (pure TS), `segmenter.ts` `createSamSegmenter` (encode once per image, decode per click), `models.ts` model descriptors at pinned revisions (`SLIMSAM_77`) and `fetchModel` (progress, Cache API). `test/` holds the real-model integration test (`ml` Vitest project).
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch, `object-select.ts` the Object mask tool (backend choice, lazy model, per-image encoding); `scripts/smoke.mjs` is the e2e smoke test, `scripts/smoke-ml.mjs` the Object tool's. `scripts/fetch-models.mjs` (repo root) downloads the test models.
 
 - `.claude/skills/` — repo skills: `add-filter` (the recipe for a new filter, tests to mutation check) and `finish-step` (verification, CLAUDE.md upkeep, PR and CI). `.claude/settings.json` enables two official plugins: `claude-md-management` and `skill-creator`.
 
@@ -53,7 +56,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 - **Curve params are read in WGSL only through the generated `curve_<name>(x)`** (never index the LUT yourself): it handles the fused-stage namespacing and linear extrapolation outside [0, 1].
 - **Lengths in pixels are `unit: 'px'` params**, defined at the original image's resolution; chains scale them (`setSource({ scale })`, `runChainCpu({ scale })`).
 - **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
-- **Zero runtime dependencies** in `packages/*`.
+- **Zero runtime dependencies** in `packages/*`. `@rullino/ml` takes ONNX Runtime as an argument (optional peer dependency), it never imports it.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
 - Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing (and `pnpm build && pnpm test:e2e` when the playground or filter list changes). When piping their output (`| tail`), use `set -o pipefail`, or a failure slips through to the commit.
 - **Workflow**: one branch and one PR per milestone step, based on `main`. Claude may merge its own PR once CI is green and no review thread is open; afterwards delete the branch and start the next one from `main`.
@@ -166,6 +169,12 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Playground UI modules have browser tests driven by synthetic pointer events; `drag.ts` `capture()` tolerates pointers that cannot be captured | Synthetic pointers cannot be captured (`setPointerCapture` throws); real ones always can, and a drag still works without capture while events reach the handle. |
 | CI runs on pull requests, pushes to main and manual dispatch; one job, `test`, is the required check for merging | Running on every branch push as well gave PRs a second, skipped `test` check, which branch protection counts as passed: a PR could be merged before the real run ended. |
 | Repo skills for the recurring workflows; official Anthropic plugins only (`claude-md-management`, `skill-creator`) | The add-filter and finish-step recipes were being re-derived every time; third-party skills were reviewed and rejected (overlap, or unvetted install scripts). |
+| `@rullino/ml`: ONNX Runtime injected by the caller (`OrtModule`), optional peer dependency; pre / post-processing in pure TS | Keeps zero runtime dependencies, lets apps pick the ORT build (WebGPU / WASM), and lets unit tests use a fake runtime. ORT used directly, not transformers.js: pinned dev builds of ORT, CPU-side processing and no inpainting pipeline (research, Oct 2026). |
+| Click-to-select = SlimSAM-77 (Apache-2.0, Xenova's ONNX export at a pinned revision); best-scored of the 3 candidate masks; sigmoid of the logits as a soft mask | Smallest permissive SAM with a working export (14 MB int8 / 40 MB fp32). SAM 2.1 tiny is better but its ONNX card declares no licence and the encoder is ≥ 28 MB; the segmenter API leaves room for it. |
+| Backend: a real GPU runs fp32 on the WebGPU EP; a software GPU (SwiftShader, fallback adapter) or none runs the int8 model on WASM | Measured on SwiftShader: WebGPU encode 480 s vs WASM 19 s (identical masks). Quantized int8 ops run poorly on WebGPU. Real-GPU timings are not measured here: check on hardware. |
+| Model weights fetched from Hugging Face on first use (pinned revision), cached with the Cache API; ORT's WASM shipped by Vite next to its lazy chunk | Nothing ML-related loads until the Object tool is used; a pinned URL never changes, so caching by URL is safe; same-origin WASM avoids a CDN at run time (dist grows by 27 MB, downloaded only on use). |
+| Object tool: points accumulate into one object (Alt = exclude), "New object" starts the next on top of the current mask (max) | One SAM prompt per object refines it; several objects add up like wand selections. The image is encoded once per raster size (WeakMap on the mask source image). |
+| Real-model tests in their own Vitest project and CI job (`ml`), models cached by revision; not part of the required `test` check | They download from Hugging Face and need about a minute of CPU inference; the required check must not depend on a third-party host. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -218,3 +227,7 @@ Things that already bit us. Add new ones as they come up.
 - **WGSL shift amounts must be `u32`** (`4 << (2 * level)` with an `i32` level does not compile): `4 << u32(2 * level)`. As always, an all-zero output.
 - **A generous `outliers` allowance hides subtle mutations**: dither at 1% let a shifted threshold (~0.6% flips) pass 14 of 16 cases. Measure with `outliers: 0` first, then allow just above what you measured.
 - **`copyExternalImageToTexture` from a `<canvas>`, `<img>` or `VideoFrame` loses the device on SwiftShader** ("A valid external Instance reference no longer exists"), like configuring a WebGPU canvas. Tests import through `ImageBitmap` / `ImageData`.
+- **ONNX Runtime's WebGPU backend refuses concurrent session creation** ("another WebGPU EP inference session is being created"): create sessions one after the other (the fake ORT in `segmenter.test.ts` enforces it).
+- **ORT's WebGPU EP on SwiftShader is ~25× slower than WASM** (SlimSAM encode 480 s vs 19 s): never benchmark ML on WebGPU in CI or cloud sessions; the app picks WASM on software adapters.
+- **A SAM click on a uniform background is ambiguous**: the best-scored mask is often the whole image. Test point prompts on objects, and labels with positive + negative pairs.
+- **Node's `fetch` ignores `HTTPS_PROXY`** in CI / cloud sessions: scripts that download (models) use `curl`.

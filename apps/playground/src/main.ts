@@ -28,9 +28,11 @@ import {
   type Vec2,
   type GpuContext,
   type LinearImage,
+  type RasterMask,
   type Step,
 } from '@rullino/core';
 import { autoAdjust, filters } from '@rullino/filters';
+import type { OrtModule, SamPoint } from '@rullino/ml';
 import { lookLut, looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
@@ -43,6 +45,7 @@ import { samples } from './samples';
 import { History } from './history';
 import { decodeState, encodeState } from './share';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
+import { createObjectSelector, isSoftwareAdapter } from './object-select';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
 const DISPLAY_SIDE = 2048;
@@ -558,7 +561,7 @@ const overlay = createMaskOverlay(
     void render();
   },
   () => (dragging = true),
-  { tool: () => tools.tool, brush: brushOptions, wand: wandClick, fit: fitRaster },
+  { tool: () => tools.tool, brush: brushOptions, wand: wandClick, object: objectClick, fit: fitRaster },
 );
 const showOverlay = () => overlay.show(selectedMask(), displaySize[0], displaySize[1]);
 
@@ -585,7 +588,53 @@ function wandClick(uv: Vec2, subtract: boolean): void {
   });
 }
 // After any queued load, so the textures it reads are the current image's.
-setMaskSource((w, h) => loads.then(() => renderer.maskSource(w, h)));
+const maskSourceImage = (w: number, h: number) => loads.then(() => renderer.maskSource(w, h));
+setMaskSource(maskSourceImage);
+
+// ONNX Runtime is its own chunk, loaded on first use; Vite ships its WASM file next to it (same
+// origin, no CDN at run time).
+const objectSelector = createObjectSelector({
+  loadOrt: async () => (await import('onnxruntime-web/webgpu')) as unknown as OrtModule,
+  gpu: async () => {
+    const adapter = gpuContext ? await navigator.gpu?.requestAdapter() : null;
+    return adapter ? { software: isSoftwareAdapter(adapter) } : undefined;
+  },
+  image: maskSourceImage,
+  status: announce,
+});
+
+/**
+ * Object-selection clicks share the wand's queue. The points of one object accumulate (a click
+ * refines it, Alt+click excludes); "New object" (or choosing the tool again) starts the next one,
+ * on top of the mask as it is then.
+ */
+let objectSession: { uid: string; id: number; base: RasterMask; points: SamPoint[] } | undefined;
+function objectClick(uv: Vec2, subtract: boolean): void {
+  const uid = chain.selected;
+  wandQueue = wandQueue.then(async () => {
+    const mask = chain.steps.find((s) => s.uid === uid)?.mask;
+    if (mask?.kind !== 'raster' || !uid) return;
+    if (!objectSession || objectSession.uid !== uid || objectSession.id !== tools.objectSession) {
+      objectSession = { uid, id: tools.objectSession, base: fitRaster(mask), points: [] };
+    }
+    const session = objectSession;
+    session.points.push({ x: uv[0], y: uv[1], positive: !subtract });
+    const t0 = performance.now();
+    try {
+      const raster = await busyWhile(objectSelector.select(session.base.raster, session.points));
+      const next = { ...session.base, raster };
+      chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? withMask(s, next) : s)) };
+      chainUi.set(chain, false);
+      showOverlay();
+      void render();
+      announce(`Object selected (${session.points.length} point${session.points.length === 1 ? '' : 's'}, ${(performance.now() - t0).toFixed(0)} ms)`);
+    } catch (e) {
+      session.points.pop();
+      announce(`Object selection failed: ${(e as Error).message}`);
+      console.error(e);
+    }
+  });
+}
 
 const chainUi = renderChain(
   ui.chain,

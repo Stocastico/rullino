@@ -7,12 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:ml": "node scripts/smoke-ml.mjs"
   },
   "dependencies": {
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*",
-    "@rullino/presets": "workspace:*"
+    "@rullino/ml": "workspace:*",
+    "@rullino/presets": "workspace:*",
+    "onnxruntime-web": "1.30.0"
   },
   "devDependencies": {
     "playwright": "1.56.1",

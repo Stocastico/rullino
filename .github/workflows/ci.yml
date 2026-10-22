@@ -49,8 +49,9 @@ jobs:
       # Timings are not asserted (shared runners vary); this only checks that the benchmark runs.
       - run: pnpm bench
 
-  # The ML models themselves (SlimSAM on ONNX Runtime's WASM backend). A separate job: it downloads
-  # 14 MB from Hugging Face (cached by the pinned revision) and takes ~30 s of CPU inference.
+  # The ML models themselves (SlimSAM on ONNX Runtime's WASM backend) and the playground's Object
+  # tool. A separate job: it downloads 14 MB from Hugging Face (cached by the pinned revision) and
+  # takes about a minute of CPU inference.
   ml:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -67,3 +68,7 @@ jobs:
           path: .cache/models
           key: models-${{ hashFiles('scripts/fetch-models.mjs') }}
       - run: pnpm test:ml
+      # The playground's Object tool end to end, models served locally (no network in the test).
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm test:e2e:ml

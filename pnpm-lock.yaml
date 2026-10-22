@@ -44,9 +44,15 @@ importers:
       '@rullino/filters':
         specifier: workspace:*
         version: link:../../packages/filters
+      '@rullino/ml':
+        specifier: workspace:*
+        version: link:../../packages/ml
       '@rullino/presets':
         specifier: workspace:*
         version: link:../../packages/presets
+      onnxruntime-web:
+        specifier: 1.30.0
+        version: 1.30.0
     devDependencies:
       playwright:
         specifier: 1.56.1

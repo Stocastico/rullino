@@ -16,6 +16,7 @@
     "dev": "pnpm --filter @rullino/playground dev",
     "test:e2e": "pnpm --filter @rullino/playground smoke",
     "test:ml": "node scripts/fetch-models.mjs && vitest run --project ml",
+    "test:e2e:ml": "node scripts/fetch-models.mjs && pnpm --filter @rullino/playground smoke:ml",
     "bench": "vitest run --project bench && cat packages/filters/bench/results.txt"
   },
   "devDependencies": {

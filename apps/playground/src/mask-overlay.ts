@@ -30,10 +30,12 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  * preview rendering (the drag ends with the window's pointerup).
  */
 export interface OverlayTools {
-  readonly tool: () => 'paint' | 'erase' | 'wand';
+  readonly tool: () => 'paint' | 'erase' | 'wand' | 'object';
   readonly brush: () => BrushOptions;
   /** Wand click at `uv` (removing with `subtract`); the caller updates the mask (asynchronously). */
   readonly wand: (uv: Vec2, subtract: boolean) => void;
+  /** Object-selection click at `uv` (an exclusion point with `subtract`); asynchronous like the wand. */
+  readonly object: (uv: Vec2, subtract: boolean) => void;
   /** The mask with its raster at the current image's resolution (called when a stroke starts). */
   readonly fit: (mask: RasterMask) => RasterMask;
 }
@@ -132,7 +134,7 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
     };
     svg.onpointermove = (e) => {
       const [u, v] = toUv(e);
-      const wand = tools.tool() === 'wand';
+      const wand = tools.tool() === 'wand' || tools.tool() === 'object';
       svg.classList.toggle('wand', wand);
       set(cursor, { cx: u * size[0], cy: v * size[1], r: wand ? 0 : tools.brush().radius * Math.max(...size) });
       if (last) paint([u, v]);
@@ -141,6 +143,10 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
       e.preventDefault();
       if (tools.tool() === 'wand') {
         tools.wand(toUv(e), e.altKey);
+        return;
+      }
+      if (tools.tool() === 'object') {
+        tools.object(toUv(e), e.altKey);
         return;
       }
       capture(svg, e.pointerId);
