@@ -7,7 +7,7 @@ Guidance for working in this repo. Design and roadmap: [PLAN.md](./PLAN.md). Kee
 ```sh
 pnpm install
 pnpm typecheck        # tsc over all packages and apps
-pnpm test             # unit tests (Node): CPU references, color, float16, compare
+pnpm test             # unit tests (Node): CPU references, color, float16, compare, playground logic (history, share)
 pnpm test:browser     # GPU tests in headless Chromium (WebGPU), incl. GPU<->CPU parity
 pnpm test:all         # both
 pnpm build            # builds the playground (Vite)
