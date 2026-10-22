@@ -84,6 +84,15 @@ try {
     await other.close();
   }
 
+  // Auto adds white balance and levels steps in front of the chain; one undo removes both.
+  const stepTitles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
+  await after(() => page.click('#auto'));
+  await page.waitForFunction(() => document.querySelectorAll('#chain li[data-step]').length === 3, null, { timeout: 20000 }).catch(() => {});
+  check(JSON.stringify(await stepTitles()) === JSON.stringify(['White balance', 'Levels', 'Exposure']), `Auto should add White balance and Levels first: ${await stepTitles()}`);
+  check(/Auto: temperature/.test(await page.textContent('#announce')), `Auto should announce its values: ${await page.textContent('#announce')}`);
+  await after(() => page.keyboard.press('Control+z'));
+  check(JSON.stringify(await stepTitles()) === JSON.stringify(['Exposure']), `undoing Auto should leave only Exposure: ${await stepTitles()}`);
+
   // A linear-gradient mask (top to bottom by default) restricts the step to the bottom of the image.
   const rowDiff = () =>
     page.evaluate(() => {

@@ -1,4 +1,5 @@
 import type { Filter } from '@rullino/core';
+export { autoAdjust, type AutoAdjustment } from './auto';
 import { adaptiveThreshold } from './adaptiveThreshold';
 import { applyLut } from './applyLut';
 import { bilateral } from './bilateral';

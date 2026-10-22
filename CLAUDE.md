@@ -21,7 +21,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 ## Layout
 
 - `packages/core`
-  - `params.ts` parameter schema (float/int/bool/enum/kernel/curve, optional `unit: 'px'`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
+  - `params.ts` parameter schema (float/int/bool/enum/kernel/curve/lut/color, optional `unit: 'px'` and UI `group`): types, validation, defaults, `scaleParams`, uniform layout/packing, generated WGSL `Params` struct.
   - `filter.ts` / `define.ts` filter contracts and `defineFilter()`: `pointwise` (CPU reference derived from `pixel()`) and `multipass` (fixed list of passes + whole-image CPU reference).
   - `curve.ts` monotone tone curves sampled to a 256-entry LUT, CPU sampler and WGSL sampler generator.
   - `color.ts`, `oklab.ts` CPU colour maths; `wgsl.ts` the `rl_*` WGSL twins prepended to every shader.
@@ -33,7 +33,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `geometry.ts` `Geometry` (orientation, perspective, straighten, crop) composed into one homography, `geometryFrame`, CPU `applyGeometryCpu`; `gpu/geometry.ts` `applyGeometry`.
   - `serialize.ts` `serializeChain` / `parseChain` (chain + geometry as JSON).
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
-- `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
+- `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes. `auto.ts` `autoAdjust` (suggested white balance + levels).
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
 - `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch; `scripts/smoke.mjs` is the e2e smoke test.
 
@@ -147,6 +147,12 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Share links in the URL fragment: JSON, `deflate-raw`, base64url; they name a sample image, never include the user's own | The fragment never reaches a server; the user's photo stays on their machine. |
 | Zoom / pan = CSS transform on the stage (zoom 1 = fit, clamped so no empty space shows); handles rescaled through `--px` | Every on-image editor maps pointers through `getBoundingClientRect`, which includes the transform, so masks, crop and perspective work zoomed without changes. Beyond the 2048 px display canvas zooming only magnifies (pixelated past 2:1); full-resolution pixel peeping would need a rendered crop. |
 | Ctrl/⌘ + wheel and pinch zoom, wheel / Space + drag / middle drag / two fingers pan; the stage has `touch-action: none` | Matches design tools; capture-phase listeners let these gestures win over the split handle, brush and handles. On phones a finger on the image no longer scrolls the page. |
+| `color` param = straight sRGB-encoded [r, g, b] in [0, 1], a `vec4f` (r, g, b, 1) in the uniform block; filters linearise it themselves | That is what colour pickers show (and `<input type=color>` speaks 8-bit hex); CPU and GPU receive the very same encoded values. |
+| Optional param `group`: the generated UI shows grouped params as tabs (open tab kept per schema) | The colour mixer has 24 sliders; grouping by property (Hue / Saturation / Luminance) keeps the panel short without special UI code. |
+| Colour mixer = 8 OKLCh hue bands (centres on typical colours: orange covers skin, blue the sky) with tent weights between neighbouring centres, faded out below chroma 0.04 | Weights sum to one, so the same change on every band is uniform; greys never move; hue / saturation / luminance in OKLCh keep the other two put. |
+| Colour grading = OKLab a/b shift towards a picked hue per range (strength 1 = chroma 0.1), range weights from smoothsteps around a balance point (sum to one), lightness kept | Split toning / three-way grading as photo editors present it; the picked colour gives the direction, the slider the amount. |
+| Hue = rotation of OKLab a/b; channel mixer = 3×3 matrix on linear (premultiplied) RGB | Hue keeps lightness and chroma; the channel mixer is the classic linear tool. |
+| Auto (`autoAdjust`) = grey-pixel white balance (OKLab chroma < 0.08, 70% strength) + levels from 0.5% / 99.5% luminance percentiles (black ≤ 0.35, white ≥ 0.6) and a gamma that pulls the median into [0.4, 0.6]; CPU on a 256 px copy of the framed original | Deterministic, explainable, licence-free; it produces ordinary editable steps (inserted first, or updating existing ones), so it is one undo step and fully adjustable. A learned auto-enhance is deferred (FiveK-trained weights are research-only). |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -178,7 +184,7 @@ Things that already bit us. Add new ones as they come up.
 - **Allocating textures is expensive** (lazy zero-fill): get working textures from `createWorkingTexture` and give intermediates back with `releaseTexture`, never create one per iteration.
 - **Browser-mode `console.log` does not reach the terminal** here; use `commands.writeFile` from `vitest/browser` (paths are relative to the repo root).
 - **`sampleCurve` caches its LUT per points array**: never mutate a points array after sampling it (the curve editor samples a copy).
-- **The registry parity test varies one param at a time**: interactions between params (curve order, combined settings) need a dedicated GPU test.
+- **The registry parity test varies one param at a time**: interactions between params (curve order, combined settings) need a dedicated GPU test. Params with no effect at their partners' defaults (colour grading's colours and balance at strength 0) are not tested at all there: a balance mutation passed.
 - **WGSL rejects mixing `&` / `|` with comparisons without parentheses** (`a <= k & k < b` does not compile): write `(a <= k) & (k < b)`. Like any shader error, it shows up as an all-zero output.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
