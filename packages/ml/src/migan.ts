@@ -1,4 +1,4 @@
-import { createImage, linearToSrgb, resampleRaster, srgbToLinear, type LinearImage, type RasterMaskData } from '@rullino/core';
+import { createImage, createRasterMask, linearToSrgb, resampleRaster, srgbToLinear, type LinearImage, type RasterMaskData } from '@rullino/core';
 import type { OrtModule } from './segmenter';
 
 // Object removal with MI-GAN (Picsart, MIT; ONNX "pipeline" export): the model takes the image and a
@@ -7,6 +7,28 @@ import type { OrtModule } from './segmenter';
 
 /** A mask value above this is a hole. */
 const HOLE = 0.5;
+
+/** The mask with every value spread over the (2r + 1) square around it (max): a grown hole, soft edges kept. */
+export function growMask(mask: RasterMaskData, r: number): RasterMaskData {
+  if (r <= 0) return mask;
+  const { width, height, data } = mask;
+  // Max over rows, then over columns.
+  const across = new Float32Array(data.length);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      let m = 0;
+      for (let u = Math.max(0, x - r); u <= Math.min(width - 1, x + r); u++) m = Math.max(m, data[y * width + u]!);
+      across[y * width + x] = m;
+    }
+  const out = createRasterMask(width, height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      let m = 0;
+      for (let v = Math.max(0, y - r); v <= Math.min(height - 1, y + r); v++) m = Math.max(m, across[v * width + x]!);
+      out.data[y * width + x] = m;
+    }
+  return out;
+}
 
 /** The model's inputs for an image (linear, premultiplied) and a hole mask (any size, soft values). */
 function input(image: LinearImage, hole: RasterMaskData, grow = 0) {
@@ -18,14 +40,10 @@ function input(image: LinearImage, hole: RasterMaskData, grow = 0) {
     const a = image.data[i * 4 + 3]!;
     for (let c = 0; c < 3; c++) pixels[c * plane + i] = a > 0 ? Math.round(Math.min(1, Math.max(0, linearToSrgb(image.data[i * 4 + c]! / a))) * 255) : 0;
   }
-  // Known = 255, hole = 0, with the hole grown by `grow` pixels (square): an object's soft edge
-  // would otherwise survive as a ghost outline.
-  const out = new Uint8Array(plane).fill(255);
-  for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++) {
-      if (mask.data[y * width + x]! <= HOLE) continue;
-      for (let v = Math.max(0, y - grow); v <= Math.min(height - 1, y + grow); v++) for (let u = Math.max(0, x - grow); u <= Math.min(width - 1, x + grow); u++) out[v * width + u] = 0;
-    }
+  // Known = 255, hole = 0, with the hole grown by `grow` pixels: an object's soft edge would
+  // otherwise survive as a ghost outline.
+  const grown = growMask(mask, grow);
+  const out = Uint8Array.from(grown.data, (v) => (v > HOLE ? 0 : 255));
   return { image: pixels, mask: out, width, height };
 }
 

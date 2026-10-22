@@ -1,6 +1,6 @@
 import { createImage, createRasterMask, linearToSrgb, srgbToLinear } from '@rullino/core';
 import { describe, expect, it } from 'vitest';
-import { createMiganInpainter, migan } from './migan';
+import { createMiganInpainter, growMask, migan } from './migan';
 import type { OrtModule, OrtTensor } from './segmenter';
 
 class FakeTensor implements OrtTensor {
@@ -73,6 +73,17 @@ describe('migan input', () => {
     const mask = migan.input(image(), half).mask;
     expect(mask[0]).toBe(255);
     expect(mask[3]).toBe(0);
+  });
+});
+
+describe('growMask', () => {
+  it('spreads the maximum over a (2r + 1) square, soft values included, without touching the input', () => {
+    const m = createRasterMask(5, 3, Float32Array.from({ length: 15 }, (_, i) => (i === 7 ? 0.6 : i === 8 ? 0.2 : 0)));
+    const before = new Float32Array(m.data);
+    const g = growMask(m, 1);
+    expect(Array.from(g.data)).toEqual([0, 0.6, 0.6, 0.6, 0.2, 0, 0.6, 0.6, 0.6, 0.2, 0, 0.6, 0.6, 0.6, 0.2].map(Math.fround));
+    expect(m.data).toEqual(before);
+    expect(growMask(m, 0)).toBe(m);
   });
 });
 

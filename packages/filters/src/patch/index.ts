@@ -9,7 +9,8 @@ const EMPTY = createImage(1, 1);
  */
 export const patch = defineFilter({
   id: 'patch',
-  label: 'Patch',
+  label: 'Remove object',
+  description: 'Select what to remove with the brush, wand or Object tool, then press Fill with AI (the first use downloads a 28 MB model).',
   category: 'classic',
   kind: 'multipass',
   params: {

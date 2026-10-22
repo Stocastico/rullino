@@ -1,5 +1,5 @@
 export { fetchModel, MIGAN, SLIMSAM_77, type FetchModelOptions, type ModelFiles } from './models';
-export { createMiganInpainter, migan, type Inpainter, type InpainterOptions } from './migan';
+export { createMiganInpainter, growMask, migan, type Inpainter, type InpainterOptions } from './migan';
 export { SAM_INPUT, SAM_MASK, samInput, samMask, type SamInput } from './sam';
 export {
   createSamSegmenter,
