@@ -28,6 +28,7 @@ import { halftone } from './halftone';
 import { hue } from './hue';
 import { inpaint } from './inpaint';
 import { invert } from './invert';
+import { kuwahara } from './kuwahara';
 import { levels } from './levels';
 import { median } from './median';
 import { morphology } from './morphology';
@@ -74,6 +75,7 @@ export {
   hue,
   inpaint,
   invert,
+  kuwahara,
   levels,
   median,
   morphology,
@@ -138,4 +140,5 @@ export const filters: readonly Filter<any>[] = [
   sketch,
   bloom,
   chromaticAberration,
+  kuwahara,
 ];
