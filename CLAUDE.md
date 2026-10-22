@@ -162,6 +162,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Look gallery: thumbnails of every look on the framed original (160 px, own Pipeline), refreshed on load and committed geometry; a click appends the look's steps | Shows what a look does before adding it; the looks are applied to the original, not to the current chain, so chain edits do not re-render ten thumbnails. |
 | Coverage: v8 over unit + browser projects together, thresholds per area (packages, playground) just below the measured values; `main.ts` excluded (entry wiring, exercised by the e2e smoke test) | Thresholds catch untested new code without flaking on rounding. Raise them as coverage improves, never lower them to pass a PR. The e2e test is not instrumented (minified build), hence the one exclusion. |
 | Playground UI modules have browser tests driven by synthetic pointer events; `drag.ts` `capture()` tolerates pointers that cannot be captured | Synthetic pointers cannot be captured (`setPointerCapture` throws); real ones always can, and a drag still works without capture while events reach the handle. |
+| CI runs on pull requests, pushes to main and manual dispatch; one job, `test`, is the required check for merging | Running on every branch push as well gave PRs a second, skipped `test` check, which branch protection counts as passed: a PR could be merged before the real run ended. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -204,7 +205,7 @@ Things that already bit us. Add new ones as they come up.
 - **UI modules that keep their own copy of shared state go stale** once a second editor exists (panel vs on-image handles): read the current state through a getter.
 - **A mask outlives image changes** (normalised coordinates), so a raster can have another image's proportions: refit it (`fitRaster` / `resampleRaster`) before tools that need the image at the raster's size.
 - **Playwright's `mouse.click` has no `modifiers` option** (only `page.click` does): hold keys with `keyboard.down` / `up`.
-- **`pnpm bench` is not run in CI**: it broke silently when a mask-aware filter was registered. Run it after adding filters.
+- **`pnpm bench` broke silently once** (a mask-aware filter was registered) when it was not in CI; CI now runs it, without asserting timings.
 - **An e2e check can pass without exercising the path it is about**: e.g. preview-only reframing never runs on images ≤ 768 px (preview and display are the same texture). Mutation-check new smoke checks too.
 - **Playwright clicks are too slow to provoke async races**: dispatch the events in one `page.$eval` task (as the wand-race check does).
 - **A new frame is not proof the latest state is shown**: changes made while a frame is in flight coalesce into the next one. E2E checks of geometry wait for the expected result (sizes, pixels), not for a frame count.
