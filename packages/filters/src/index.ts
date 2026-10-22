@@ -16,6 +16,7 @@ import { grayscale } from './grayscale';
 import { inpaint } from './inpaint';
 import { invert } from './invert';
 import { levels } from './levels';
+import { median } from './median';
 import { morphology } from './morphology';
 import { otsu } from './otsu';
 import { posterize } from './posterize';
@@ -47,6 +48,7 @@ export {
   inpaint,
   invert,
   levels,
+  median,
   morphology,
   otsu,
   posterize,
@@ -91,5 +93,6 @@ export const filters: readonly Filter<any>[] = [
   convolve,
   canny,
   morphology,
+  median,
   inpaint,
 ];

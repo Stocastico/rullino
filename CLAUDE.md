@@ -154,6 +154,7 @@ Things that already bit us. Add new ones as they come up.
 - **Browser-mode `console.log` does not reach the terminal** here; use `commands.writeFile` from `vitest/browser` (paths are relative to the repo root).
 - **`sampleCurve` caches its LUT per points array**: never mutate a points array after sampling it (the curve editor samples a copy).
 - **The registry parity test varies one param at a time**: interactions between params (curve order, combined settings) need a dedicated GPU test.
+- **WGSL rejects mixing `&` / `|` with comparisons without parentheses** (`a <= k & k < b` does not compile): write `(a <= k) & (k < b)`. Like any shader error, it shows up as an all-zero output.
 - **WGSL `round()` is round-half-to-even, `Math.round` is half-up.** Use `floor(x + 0.5)` on both sides when parity matters.
 - **OKLab round trips leave float noise** (~1e-26 instead of 0): assert with a small epsilon, not `>= 0`.
 - **Uint8ClampedArray needs `<ArrayBuffer>`** for `new ImageData(...)` under TS's typed-array generics; `readSrgb8` returns that type.
