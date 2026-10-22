@@ -75,6 +75,7 @@ const ui = {
   redo: $<HTMLButtonElement>('redo'),
   share: $<HTMLButtonElement>('share'),
   auto: $<HTMLButtonElement>('auto'),
+  looks: $<HTMLDivElement>('looks'),
   viewport: $<HTMLElement>('viewport'),
   zoomIn: $<HTMLButtonElement>('zoom-in'),
   zoomOut: $<HTMLButtonElement>('zoom-out'),
@@ -156,6 +157,8 @@ interface Renderer {
   export(steps: Step[], options: ExportOptions, longSide: number | undefined, geometry: Geometry): Promise<Blob>;
   /** The original image at w x h on the CPU, for mask tools (wand, edge refinement). */
   maskSource(w: number, h: number): Promise<LinearImage>;
+  /** Each chain applied to the framed image shrunk to `maxSide` (the look gallery). */
+  thumbnails(chains: readonly (readonly Step[])[], maxSide: number): Promise<ImageData[]>;
 }
 
 // Output goes through readback + putImageData on a 2D canvas rather than a WebGPU canvas:
@@ -164,6 +167,7 @@ interface Renderer {
 function gpuRenderer(gpu: GpuContext): Renderer {
   const full = new Pipeline(gpu);
   const small = new Pipeline(gpu);
+  const thumbs = new Pipeline(gpu);
   let textures: GPUTexture[] = [];
   let raw: { fullRes: GPUTexture; display: GPUTexture; preview: GPUTexture; fullScale: number; displayScale: number; previewScale: number } | undefined;
   let geometry: Geometry = IDENTITY_GEOMETRY;
@@ -247,6 +251,23 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       }
       return p;
     },
+    async thumbnails(chains, maxSide) {
+      const src = displayTex;
+      if (!src || !raw) throw new Error('no image loaded');
+      const [w, h] = fitWithin(src.width, src.height, maxSide);
+      const tiny = downscale(gpu, src, w, h);
+      try {
+        thumbs.setSource(tiny, { scale: (raw.displayScale * w) / src.width });
+        const out: ImageData[] = [];
+        for (const steps of chains) {
+          const t = thumbs.run(steps);
+          out.push(new ImageData(await readSrgb8(gpu, t), t.width, t.height));
+        }
+        return out;
+      } finally {
+        releaseTexture(gpu, tiny);
+      }
+    },
     async export(steps, options, longSide, g) {
       if (!raw) throw new Error('no image loaded');
       // A throwaway Pipeline: full-resolution intermediates are freed as soon as the file is encoded.
@@ -304,6 +325,12 @@ function cpuRenderer(): Renderer {
     async maskSource(w, h) {
       if (!source) throw new Error('no image loaded');
       return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
+    },
+    async thumbnails(chains, maxSide) {
+      if (!source) throw new Error('no image loaded');
+      const [w, h] = fitWithin(source.width, source.height, maxSide);
+      const tiny = downscaleCpu(source, w, h);
+      return chains.map((steps) => new ImageData(encodeSrgb8(runChainCpu(steps, tiny, { scale: (scale * w) / source!.width })) as Uint8ClampedArray<ArrayBuffer>, w, h));
     },
     async export(steps, options, longSide, g) {
       if (!raw) throw new Error('no image loaded');
@@ -409,6 +436,7 @@ function setGeometry(g: Geometry): void {
       const previewOnly = dragging;
       const [w, h] = await renderer.setGeometry(shownGeometry(), previewOnly);
       displayStale = previewOnly;
+      if (!previewOnly) refreshThumbnails();
       displaySize = [w, h];
       setImageSize(w, h);
       showOverlay();
@@ -471,6 +499,7 @@ function loadImage(pending: ImageBitmapSource | Promise<ImageBitmapSource>, name
       image.close();
       lastSource = source;
       loaded = true;
+      refreshThumbnails();
       ui.announce.textContent = `Loaded ${imageInfo}`;
     } catch (e) {
       announce(`Could not load ${name}: ${(e as Error).message}`);
@@ -654,6 +683,49 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === '-') zoom.zoomBy(1 / ZOOM_STEP);
   else if (e.key === '0') zoom.set(FIT);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Look gallery: every look applied to a thumbnail of the (framed) original; a click adds its steps.
+
+const THUMB_SIDE = 160;
+const lookCards = looks.map((look) => {
+  const card = Object.assign(document.createElement('button'), { type: 'button', className: 'look-card', title: `Add the ${look.label} look` });
+  card.dataset.look = look.id;
+  card.setAttribute('role', 'listitem');
+  const canvas = document.createElement('canvas');
+  card.append(canvas, Object.assign(document.createElement('span'), { textContent: look.label }));
+  card.addEventListener('click', () => {
+    const added = lookSteps(look).map((s) => ({ ...newStep(s.filter), params: { ...defaultParams(s.filter.params), ...s.params } }));
+    chain = { steps: [...chain.steps, ...added], selected: added[0]?.uid ?? chain.selected };
+    chainUi.set(chain, true);
+    showOverlay();
+    void render();
+  });
+  ui.looks.append(card);
+  return { look, canvas };
+});
+
+let thumbnailsQueued = false;
+/** Redraws the gallery after the current load / reframe (queued like them, so textures are valid). */
+function refreshThumbnails(): void {
+  if (thumbnailsQueued) return;
+  thumbnailsQueued = true;
+  loads = loads.then(async () => {
+    thumbnailsQueued = false;
+    if (!loaded) return;
+    try {
+      const images = await renderer.thumbnails(lookCards.map((c) => lookSteps(c.look)), THUMB_SIDE);
+      images.forEach((img, i) => {
+        const { canvas } = lookCards[i]!;
+        [canvas.width, canvas.height] = [img.width, img.height];
+        canvas.getContext('2d')!.putImageData(img, 0, 0);
+        canvas.dataset.ready = '';
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------------------------
 // Auto: suggested white balance and levels for the (framed) original, as ordinary editable steps.

@@ -84,6 +84,26 @@ try {
     await other.close();
   }
 
+  // Look gallery: one thumbnail per look, rendered and different from each other; a click adds the look.
+  await page.waitForFunction(() => [...document.querySelectorAll('.look-card canvas')].every((c) => 'ready' in c.dataset), null, { timeout: 30000 }).catch(() => {});
+  const thumbs = await page.$$eval('.look-card canvas', (cs) =>
+    cs.map((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let s = 0;
+      for (let i = 0; i < d.length; i += 4) s += d[i] * 3 + d[i + 1] * 7 + d[i + 2];
+      return { ready: 'ready' in c.dataset, sig: s };
+    }),
+  );
+  check(thumbs.length >= 3 && thumbs.every((t) => t.ready && t.sig > 0), `look thumbnails not rendered: ${JSON.stringify(thumbs.map((t) => t.ready))}`);
+  check(new Set(thumbs.map((t) => t.sig)).size === thumbs.length, 'every look thumbnail should differ');
+  {
+    const before = (await page.$$('#chain li[data-step]')).length;
+    await after(() => page.click('.look-card[data-look="noir"]'));
+    check((await page.$$('#chain li[data-step]')).length === before + 3, 'clicking the Noir card should add its 3 steps');
+    await after(() => page.keyboard.press('Control+z'));
+    check((await page.$$('#chain li[data-step]')).length === before, 'undo should remove the added look');
+  }
+
   // Auto adds white balance and levels steps in front of the chain; one undo removes both.
   const stepTitles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
   await after(() => page.click('#auto'));

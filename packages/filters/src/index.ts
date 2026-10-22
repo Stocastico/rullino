@@ -4,33 +4,41 @@ import { adaptiveThreshold } from './adaptiveThreshold';
 import { applyLut } from './applyLut';
 import { bilateral } from './bilateral';
 import { blackPoint } from './blackPoint';
+import { bloom } from './bloom';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
 import { canny } from './canny';
 import { channelMixer } from './channelMixer';
+import { chromaticAberration } from './chromaticAberration';
 import { clahe } from './clahe';
 import { colorGrading } from './colorGrading';
 import { colorMixer } from './colorMixer';
 import { contrast } from './contrast';
 import { convolve } from './convolve';
 import { curves } from './curves';
+import { dither } from './dither';
+import { emboss } from './emboss';
 import { equalize } from './equalize';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
 import { grain } from './grain';
 import { grayscale } from './grayscale';
+import { halftone } from './halftone';
 import { hue } from './hue';
 import { inpaint } from './inpaint';
 import { invert } from './invert';
+import { kuwahara } from './kuwahara';
 import { levels } from './levels';
 import { median } from './median';
 import { morphology } from './morphology';
 import { otsu } from './otsu';
+import { pixelate } from './pixelate';
 import { posterize } from './posterize';
 import { saturation } from './saturation';
 import { shadowsHighlights } from './shadowsHighlights';
 import { sharpen } from './sharpen';
+import { sketch } from './sketch';
 import { threshold } from './threshold';
 import { transparency } from './transparency';
 import { unsharpMask } from './unsharpMask';
@@ -43,33 +51,41 @@ export {
   applyLut,
   bilateral,
   blackPoint,
+  bloom,
   boxBlur,
   brightness,
   canny,
   channelMixer,
+  chromaticAberration,
   clahe,
   colorGrading,
   colorMixer,
   contrast,
   convolve,
   curves,
+  dither,
+  emboss,
   equalize,
   exposure,
   gamma,
   gaussianBlur,
   grain,
   grayscale,
+  halftone,
   hue,
   inpaint,
   invert,
+  kuwahara,
   levels,
   median,
   morphology,
   otsu,
+  pixelate,
   posterize,
   saturation,
   shadowsHighlights,
   sharpen,
+  sketch,
   threshold,
   transparency,
   unsharpMask,
@@ -117,4 +133,12 @@ export const filters: readonly Filter<any>[] = [
   median,
   bilateral,
   inpaint,
+  pixelate,
+  halftone,
+  dither,
+  emboss,
+  sketch,
+  bloom,
+  chromaticAberration,
+  kuwahara,
 ];

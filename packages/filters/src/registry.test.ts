@@ -10,7 +10,7 @@ describe('filter registry', () => {
 
   it('contains the expected filters', () => {
     expect(filters.map((f) => f.id).sort()).toEqual(
-      ['adaptiveThreshold', 'applyLut', 'bilateral', 'blackPoint', 'boxBlur', 'brightness', 'canny', 'channelMixer', 'clahe', 'colorGrading', 'colorMixer', 'contrast', 'convolve', 'curves', 'equalize', 'exposure', 'gamma', 'gaussianBlur', 'grain', 'grayscale', 'hue', 'inpaint', 'invert', 'levels', 'median', 'morphology', 'otsu', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'threshold', 'transparency', 'unsharpMask', 'vibrance', 'vignette', 'whiteBalance'].sort(),
+      ['adaptiveThreshold', 'applyLut', 'bilateral', 'blackPoint', 'bloom', 'boxBlur', 'brightness', 'canny', 'channelMixer', 'chromaticAberration', 'clahe', 'colorGrading', 'colorMixer', 'contrast', 'convolve', 'curves', 'dither', 'emboss', 'equalize', 'exposure', 'gamma', 'gaussianBlur', 'grain', 'grayscale', 'halftone', 'hue', 'inpaint', 'invert', 'kuwahara', 'levels', 'median', 'morphology', 'otsu', 'pixelate', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'sketch', 'threshold', 'transparency', 'unsharpMask', 'vibrance', 'vignette', 'whiteBalance'].sort(),
     );
   });
 
