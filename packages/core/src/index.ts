@@ -35,6 +35,7 @@ export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, va
 export { paintStroke, type BrushOptions } from './paint';
 export { magicWand, type WandOptions } from './wand';
 export { histogramSrgb8, type Histogram } from './histogram';
+export { applyGeometryCpu, geometryFrame, IDENTITY_GEOMETRY, validateGeometry, type Geometry, type GeometryFrame } from './geometry';
 export { refineMask, type RefineOptions } from './refine';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {
