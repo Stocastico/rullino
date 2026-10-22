@@ -20,6 +20,7 @@ import { gamma } from './gamma';
 import { gaussianBlur } from './gaussianBlur';
 import { grain } from './grain';
 import { grayscale } from './grayscale';
+import { halftone } from './halftone';
 import { hue } from './hue';
 import { inpaint } from './inpaint';
 import { invert } from './invert';
@@ -27,6 +28,7 @@ import { levels } from './levels';
 import { median } from './median';
 import { morphology } from './morphology';
 import { otsu } from './otsu';
+import { pixelate } from './pixelate';
 import { posterize } from './posterize';
 import { saturation } from './saturation';
 import { shadowsHighlights } from './shadowsHighlights';
@@ -59,6 +61,7 @@ export {
   gaussianBlur,
   grain,
   grayscale,
+  halftone,
   hue,
   inpaint,
   invert,
@@ -66,6 +69,7 @@ export {
   median,
   morphology,
   otsu,
+  pixelate,
   posterize,
   saturation,
   shadowsHighlights,
@@ -117,4 +121,6 @@ export const filters: readonly Filter<any>[] = [
   median,
   bilateral,
   inpaint,
+  pixelate,
+  halftone,
 ];

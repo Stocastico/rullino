@@ -15,7 +15,9 @@ function ink(x: number, y: number, size: number, deg: number, coverage: (px: num
   const [px, py] = [x + 0.5, y + 0.5];
   const [ux, uy] = [(cs * px + sn * py) / size, (-sn * px + cs * py) / size];
   const [cx, cy] = [Math.floor(ux) + 0.5, Math.floor(uy) + 0.5];
-  const k = coverage(Math.floor((cs * cx - sn * cy) * size), Math.floor((sn * cx + cs * cy) * size));
+  // + 0.25: centres often fall exactly on a pixel boundary (screens at 0° / 90°, the 45° diagonal),
+  // where f32 and f64 would floor to different pixels.
+  const k = coverage(Math.floor((cs * cx - sn * cy) * size + 0.25), Math.floor((sn * cx + cs * cy) * size + 0.25));
   const r = size * Math.sqrt(Math.max(0, k) / Math.PI);
   const d = Math.hypot(ux - cx, uy - cy) * size;
   const t2 = Math.min(1, Math.max(0, (d - (r - 0.5)) / 1));
@@ -71,7 +73,7 @@ fn ink(xy: vec2i, deg: f32, c: i32) -> f32 {
   let pp = vec2f(xy) + 0.5;
   let u = vec2f(cs * pp.x + sn * pp.y, -sn * pp.x + cs * pp.y) / size;
   let cc = floor(u) + 0.5;
-  let centre = vec2i(floor(vec2f(cs * cc.x - sn * cc.y, sn * cc.x + cs * cc.y) * size));
+  let centre = vec2i(floor(vec2f(cs * cc.x - sn * cc.y, sn * cc.x + cs * cc.y) * size + 0.25));
   let k = 1.0 - encoded_at(centre, c);
   let r = size * sqrt(max(0.0, k) / 3.141592653589793);
   let d = length(u - cc) * size;
@@ -101,6 +103,9 @@ fn run(xy: vec2i, p: Params) -> vec4f {
       }
     return out;
   },
-  // Dot centres land on a pixel by floor(): f32 and f64 rotations can pick a neighbouring pixel.
-  tolerance: { abs: 2e-3, rel: 2e-3, outliers: 0.01 },
+  // Dot edges amplify tone differences (Δink ≈ 1.5 · dr/dk · Δk with dr/dk = size / (2√(πk))): ~5x at
+  // mid tones, unbounded for near-white tones, where the GPU's pow() in the sRGB encoding (accurate to
+  // ~1e-4) decides whether a sub-pixel dot exists at all. Measured: ~1% of channels on the parity
+  // rings in CMY mode, all at dot edges or tiny dots.
+  tolerance: { abs: 1e-2, rel: 1e-2, outliers: 0.02 },
 });
