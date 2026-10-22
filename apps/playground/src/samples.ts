@@ -1,10 +1,19 @@
-// Built-in sample images, generated in code so the repo carries no image assets (and no licences).
+// Sample images: a few public-domain photos (public/samples, see NOTICE.md there) and test images
+// generated in code (ramps, a colour chart, transparency) that the e2e smoke test relies on.
 
 export interface Sample {
   readonly id: string;
   readonly label: string;
-  make(): ImageData;
+  readonly group: 'Photos' | 'Test images';
+  make(): ImageBitmapSource | Promise<ImageBitmapSource>;
 }
+
+/** A photo served next to the page (relative URL: the build works from any base path). */
+const photo = (file: string) => async (): Promise<Blob> => {
+  const res = await fetch(new URL(`samples/${file}`, document.baseURI));
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${file}`);
+  return res.blob();
+};
 
 const hue = (t: number): [number, number, number] => {
   const h = t * 6;
@@ -92,7 +101,13 @@ function alpha(): ImageData {
 }
 
 export const samples: readonly Sample[] = [
-  { id: 'ramps', label: 'Ramps & hues', make: ramps },
-  { id: 'chart', label: 'Colour chart', make: chart },
-  { id: 'alpha', label: 'Transparency', make: alpha },
+  { id: 'river', label: 'River', group: 'Photos', make: photo('river.jpg') },
+  { id: 'london-night', label: 'London at night', group: 'Photos', make: photo('london-night.jpg') },
+  { id: 'still-life', label: 'Still life', group: 'Photos', make: photo('still-life.jpg') },
+  { id: 'tiger-cubs', label: 'Tiger cubs', group: 'Photos', make: photo('tiger-cubs.jpg') },
+  { id: 'skyscraper', label: 'Skyscraper (perspective)', group: 'Photos', make: photo('skyscraper.jpg') },
+  { id: 'desert-road', label: 'Desert road', group: 'Photos', make: photo('desert-road.jpg') },
+  { id: 'ramps', label: 'Ramps & hues', group: 'Test images', make: ramps },
+  { id: 'chart', label: 'Colour chart', group: 'Test images', make: chart },
+  { id: 'alpha', label: 'Transparency', group: 'Test images', make: alpha },
 ];

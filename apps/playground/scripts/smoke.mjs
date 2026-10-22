@@ -45,7 +45,8 @@ try {
       return n / a.length;
     });
 
-  await page.goto(url);
+  // Pinned to a generated test image: the checks below rely on its layout.
+  await page.goto(`${url}?sample=ramps`);
   await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
   check((await status()).startsWith('WebGPU'), `expected the WebGPU renderer, status was: ${await status()}`);
 
@@ -60,6 +61,28 @@ try {
   check((await histMean()) > meanBefore + 10, `histogram mean did not follow +1.5 EV: ${meanBefore} -> ${await histMean()}`);
   const changed = await differs();
   check(changed > 0.3, `exposure +1.5 EV changed only ${(changed * 100).toFixed(1)}% of channels`);
+
+  // Undo / redo: Ctrl+Z goes back to 0 EV (one step for the whole change), the Redo button forward again.
+  const ev = () => page.$eval('#chain [name=ev]', (el) => el.value);
+  await after(() => page.keyboard.press('Control+z'));
+  check((await ev()) === '0' && (await differs()) < 0.01, `undo should restore 0 EV, slider ${await ev()}`);
+  await after(() => page.click('#redo'));
+  check((await ev()) === '1.5' && (await differs()) > 0.3, `redo should restore +1.5 EV, slider ${await ev()}`);
+
+  // A share link opens the same edits in a fresh page.
+  await page.click('#share');
+  await page.waitForFunction(() => location.hash.startsWith('#s='));
+  const link = await page.evaluate(() => location.href);
+  {
+    const other = await browser.newPage();
+    other.on('pageerror', (e) => failures.push(`page error (shared link): ${e.message}`));
+    await other.goto(link);
+    await other.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+    const sharedEv = await other.$eval('#chain [name=ev]', (el) => el.value);
+    check(sharedEv === '1.5', `shared link should open with +1.5 EV, slider ${sharedEv}`);
+    check(await other.$eval('#undo', (b) => b.disabled), 'a shared link should not start with an undo step');
+    await other.close();
+  }
 
   // A linear-gradient mask (top to bottom by default) restricts the step to the bottom of the image.
   const rowDiff = () =>
@@ -357,6 +380,56 @@ try {
   await after(() => page.click('#geometry button[data-action=geometry-reset]'));
   await sizesBecome(sizeBefore);
 
+  // Zoom: Ctrl+wheel zooms about the cursor, handles keep their size on screen, and a crop handle
+  // dragged while zoomed lands under the pointer.
+  const stageScale = () => page.$eval('#stage', (s) => new DOMMatrix(getComputedStyle(s).transform).a);
+  await page.click('#geometry button[data-action=crop-mode]');
+  await page.waitForSelector('#geometry-overlay [data-handle=tl]', { timeout: 20000 }).catch(() => {});
+  const handleWidth = async () => (await page.locator('#geometry-overlay [data-handle=tl]').boundingBox()).width;
+  const fitHandle = await handleWidth();
+  {
+    const st = await page.locator('#after').boundingBox();
+    await page.mouse.move(st.x + 1, st.y + 1);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -100);
+    await page.mouse.wheel(0, -100);
+    await page.keyboard.up('Control');
+  }
+  const zoomed = await stageScale();
+  check(zoomed > 2, `Ctrl+wheel should zoom in, scale ${zoomed}`);
+  check(Math.abs((await handleWidth()) - fitHandle) < 2, `handles should keep their size when zoomed: ${fitHandle} -> ${await handleWidth()}`);
+  {
+    const handle = await page.locator('#geometry-overlay [data-handle=tl]').boundingBox();
+    const st = await page.locator('#after').boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(st.x + st.width * 0.25, st.y + st.height * 0.25, { steps: 5 });
+    await page.mouse.up();
+  }
+  await after(() => page.click('#geometry button[data-action=crop-done]'));
+  await page.waitForFunction((cw) => document.getElementById('after').width < cw * 0.9, cw, { timeout: 20000 }).catch(() => {});
+  const zoomCrop = (await canvasSizes()).split(' ')[1].split('x').map(Number);
+  check(Math.abs(zoomCrop[0] - cw * 0.75) <= 3 && Math.abs(zoomCrop[1] - ch * 0.75) <= 3, `crop dragged while zoomed gave ${zoomCrop.join('x')}, expected about ${cw * 0.75}x${ch * 0.75}`);
+  // Two-finger pinch spreading from 40 to 100 px zooms in 2.5x more; Fit restores the view.
+  const beforePinch = await stageScale();
+  // Dispatched on the stage itself: synthetic pointers cannot be captured by the split handle.
+  await page.$eval('#stage', (el) => {
+    const r = el.getBoundingClientRect();
+    const [cx, cy] = [r.left + r.width / 2, r.top + r.height / 2];
+    const fire = (type, id, x) => el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: x, clientY: cy, bubbles: true, isPrimary: id === 11 }));
+    fire('pointerdown', 11, cx - 20);
+    fire('pointerdown', 12, cx + 20);
+    for (let i = 1; i <= 6; i++) fire('pointermove', 12, cx + 20 + i * 10);
+    fire('pointerup', 12, cx + 80);
+    fire('pointerup', 11, cx - 20);
+  });
+  const pinched = await stageScale();
+  check(Math.abs(pinched / beforePinch - 2.5) < 0.1 || pinched === 32, `pinch should zoom 2.5x: ${beforePinch} -> ${pinched}`);
+  await page.click('#zoom-fit');
+  check((await stageScale()) === 1, `Fit should reset the zoom, scale ${await stageScale()}`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await sizesBecome(sizeBefore);
+
   // Perspective: drag the top-left corner inwards; on Done the image is resampled (same frame size).
   const pixelsBefore = await afterPixels();
   await page.click('#geometry button[data-action=perspective-mode]');
@@ -381,6 +454,25 @@ try {
   await sizesBecome(sizeBefore);
   await sizesBecome(sizeBefore);
 
+  // A lost GPU device is replaced: same chain, same pixels, no reload.
+  {
+    const pixels = await afterPixels();
+    await after(() => page.evaluate(() => window.rullino.loseDevice()));
+    await page.waitForFunction(() => /restarted with WebGPU/.test(document.getElementById('announce').textContent), null, { timeout: 30000 }).catch(() => {});
+    check(/restarted with WebGPU/.test(await page.textContent('#announce')), `device loss: announce says "${await page.textContent('#announce')}"`);
+    await page.waitForFunction(() => !document.getElementById('stage').classList.contains('busy'), null, { timeout: 30000 });
+    await page.waitForTimeout(200);
+    const restored = await afterPixels();
+    let off = 0;
+    for (let i = 0; i < pixels.length; i++) off += Math.abs(pixels[i] - restored[i]) > 1 ? 1 : 0;
+    check(restored.length === pixels.length && off / pixels.length < 0.001, `after a device loss ${(off / pixels.length * 100).toFixed(2)}% of channels differ`);
+  }
+
+  // Slow frames (first shader compiles take seconds on SwiftShader) show the busy spinner, and it goes away.
+  await page.evaluate(() => {
+    window.sawBusy = false;
+    new MutationObserver(() => (window.sawBusy ||= document.getElementById('stage').classList.contains('busy'))).observe(document.getElementById('stage'), { attributes: true });
+  });
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
@@ -389,9 +481,31 @@ try {
   await after(() => page.click('#chain button[data-action=select][aria-label="Edit Transparency"]'));
   await after(() => slider('amount', 0));
   check((await status()).includes(`${ids.length + 2} steps`), `expected ${ids.length + 2} steps, status: ${await status()}`);
+  check(await page.evaluate(() => window.sawBusy), 'the busy spinner never showed while compiling 30+ filters');
+  check(!(await page.$eval('#stage', (s) => s.classList.contains('busy'))), 'the busy spinner should be gone after the frame');
 
-  for (const s of await page.$$eval('#sample option', (o) => o.map((x) => x.value))) {
+  // The generated test images load under the full chain; the 2048 px photos (below) would take
+  // ~40 s each with it on SwiftShader.
+  for (const s of await page.$$eval('#sample optgroup[label="Test images"] option', (o) => o.map((x) => x.value))) {
     await after(() => page.selectOption('#sample', s));
+  }
+  // Without a parameter the page opens on a photo; every photo loads (default chain).
+  {
+    const other = await browser.newPage();
+    other.on('pageerror', (e) => failures.push(`page error (photos): ${e.message}`));
+    other.on('console', (m) => m.type() === 'error' && failures.push(`console error (photos): ${m.text()}`));
+    const otherFrame = () => other.$eval('#status', (s) => Number(s.dataset.frame ?? 0));
+    await other.goto(url);
+    await other.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+    const text = await other.textContent('#status');
+    check(/River 2048×1365/.test(text), `default sample should be the River photo, status: ${text}`);
+    for (const s of await other.$$eval('#sample optgroup[label="Photos"] option', (o) => o.map((x) => [x.value, x.textContent]))) {
+      const n = await otherFrame();
+      await other.selectOption('#sample', s[0]);
+      await other.waitForFunction(([n, label]) => Number(document.getElementById('status').dataset.frame ?? 0) > n && document.getElementById('status').textContent.includes(label), [n, s[1]], { timeout: 30000 }).catch(() => {});
+      check(new RegExp(`${s[1].replace(/[()]/g, '\\$&')} \\d+×\\d+`).test(await other.textContent('#status')), `photo ${s[0]} did not load, status: ${await other.textContent('#status')}`);
+    }
+    await other.close();
   }
 
   // Loading an image while a frame is in flight must still end with the new image fully drawn.

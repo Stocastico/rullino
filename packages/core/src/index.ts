@@ -65,3 +65,4 @@ export { activeSteps, effectiveParams, runChainCpu, type ChainOptions, type Step
 export { Pipeline, type PipelineOptions } from './pipeline/pipeline';
 export { downscale } from './gpu/resize';
 export { downscaleCpu, fitWithin } from './resize';
+export { CHAIN_VERSION, parseChain, serializeChain, type ChainDocument, type MaskDocument, type ParseOptions, type SerializeOptions, type StepDocument } from './serialize';
