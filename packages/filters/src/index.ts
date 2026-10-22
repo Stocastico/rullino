@@ -1,6 +1,7 @@
 import type { Filter } from '@rullino/core';
 import { adaptiveThreshold } from './adaptiveThreshold';
 import { applyLut } from './applyLut';
+import { bilateral } from './bilateral';
 import { blackPoint } from './blackPoint';
 import { boxBlur } from './boxBlur';
 import { brightness } from './brightness';
@@ -33,6 +34,7 @@ import { whiteBalance } from './whiteBalance';
 export {
   adaptiveThreshold,
   applyLut,
+  bilateral,
   blackPoint,
   boxBlur,
   brightness,
@@ -94,5 +96,6 @@ export const filters: readonly Filter<any>[] = [
   canny,
   morphology,
   median,
+  bilateral,
   inpaint,
 ];
