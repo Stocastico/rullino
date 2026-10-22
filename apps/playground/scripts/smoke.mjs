@@ -503,7 +503,7 @@ try {
       const n = await otherFrame();
       await other.selectOption('#sample', s[0]);
       await other.waitForFunction(([n, label]) => Number(document.getElementById('status').dataset.frame ?? 0) > n && document.getElementById('status').textContent.includes(label), [n, s[1]], { timeout: 30000 }).catch(() => {});
-      check((await other.textContent('#status')).includes(`${s[1]} 2048×`), `photo ${s[0]} did not load, status: ${await other.textContent('#status')}`);
+      check(new RegExp(`${s[1].replace(/[()]/g, '\\$&')} \\d+×\\d+`).test(await other.textContent('#status')), `photo ${s[0]} did not load, status: ${await other.textContent('#status')}`);
     }
     await other.close();
   }

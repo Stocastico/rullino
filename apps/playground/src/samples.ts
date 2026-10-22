@@ -105,6 +105,8 @@ export const samples: readonly Sample[] = [
   { id: 'london-night', label: 'London at night', group: 'Photos', make: photo('london-night.jpg') },
   { id: 'still-life', label: 'Still life', group: 'Photos', make: photo('still-life.jpg') },
   { id: 'tiger-cubs', label: 'Tiger cubs', group: 'Photos', make: photo('tiger-cubs.jpg') },
+  { id: 'skyscraper', label: 'Skyscraper (perspective)', group: 'Photos', make: photo('skyscraper.jpg') },
+  { id: 'desert-road', label: 'Desert road', group: 'Photos', make: photo('desert-road.jpg') },
   { id: 'ramps', label: 'Ramps & hues', group: 'Test images', make: ramps },
   { id: 'chart', label: 'Colour chart', group: 'Test images', make: chart },
   { id: 'alpha', label: 'Transparency', group: 'Test images', make: alpha },
