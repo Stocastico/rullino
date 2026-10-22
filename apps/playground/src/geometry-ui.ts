@@ -8,10 +8,12 @@ const turn = (g: Geometry, by: 90 | 270): Geometry['rotate'] => (((g.rotate + by
 export const ASPECTS = { free: 'Free', original: 'Original', '1:1': '1:1', '4:3': '4:3', '3:2': '3:2', '16:9': '16:9' } as const;
 export type Aspect = keyof typeof ASPECTS;
 
-export interface CropControls {
-  /** Whether crop editing is active. */
-  readonly editing: () => boolean;
-  readonly setEditing: (on: boolean) => void;
+/** What is being edited on the image. */
+export type EditMode = 'none' | 'crop' | 'perspective';
+
+export interface EditControls {
+  readonly mode: () => EditMode;
+  readonly setMode: (mode: EditMode) => void;
   readonly setAspect: (aspect: Aspect) => void;
 }
 
@@ -19,7 +21,7 @@ export function renderGeometryControls(
   root: HTMLElement,
   get: () => Geometry,
   onChange: (g: Geometry, dragging?: boolean) => void,
-  crop: CropControls,
+  edit: EditControls,
 ): { refresh(): void } {
   const button = (text: string, action: string, title: string, next: () => Geometry) => {
     const b = Object.assign(document.createElement('button'), { type: 'button', textContent: text, title });
@@ -53,22 +55,30 @@ export function renderGeometryControls(
   const aspect = Object.assign(document.createElement('select'), { title: 'Crop aspect ratio' });
   aspect.dataset.action = 'crop-aspect';
   for (const [value, text] of Object.entries(ASPECTS)) aspect.append(new Option(text, value));
-  aspect.addEventListener('change', () => crop.setAspect(aspect.value as Aspect));
-  const cropButton = Object.assign(document.createElement('button'), { type: 'button' });
-  cropButton.addEventListener('click', () => {
-    crop.setEditing(!crop.editing());
-    refresh();
-  });
-  cropRow.append(cropButton, aspect);
+  aspect.addEventListener('change', () => edit.setAspect(aspect.value as Aspect));
+  const modeButton = (mode: Exclude<EditMode, 'none'>) => {
+    const b = Object.assign(document.createElement('button'), { type: 'button' });
+    b.addEventListener('click', () => {
+      edit.setMode(edit.mode() === mode ? 'none' : mode);
+      refresh();
+    });
+    return b;
+  };
+  const cropButton = modeButton('crop');
+  const perspectiveButton = modeButton('perspective');
+  cropRow.append(cropButton, aspect, perspectiveButton);
   root.replaceChildren(row, label, cropRow);
 
   const refresh = () => {
     straighten.value = String(get().straighten);
     out.textContent = `${get().straighten.toFixed(1)}°`;
-    const editing = crop.editing();
-    cropButton.textContent = editing ? 'Done' : 'Crop…';
-    cropButton.dataset.action = editing ? 'crop-done' : 'crop-mode';
-    cropButton.classList.toggle('primary', editing);
+    const mode = edit.mode();
+    for (const [b, m, text] of [[cropButton, 'crop', 'Crop…'], [perspectiveButton, 'perspective', 'Perspective…']] as const) {
+      b.textContent = mode === m ? 'Done' : text;
+      b.dataset.action = mode === m ? `${m}-done` : `${m}-mode`;
+      b.classList.toggle('primary', mode === m);
+      b.disabled = mode !== 'none' && mode !== m;
+    }
   };
   refresh();
   return { refresh };

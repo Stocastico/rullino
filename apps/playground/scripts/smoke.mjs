@@ -275,6 +275,30 @@ try {
   await after(() => page.click('#geometry button[data-action=geometry-reset]'));
   await sizesBecome(sizeBefore);
 
+  // Perspective: drag the top-left corner inwards; on Done the image is resampled (same frame size).
+  const pixelsBefore = await afterPixels();
+  await page.click('#geometry button[data-action=perspective-mode]');
+  await page.waitForSelector('#geometry-overlay [data-handle=p0]', { timeout: 20000 }).catch(() => {});
+  check((await page.$$('#geometry-overlay [data-handle]')).length === 4, 'perspective mode should show 4 handles');
+  {
+    const handle = await page.locator('#geometry-overlay [data-handle=p0]').boundingBox();
+    const stage = await page.locator('#after').boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(stage.x + stage.width * 0.25, stage.y + stage.height * 0.25, { steps: 5 });
+    await page.mouse.up();
+  }
+  await after(() => page.click('#geometry button[data-action=perspective-done]'));
+  await page.waitForFunction(() => !document.querySelector('#geometry-overlay [data-handle]'), null, { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  const pixelsAfter = await afterPixels();
+  const moved = pixelsAfter.length === pixelsBefore.length ? pixelsAfter.filter((v, i) => Math.abs(v - pixelsBefore[i]) > 2).length / pixelsAfter.length : 0;
+  check(moved > 0.3, `perspective changed only ${(moved * 100).toFixed(1)}% of the after canvas`);
+  check((await canvasSizes()) === sizeBefore, `perspective should keep the frame size: ${await canvasSizes()}`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await sizesBecome(sizeBefore);
+  await sizesBecome(sizeBefore);
+
   // Every filter in one chain renders without errors.
   const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
   for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));

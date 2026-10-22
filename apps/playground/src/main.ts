@@ -29,7 +29,8 @@ import { filters } from '@rullino/filters';
 import { looks, lookSteps } from '@rullino/presets';
 import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
-import { renderGeometryControls, type Aspect } from './geometry-ui';
+import { renderGeometryControls, type Aspect, type EditMode } from './geometry-ui';
+import { createPerspectiveOverlay, UNIT_QUAD } from './perspective-overlay';
 import { drawHistogram } from './histogram-view';
 import { createMaskOverlay } from './mask-overlay';
 import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
@@ -286,11 +287,21 @@ let latestLoad = 0;
 
 let geometry: Geometry = IDENTITY_GEOMETRY;
 let geometryQueued = false;
-/** While the crop is edited the frame is shown uncropped; the crop applies on Done. */
-let cropEditing = false;
+/**
+ * While the crop is edited the frame is shown uncropped; while the perspective is edited, the
+ * oriented image is shown without perspective, straighten or crop. Changes apply on Done.
+ */
+let editMode: EditMode = 'none';
 let cropAspect: Aspect = 'free';
 const FULL_CROP: Geometry['crop'] = { x: 0, y: 0, width: 1, height: 1 };
-const shownGeometry = (): Geometry => (cropEditing ? { ...geometry, crop: FULL_CROP } : geometry);
+const shownGeometry = (): Geometry => {
+  if (editMode === 'crop') return { ...geometry, crop: FULL_CROP };
+  if (editMode === 'perspective') {
+    const { perspective: _, ...rest } = geometry;
+    return { ...rest, straighten: 0, crop: FULL_CROP };
+  }
+  return geometry;
+};
 const aspectRatio = (): number | undefined => {
   if (cropAspect === 'free') return undefined;
   if (cropAspect === 'original') return displaySize[0] / displaySize[1];
@@ -298,10 +309,12 @@ const aspectRatio = (): number | undefined => {
   return a! / b!;
 };
 const cropOverlay = createCropOverlay(ui.geometryOverlay, (crop) => (geometry = { ...geometry, crop }));
+const perspectiveOverlay = createPerspectiveOverlay(ui.geometryOverlay, (quad) => (geometry = { ...geometry, perspective: quad }));
 const showCrop = () => {
-  ui.stage.classList.toggle('cropping', cropEditing);
-  ui.geometryOverlay.style.pointerEvents = cropEditing ? 'auto' : 'none';
-  if (cropEditing) cropOverlay.show(geometry.crop, displaySize[0], displaySize[1], aspectRatio());
+  ui.stage.classList.toggle('cropping', editMode !== 'none');
+  ui.geometryOverlay.style.pointerEvents = editMode !== 'none' ? 'auto' : 'none';
+  if (editMode === 'crop') cropOverlay.show(geometry.crop, displaySize[0], displaySize[1], aspectRatio());
+  else if (editMode === 'perspective') perspectiveOverlay.show(geometry.perspective ?? UNIT_QUAD, displaySize[0], displaySize[1]);
   else cropOverlay.hide();
 };
 
@@ -335,15 +348,15 @@ const geometryControls = renderGeometryControls(
     setGeometry(g);
   },
   {
-    editing: () => cropEditing,
-    setEditing(on) {
-      cropEditing = on;
+    mode: () => editMode,
+    setMode(mode) {
+      editMode = mode;
       setGeometry(geometry);
     },
     setAspect(aspect) {
       cropAspect = aspect;
       const ratio = aspectRatio();
-      if (ratio !== undefined && cropEditing) geometry = { ...geometry, crop: fitAspect(geometry.crop, displaySize[0], displaySize[1], ratio) };
+      if (ratio !== undefined && editMode === 'crop') geometry = { ...geometry, crop: fitAspect(geometry.crop, displaySize[0], displaySize[1], ratio) };
       showCrop();
     },
   },
@@ -360,7 +373,7 @@ function loadImage(source: ImageBitmapSource, name: string): Promise<void> {
       const image = await createImageBitmap(source);
       // A new image starts unframed, as in photo editors.
       geometry = IDENTITY_GEOMETRY;
-      cropEditing = false;
+      editMode = 'none';
       geometryControls.refresh();
       const [w, h] = await renderer.load(image, geometry);
       displaySize = [w, h];
