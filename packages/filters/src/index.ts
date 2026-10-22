@@ -15,6 +15,7 @@ import { contrast } from './contrast';
 import { convolve } from './convolve';
 import { curves } from './curves';
 import { dither } from './dither';
+import { emboss } from './emboss';
 import { equalize } from './equalize';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
@@ -34,6 +35,7 @@ import { posterize } from './posterize';
 import { saturation } from './saturation';
 import { shadowsHighlights } from './shadowsHighlights';
 import { sharpen } from './sharpen';
+import { sketch } from './sketch';
 import { threshold } from './threshold';
 import { transparency } from './transparency';
 import { unsharpMask } from './unsharpMask';
@@ -57,6 +59,7 @@ export {
   convolve,
   curves,
   dither,
+  emboss,
   equalize,
   exposure,
   gamma,
@@ -76,6 +79,7 @@ export {
   saturation,
   shadowsHighlights,
   sharpen,
+  sketch,
   threshold,
   transparency,
   unsharpMask,
@@ -126,4 +130,6 @@ export const filters: readonly Filter<any>[] = [
   pixelate,
   halftone,
   dither,
+  emboss,
+  sketch,
 ];
