@@ -35,7 +35,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
   - `lut.ts` 3D LUTs: `createLut`, `.cube` / HaldCLUT parsers, CPU trilinear sampler and its WGSL twin; `gpu/lut.ts` the cached 3D texture.
 - `packages/filters` — one directory per filter: `index.ts` (schema + WGSL + CPU reference) and `*.test.ts` (CPU semantics). `convolution.ts` holds shared CPU convolution code and WGSL pass builders. `index.ts` at the root is the registry; `parity.browser.test.ts` checks every registered filter GPU <-> CPU at defaults and parameter extremes.
 - `packages/presets` — `bake.ts` (`bakeLut`: a pointwise chain baked into a 33³ LUT) and `looks.ts` (the looks: grade + vignette + grain, `lookSteps`, `lookLut`); golden charts in `__snapshots__`.
-- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding; `scripts/smoke.mjs` is the e2e smoke test.
+- `apps/playground` — Vite site; consumes packages through their public `index.ts` only. `controls.ts` generates the parameter UI from a schema (curve params share one `curve-editor.ts` with tabs); `chain-ui.ts` is the chain editor; `mask-ui.ts` the per-step mask panel and `mask-overlay.ts` the on-image handles / brush; `geometry-ui.ts` the Geometry panel, `crop-overlay.ts` / `perspective-overlay.ts` its on-image editors; `histogram-view.ts`; `history.ts` undo/redo, `share.ts` share-link encoding, `zoom.ts` zoom / pan / pinch; `scripts/smoke.mjs` is the e2e smoke test.
 
 ## Rules
 
@@ -145,6 +145,8 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | Chains serialise to plain JSON (`serializeChain` / `parseChain`): defaults omitted, raster masks as 8-bit base64, LUTs by reference only | Short share links and saved presets; a LUT table (430 KB at 33³) cannot travel in a link, so callers name LUTs (the playground: `look:<id>`) and a chain with a loaded .cube file cannot be shared. |
 | Undo / redo over immutable snapshots (chain + geometry), recorded when a gesture ends (not while dragging or editing the crop) | States are already immutable, so a snapshot is two references; one slider drag or brush stroke is one undo step. Selection changes are not edits. |
 | Share links in the URL fragment: JSON, `deflate-raw`, base64url; they name a sample image, never include the user's own | The fragment never reaches a server; the user's photo stays on their machine. |
+| Zoom / pan = CSS transform on the stage (zoom 1 = fit, clamped so no empty space shows); handles rescaled through `--px` | Every on-image editor maps pointers through `getBoundingClientRect`, which includes the transform, so masks, crop and perspective work zoomed without changes. Beyond the 2048 px display canvas zooming only magnifies (pixelated past 2:1); full-resolution pixel peeping would need a rendered crop. |
+| Ctrl/⌘ + wheel and pinch zoom, wheel / Space + drag / middle drag / two fingers pan; the stage has `touch-action: none` | Matches design tools; capture-phase listeners let these gestures win over the split handle, brush and handles. On phones a finger on the image no longer scrolls the page. |
 | `shader-f16` not required | Textures are rgba16float but shaders compute in f32; SwiftShader does not expose `shader-f16`. |
 
 ## Traps
@@ -193,3 +195,4 @@ Things that already bit us. Add new ones as they come up.
 - **A new frame is not proof the latest state is shown**: changes made while a frame is in flight coalesce into the next one. E2E checks of geometry wait for the expected result (sizes, pixels), not for a frame count.
 - **Handles on the image edge are half clipped** by an `overflow: hidden` overlay: the crop / perspective overlay uses `overflow: visible`.
 - **Playwright version must match the installed Chromium build** in cloud sessions (1.56.x ↔ chromium-1194), or it tries to download a browser.
+- **Synthetic `PointerEvent`s cannot be captured**: `setPointerCapture` throws "No active pointer". Dispatch fake touches where no handler captures (the smoke test pinches on `#stage`).

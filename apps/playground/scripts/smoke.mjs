@@ -379,6 +379,56 @@ try {
   await after(() => page.click('#geometry button[data-action=geometry-reset]'));
   await sizesBecome(sizeBefore);
 
+  // Zoom: Ctrl+wheel zooms about the cursor, handles keep their size on screen, and a crop handle
+  // dragged while zoomed lands under the pointer.
+  const stageScale = () => page.$eval('#stage', (s) => new DOMMatrix(getComputedStyle(s).transform).a);
+  await page.click('#geometry button[data-action=crop-mode]');
+  await page.waitForSelector('#geometry-overlay [data-handle=tl]', { timeout: 20000 }).catch(() => {});
+  const handleWidth = async () => (await page.locator('#geometry-overlay [data-handle=tl]').boundingBox()).width;
+  const fitHandle = await handleWidth();
+  {
+    const st = await page.locator('#after').boundingBox();
+    await page.mouse.move(st.x + 1, st.y + 1);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -100);
+    await page.mouse.wheel(0, -100);
+    await page.keyboard.up('Control');
+  }
+  const zoomed = await stageScale();
+  check(zoomed > 2, `Ctrl+wheel should zoom in, scale ${zoomed}`);
+  check(Math.abs((await handleWidth()) - fitHandle) < 2, `handles should keep their size when zoomed: ${fitHandle} -> ${await handleWidth()}`);
+  {
+    const handle = await page.locator('#geometry-overlay [data-handle=tl]').boundingBox();
+    const st = await page.locator('#after').boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(st.x + st.width * 0.25, st.y + st.height * 0.25, { steps: 5 });
+    await page.mouse.up();
+  }
+  await after(() => page.click('#geometry button[data-action=crop-done]'));
+  await page.waitForFunction((cw) => document.getElementById('after').width < cw * 0.9, cw, { timeout: 20000 }).catch(() => {});
+  const zoomCrop = (await canvasSizes()).split(' ')[1].split('x').map(Number);
+  check(Math.abs(zoomCrop[0] - cw * 0.75) <= 3 && Math.abs(zoomCrop[1] - ch * 0.75) <= 3, `crop dragged while zoomed gave ${zoomCrop.join('x')}, expected about ${cw * 0.75}x${ch * 0.75}`);
+  // Two-finger pinch spreading from 40 to 100 px zooms in 2.5x more; Fit restores the view.
+  const beforePinch = await stageScale();
+  // Dispatched on the stage itself: synthetic pointers cannot be captured by the split handle.
+  await page.$eval('#stage', (el) => {
+    const r = el.getBoundingClientRect();
+    const [cx, cy] = [r.left + r.width / 2, r.top + r.height / 2];
+    const fire = (type, id, x) => el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: x, clientY: cy, bubbles: true, isPrimary: id === 11 }));
+    fire('pointerdown', 11, cx - 20);
+    fire('pointerdown', 12, cx + 20);
+    for (let i = 1; i <= 6; i++) fire('pointermove', 12, cx + 20 + i * 10);
+    fire('pointerup', 12, cx + 80);
+    fire('pointerup', 11, cx - 20);
+  });
+  const pinched = await stageScale();
+  check(Math.abs(pinched / beforePinch - 2.5) < 0.1 || pinched === 32, `pinch should zoom 2.5x: ${beforePinch} -> ${pinched}`);
+  await page.click('#zoom-fit');
+  check((await stageScale()) === 1, `Fit should reset the zoom, scale ${await stageScale()}`);
+  await after(() => page.click('#geometry button[data-action=geometry-reset]'));
+  await sizesBecome(sizeBefore);
+
   // Perspective: drag the top-left corner inwards; on Done the image is resampled (same frame size).
   const pixelsBefore = await afterPixels();
   await page.click('#geometry button[data-action=perspective-mode]');

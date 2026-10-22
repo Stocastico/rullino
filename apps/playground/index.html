@@ -57,7 +57,12 @@
           <label>Split <input id="split" type="range" min="0" max="1" step="0.001" value="0.5" /></label>
         </section>
       </aside>
-      <figure>
+      <figure id="viewport">
+        <div class="zoom-bar" role="group" aria-label="Zoom">
+          <button id="zoom-out" type="button" title="Zoom out (−)" aria-label="Zoom out">−</button>
+          <button id="zoom-fit" type="button" title="Fit (0)">Fit</button>
+          <button id="zoom-in" type="button" title="Zoom in (+)" aria-label="Zoom in">+</button>
+        </div>
         <div id="stage">
           <canvas id="after" aria-label="Filtered image"></canvas>
           <canvas id="before" aria-label="Original image"></canvas>

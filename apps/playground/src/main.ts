@@ -42,6 +42,7 @@ import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } f
 import { samples } from './samples';
 import { History } from './history';
 import { decodeState, encodeState } from './share';
+import { attachZoom, FIT, updateHandleScale } from './zoom';
 
 /** Display resolution: the after/before canvases. Export re-runs the chain at full resolution. */
 const DISPLAY_SIDE = 2048;
@@ -72,6 +73,10 @@ const ui = {
   undo: $<HTMLButtonElement>('undo'),
   redo: $<HTMLButtonElement>('redo'),
   share: $<HTMLButtonElement>('share'),
+  viewport: $<HTMLElement>('viewport'),
+  zoomIn: $<HTMLButtonElement>('zoom-in'),
+  zoomOut: $<HTMLButtonElement>('zoom-out'),
+  zoomFit: $<HTMLButtonElement>('zoom-fit'),
 };
 const beforeCtx = ui.before.getContext('2d')!;
 const afterCtx = ui.after.getContext('2d')!;
@@ -420,6 +425,7 @@ function loadImage(source: ImageBitmapSource, name: string, sample?: string): Pr
       // A new image starts unframed, as in photo editors.
       geometry = IDENTITY_GEOMETRY;
       editMode = 'none';
+      zoom.set(FIT);
       geometryControls.refresh();
       const [w, h] = await renderer.load(image, geometry);
       displaySize = [w, h];
@@ -589,6 +595,26 @@ ui.after.addEventListener('pointerdown', (e) => {
 // The before canvas sits on top; let pointer events fall through to the after canvas.
 ui.before.style.pointerEvents = 'none';
 setSplit(0.5);
+
+// ---------------------------------------------------------------------------------------------
+// Zoom and pan.
+
+const zoom = attachZoom(ui.viewport, ui.stage, (v) => {
+  updateHandleScale([ui.overlay, ui.geometryOverlay]);
+  ui.zoomFit.textContent = v.zoom === 1 ? 'Fit' : `${Math.round(v.zoom * 100)}%`;
+  ui.stage.classList.toggle('pixelated', (v.zoom * ui.after.clientWidth) / Math.max(1, ui.after.width) > 2);
+});
+const ZOOM_STEP = Math.SQRT2;
+ui.zoomIn.addEventListener('click', () => zoom.zoomBy(ZOOM_STEP));
+ui.zoomOut.addEventListener('click', () => zoom.zoomBy(1 / ZOOM_STEP));
+ui.zoomFit.addEventListener('click', () => zoom.set(FIT));
+document.addEventListener('keydown', (e) => {
+  const t = e.target as HTMLElement;
+  if (e.ctrlKey || e.metaKey || e.altKey || t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
+  if (e.key === '+' || e.key === '=') zoom.zoomBy(ZOOM_STEP);
+  else if (e.key === '-') zoom.zoomBy(1 / ZOOM_STEP);
+  else if (e.key === '0') zoom.set(FIT);
+});
 
 // ---------------------------------------------------------------------------------------------
 // Undo / redo and share links.

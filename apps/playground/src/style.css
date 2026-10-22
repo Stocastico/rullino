@@ -47,10 +47,16 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .control-enum label { justify-content: space-between; }
 .reset { align-self: flex-start; cursor: pointer; }
 /* Anchored to the top (and sticky), so a long sidebar does not push the image down. */
-figure { margin: 0; padding: 24px; display: grid; justify-items: center; align-items: start; overflow: auto; }
+figure { margin: 0; padding: 24px; display: grid; justify-items: center; align-items: start; overflow: hidden; position: relative; }
 #stage { position: sticky; top: 24px; }
 /* Sized by the canvases, so the split handle spans exactly the image. */
-#stage { display: grid; position: relative; max-width: 100%; }
+#stage { display: grid; position: relative; max-width: 100%; transform-origin: 0 0; touch-action: none; }
+#stage.panning, #stage.panning * { cursor: grab !important; }
+/* Beyond 2 screen pixels per image pixel, show pixels rather than a blur. */
+#stage.pixelated canvas { image-rendering: pixelated; }
+.zoom-bar { position: absolute; right: 16px; bottom: 16px; z-index: 2; display: flex; gap: 2px; padding: 4px; border-radius: 8px; background: rgb(0 0 0 / 0.6); backdrop-filter: blur(4px); }
+.zoom-bar button { border: 0; background: none; min-width: 2.2em; }
+.zoom-bar button:hover { background: rgb(255 255 255 / 0.1); }
 #stage canvas {
   grid-area: 1 / 1;
   max-width: 100%;
@@ -122,3 +128,7 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 #stage.cropping #before, #stage.cropping #handle, #stage.cropping #overlay { display: none; }
 button.primary { border-color: var(--accent); color: var(--accent); }
 #export-size { width: 7em; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+/* Fingers need bigger targets than a mouse. */
+@media (pointer: coarse) {
+  .mask-handle { r: calc(14px * var(--px, 1)); }
+}
