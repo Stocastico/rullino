@@ -1,4 +1,5 @@
 import { CURVE_SAMPLES, curveLut, curveSamplerWgsl, type CurvePoints } from './curve';
+import { MAX_IMAGE_SIDE, type LinearImage } from './image';
 import { MAX_LUT_SIZE, type Lut } from './lut';
 
 // Parameter schema: the contract between a filter, its UI, validation and serialisation.
@@ -70,6 +71,16 @@ export interface LutParam extends ParamBase {
 }
 
 /**
+ * An image (`image.ts`), e.g. a patch computed elsewhere (object removal). It takes no uniform
+ * space: multipass filters read it through the generated `image_<name>(uv)` sampler (bilinear,
+ * normalised coordinates). Kept by identity like LUTs, so treat images as immutable.
+ */
+export interface ImageParam extends ParamBase {
+  readonly type: 'image';
+  readonly default: LinearImage;
+}
+
+/**
  * A colour picked by the user: straight sRGB-encoded [r, g, b] in [0, 1], as colour pickers show
  * it. In WGSL a vec4f (r, g, b, 1) with the same encoded values; filters convert to linear themselves.
  */
@@ -78,7 +89,7 @@ export interface ColorParam extends ParamBase {
   readonly default: readonly [number, number, number];
 }
 
-export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam | LutParam | ColorParam;
+export type Param = FloatParam | IntParam | BoolParam | EnumParam | KernelParam | CurveParam | LutParam | ImageParam | ColorParam;
 export type ParamSchema = Readonly<Record<string, Param>>;
 
 export type ParamValue<P extends Param> = P extends { readonly type: 'float' | 'int' }
@@ -93,7 +104,9 @@ export type ParamValue<P extends Param> = P extends { readonly type: 'float' | '
           ? CurvePoints
           : P extends { readonly type: 'lut' }
             ? Lut
-            : P extends { readonly type: 'color' }
+            : P extends { readonly type: 'image' }
+              ? LinearImage
+              : P extends { readonly type: 'color' }
               ? readonly [number, number, number]
               : never;
 
@@ -121,6 +134,16 @@ function lutProblem(v: unknown): string | undefined {
   const ok = (d: unknown) => Array.isArray(d) && d.length === 3 && d.every((x) => typeof x === 'number' && Number.isFinite(x));
   if (!ok(l.domainMin) || !ok(l.domainMax)) return 'domain must be two [r, g, b] number triples';
   if (!l.domainMin!.every((m, i) => l.domainMax![i]! > m)) return 'domain max must exceed min';
+  return undefined;
+}
+
+/** Why `v` is not a usable image param, or undefined if it is. */
+function imageProblem(v: unknown): string | undefined {
+  if (typeof v !== 'object' || v === null) return 'not an image object';
+  const i = v as Partial<LinearImage>;
+  const side = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_IMAGE_SIDE;
+  if (!side(i.width) || !side(i.height)) return `width and height must be integers in [1, ${MAX_IMAGE_SIDE}]`;
+  if (!(i.data instanceof Float32Array) || i.data.length !== i.width! * i.height! * 4) return 'data must be a Float32Array of width x height RGBA values';
   return undefined;
 }
 
@@ -157,6 +180,11 @@ export function validateSchema(schema: ParamSchema): void {
       case 'lut': {
         const problem = lutProblem(p.default);
         if (problem) fail(`lut default: ${problem}`);
+        break;
+      }
+      case 'image': {
+        const problem = imageProblem(p.default);
+        if (problem) fail(`image default: ${problem}`);
         break;
       }
       case 'color':
@@ -208,6 +236,10 @@ export function resolveParams<S extends ParamSchema>(schema: S, values: Partial<
         if (lutProblem(v)) throw new TypeError(`parameter "${key}" (lut): ${lutProblem(v)}`);
         out[key] = v; // not copied: GPU textures are cached by object identity
         break;
+      case 'image':
+        if (imageProblem(v)) throw new TypeError(`parameter "${key}" (image): ${imageProblem(v)}`);
+        out[key] = v; // not copied: GPU textures are cached by object identity
+        break;
       case 'color':
         if (!Array.isArray(v) || v.length !== 3 || !v.every((c) => typeof c === 'number' && Number.isFinite(c))) throw bad();
         out[key] = v.map((c: number) => Math.min(1, Math.max(0, c)));
@@ -243,6 +275,7 @@ export function paramsLayout(schema: ParamSchema): { fields: Field[]; size: numb
   const fields: Field[] = [];
   let offset = 0;
   for (const [key, p] of Object.entries(schema)) {
+    if (p.type === 'image') continue; // a texture binding, no uniform
     if (p.type === 'color') {
       offset = roundUp(offset, 16);
       fields.push({ key, param: p, offset, wgsl: `@align(16) ${key}: vec4f` });

@@ -27,6 +27,7 @@ import { grayscale } from './grayscale';
 import { halftone } from './halftone';
 import { hue } from './hue';
 import { inpaint } from './inpaint';
+import { patch } from './patch';
 import { invert } from './invert';
 import { kuwahara } from './kuwahara';
 import { levels } from './levels';
@@ -74,6 +75,7 @@ export {
   halftone,
   hue,
   inpaint,
+  patch,
   invert,
   kuwahara,
   levels,
@@ -133,6 +135,7 @@ export const filters: readonly Filter<any>[] = [
   median,
   bilateral,
   inpaint,
+  patch,
   pixelate,
   halftone,
   dither,

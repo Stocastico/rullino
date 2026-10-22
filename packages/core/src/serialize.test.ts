@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defineFilter } from './define';
 import type { Filter } from './filter';
 import { IDENTITY_GEOMETRY, type Geometry } from './geometry';
+import { createImage } from './image';
 import { identityLut } from './lut';
 import { createRasterMask } from './mask';
 import type { Step } from './pipeline/chain';
@@ -24,7 +25,8 @@ const gain = defineFilter({
 });
 // Serialisation only looks at a filter's id and schema; a LUT filter must be multipass to be defined.
 const lutFilter = { id: 'lutty', label: 'LUT', kind: 'multipass', params: { lut: { type: 'lut', default: identityLut(), label: 'LUT' } } } as unknown as Filter<any>;
-const filters = [gain, lutFilter];
+const patchFilter = { id: 'patchy', label: 'Patch', kind: 'multipass', params: { patch: { type: 'image', default: createImage(1, 1), label: 'Patch' } } } as unknown as Filter<any>;
+const filters = [gain, lutFilter, patchFilter];
 
 /** JSON round trip, as through a URL or a file. */
 const viaJson = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
@@ -77,6 +79,12 @@ describe('serializeChain / parseChain', () => {
     expect(() => serializeChain([{ filter: lutFilter, params: { lut: identityLut(3) } }])).toThrow(/LUT/);
     const doc = viaJson(serializeChain([{ filter: lutFilter, params: { lut: identityLut(3) } }], { lutRef: () => 'look:gone' }));
     expect(() => parseChain(doc, { filters })).toThrow(/look:gone/);
+  });
+
+  it('refuses an image param (a patch cannot travel in a link) unless it is the default', () => {
+    expect(() => serializeChain([{ filter: patchFilter, params: { patch: createImage(2, 2) } }])).toThrow(/image/);
+    expect(serializeChain([{ filter: patchFilter }]).steps[0]!.params).toEqual({});
+    expect(() => parseChain({ version: 1, steps: [{ filter: 'patchy', params: { patch: { width: 1 } } }] }, { filters })).toThrow(/patch/);
   });
 
   it('a default LUT needs no reference', () => {

@@ -1,4 +1,4 @@
-import { defaultParams, identityLut } from '@rullino/core';
+import { createImage, defaultParams, identityLut } from '@rullino/core';
 import { describe, expect, it, vi } from 'vitest';
 import { renderControls } from './controls';
 
@@ -180,5 +180,24 @@ describe('renderControls', () => {
     expect(info.classList.contains('error')).toBe(true);
     expect(info.textContent).toMatch(/Could not read bad\.cube/);
     expect(changes).toHaveLength(1);
+  });
+
+  it('shows an image param as read-only info with a Clear button that restores the default', () => {
+    const img = { patch: { type: 'image', default: createImage(1, 1), label: 'Image' } } as const;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const changes: Record<string, unknown>[] = [];
+    const controls = renderControls(root, img, defaultParams(img), (v) => changes.push(v));
+    const info = root.querySelector('.image-info')!;
+    const clear = root.querySelector<HTMLButtonElement>('button[data-clear]')!;
+    expect(info.textContent).toBe('None');
+    expect(clear.disabled).toBe(true);
+    controls.set({ patch: createImage(512, 384) });
+    expect(info.textContent).toBe('512 × 384 px');
+    expect(clear.disabled).toBe(false);
+    clear.click();
+    expect(changes).toHaveLength(1);
+    expect(changes[0]!.patch).toBe(img.patch.default);
+    expect(info.textContent).toBe('None');
   });
 });
