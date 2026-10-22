@@ -1,4 +1,4 @@
-import { createRasterMask, type RasterMaskData, type Vec2 } from './mask';
+import { createRasterMask, smoothstep, type RasterMaskData, type Vec2 } from './mask';
 
 export interface BrushOptions {
   /** In units of the raster's longer side, like mask radii. */
@@ -9,12 +9,6 @@ export interface BrushOptions {
   readonly strength?: number;
   readonly erase?: boolean;
 }
-
-const smoothstep = (e0: number, e1: number, x: number) => {
-  if (e1 <= e0) return x < e0 ? 0 : 1;
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
 
 /**
  * Paints a stroke through `points` (normalised coordinates) onto a copy of `raster`. Dabs are

@@ -4,6 +4,8 @@ import { paintStroke, type BrushOptions, type LinearMask, type Mask, type Radial
 // display image's pixel coordinates (viewBox = image size), so ellipses and the gradient's
 // perpendicular lines look the way the mask is computed (distances in units of the longer side).
 
+import { makeDraggable } from './drag';
+
 const NS = 'http://www.w3.org/2000/svg';
 
 export interface MaskOverlay {
@@ -47,27 +49,15 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
   const handle = (name: string, drag: (u: number, v: number) => Mask | undefined) => {
     const c = el('circle', { class: 'mask-handle' });
     c.dataset.handle = name;
-    c.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      c.setPointerCapture(e.pointerId);
+    makeDraggable(c, svg, () => {
       onDragStart();
-      const move = (ev: PointerEvent) => {
-        const r = svg.getBoundingClientRect();
-        const next = drag(clamp01((ev.clientX - r.left) / r.width), clamp01((ev.clientY - r.top) / r.height));
+      return (u, v) => {
+        const next = drag(clamp01(u), clamp01(v));
         if (!next) return;
         mask = next;
         update();
         onChange(next);
       };
-      const stop = () => {
-        c.removeEventListener('pointermove', move);
-        c.removeEventListener('pointerup', stop);
-        c.removeEventListener('pointercancel', stop);
-      };
-      c.addEventListener('pointermove', move);
-      c.addEventListener('pointerup', stop);
-      c.addEventListener('pointercancel', stop);
     });
     return c;
   };
