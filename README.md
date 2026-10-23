@@ -1,17 +1,21 @@
 # rullino
 
+[![CI](https://github.com/Stocastico/rullino/actions/workflows/ci.yml/badge.svg)](https://github.com/Stocastico/rullino/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE) [![Playground](https://img.shields.io/badge/playground-live-brightgreen.svg)](https://stocastico.github.io/rullino/)
+
 GPU-first image processing for the web, built on **WebGPU** and written in **TypeScript**.
 
 rullino spans the arc from classic computer-vision operations (thresholds, convolutions, Canny edges, morphology, median, bilateral, CLAHE) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain), with a few optional AI tools. A companion **playground** lets you load a photo, chain filters and tweak their parameters live: **[try it](https://stocastico.github.io/rullino/)**. Photos are processed on your machine and never uploaded.
 
+[![The rullino playground: a photo with a look applied, before / after split, histogram and look gallery](./docs/playground.jpg)](https://stocastico.github.io/rullino/)
+
 > **Status:** pre-alpha, working towards a first `0.1.0` release (see [PLAN.md](./PLAN.md)). What exists:
 > - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, share-link serialisation.
-> - **Filters**: adjustments (exposure, curves, levels, white balance, colour mixer, grading...), convolutions, edges (Canny), thresholds, morphology, median, bilateral, histogram equalisation / CLAHE, inpainting, stylize (halftone, dither, Kuwahara, bloom...), lens blur.
+> - **Filters**: adjustments (exposure, curves, levels, white balance, colour mixer, grading...), convolutions, edges (Canny, Sobel / Scharr / Prewitt, Laplacian), thresholds, morphology, median, bilateral, histogram equalisation / CLAHE, inpainting, stylize (halftone, dither, Kuwahara, bloom...), lens blur.
 > - **Presets**: ten looks built from a LUT recipe, vignette and grain.
 > - **ML (optional, `@rullino/ml`)**: click-to-select objects (SlimSAM), object removal (MI-GAN) and depth for lens blur (Depth Anything V2 Small), with ONNX Runtime passed in by the caller.
 > - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links.
 >
-> Not published to npm yet. Input is 8-bit sRGB (what the browser decodes); not done yet: Sobel / Scharr / Laplacian, Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
+> Not published to npm yet. Input is 8-bit sRGB (what the browser decodes); not done yet: Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
 
 ## Why
 

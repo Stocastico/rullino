@@ -94,7 +94,7 @@ Tiers: **A** = MVP, **B** = second wave, **C** = once the rest is solid.
 ### 4.3 Classic image processing (OpenCV style)
 - **A** grayscale, threshold (fixed, Otsu, adaptive), invert, posterize
 - **A** convolutions: box, Gaussian (separable), sharpen, unsharp mask, custom 3×3 / 5×5 kernel
-- **A** edges: Sobel, Scharr, Prewitt, Laplacian (*not done yet*), **Canny** (*done*)
+- **A** edges: Sobel, Scharr, Prewitt (`gradient`) and Laplacian (*done*), **Canny** (*done*)
 - **B** non-linear: median, bilateral, guided filter, Kuwahara
 - **B** morphology: erode, dilate, open, close, gradient, top-hat; configurable structuring element
 - **B** histogram (computation + display), equalization, **CLAHE**

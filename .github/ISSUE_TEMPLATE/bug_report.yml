@@ -1,0 +1,32 @@
+name: Bug report
+description: Something renders wrong, throws, or is slower than it should be
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A playground share link, or a minimal code snippet. Do not attach photos you do not want public.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: rullino version (or commit)
+  - type: input
+    id: env
+    attributes:
+      label: Browser, OS and GPU
+      description: e.g. Chrome 142, macOS 15, Apple M3. `chrome://gpu` shows the WebGPU status.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output
+      description: Shader compile errors and GPU errors are reported with the shader key and line.
+      render: text

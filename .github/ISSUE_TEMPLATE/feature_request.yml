@@ -1,0 +1,15 @@
+name: Feature or filter request
+description: A filter, option or API you would like
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want to do?
+      description: Describe the result you are after (a reference image or link helps), not only the mechanism.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried, or how do other tools do it?
