@@ -25,7 +25,17 @@
   },
   "private": true,
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./internal": {
+        "types": "./dist/internal.d.ts",
+        "default": "./dist/internal.js"
+      }
+    }
   },
   "type": "module",
   "sideEffects": false,
@@ -43,5 +53,12 @@
     "onnxruntime-web": {
       "optional": true
     }
-  }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ]
 }
