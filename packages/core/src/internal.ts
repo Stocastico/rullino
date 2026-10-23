@@ -2,6 +2,8 @@
 // packing, texture caches, the pooled working textures. Unstable: it may change in any release
 // (semver covers only the package root), use it to write your own filter kinds at your own risk.
 export { CURVE_SAMPLES, curveLut, curveSamplerWgsl, sampleCurveLut } from './curve';
+export { reportGpuError } from './gpu/context';
+export { toGpuError } from './gpu/errors';
 export { passShader, runMultipass, type FilterRun } from './gpu/multipass';
 export { poolStats } from './gpu/pool';
 export { runPointwise } from './gpu/pointwise';

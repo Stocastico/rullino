@@ -15,7 +15,8 @@ export type {
   Rgba,
   TexturePassDef,
 } from './filter';
-export { createGpuContext, WebGpuUnavailableError, type GpuContext } from './gpu/context';
+export { createGpuContext, WebGpuUnavailableError, type GpuContext, type GpuContextOptions } from './gpu/context';
+export { GpuError, ShaderCompileError, type GpuErrorKind, type ShaderMessage } from './gpu/errors';
 export { releaseTexture } from './gpu/pool';
 export { runFilter } from './gpu/run';
 export { importImage, readSrgb8 } from './gpu/io';

@@ -38,6 +38,23 @@ const out = pipeline.run([
 const rgba = await readSrgb8(ctx, out); // Uint8ClampedArray, straight sRGB: ready for ImageData
 ```
 
+## Errors and device loss
+
+WebGPU reports mistakes asynchronously: a shader that does not compile gives an all-zero image, not an exception. Pass `onError` to hear about it, with the shader's name and the compiler's lines (without it the errors go to `console.error`). `ctx.lost` resolves when the device is lost (driver reset, GPU switch): create a new context and upload your images again. `ctx.limits` holds the device limits, raised to the adapter's own.
+
+```ts
+import { createGpuContext, ShaderCompileError } from '@rullino/core';
+
+const ctx = await createGpuContext({
+  onError: (error) => {
+    if (error instanceof ShaderCompileError) console.error(error.label, error.messages); // line, column, message
+    else console.error(error.kind, error.message); // 'validation' | 'out-of-memory' | 'internal'
+  },
+});
+const info = await ctx.lost; // when the device is lost
+console.warn('GPU device lost:', info.reason, info.message, ctx.limits.maxTextureDimension2D);
+```
+
 ## Run the same chain on the CPU
 
 The CPU version is the specification the GPU shaders are tested against, so results agree within the filter's tolerance.
