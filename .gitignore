@@ -40,3 +40,6 @@ Thumbs.db
 # Local Claude Code settings
 .claude/settings.local.json
 .cache/
+
+# Copied from the repo root by each package build (so the npm tarballs carry it)
+packages/*/LICENSE

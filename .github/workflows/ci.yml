@@ -43,7 +43,13 @@ jobs:
           name: coverage
           path: coverage/
           if-no-files-found: ignore
+      # Builds the packages (dist/) and the playground.
       - run: pnpm build
+      # gzip size of every package and of the playground's main chunk against size-budget.json.
+      - run: pnpm size
+      # The packed packages as a user installs them: tarball contents, Node ESM, and a Vite bundle
+      # running a GPU filter in Chromium (compared with the CPU one).
+      - run: pnpm test:pack
       # Built playground in headless Chromium: WebGPU renderer, every filter, pixels actually change.
       - run: pnpm test:e2e
       # Timings are not asserted (shared runners vary); this only checks that the benchmark runs.

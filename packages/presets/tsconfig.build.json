@@ -1,0 +1,30 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "types": [
+      "@webgpu/types"
+    ],
+    "paths": {
+      "@rullino/core": [
+        "../core/dist/index.d.ts"
+      ],
+      "@rullino/core/internal": [
+        "../core/dist/internal.d.ts"
+      ],
+      "@rullino/filters": [
+        "../filters/dist/index.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/test-utils.ts"
+  ]
+}

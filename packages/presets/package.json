@@ -21,7 +21,13 @@
   },
   "private": true,
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
   },
   "type": "module",
   "sideEffects": false,
@@ -31,5 +37,12 @@
   "dependencies": {
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*"
-  }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ]
 }

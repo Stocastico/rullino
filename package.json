@@ -17,7 +17,9 @@
     "test:e2e": "pnpm --filter @rullino/playground smoke",
     "test:ml": "node scripts/fetch-models.mjs && vitest run --project ml",
     "test:e2e:ml": "node scripts/fetch-models.mjs && pnpm --filter @rullino/playground smoke:ml",
-    "bench": "vitest run --project bench && cat packages/filters/bench/results.txt"
+    "bench": "vitest run --project bench && cat packages/filters/bench/results.txt",
+    "test:pack": "node scripts/pack-smoke.mjs",
+    "size": "node scripts/size-budget.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

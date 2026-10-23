@@ -11,7 +11,9 @@ pnpm test             # unit tests (Node): CPU references, color, float16, compa
 pnpm test:browser     # GPU tests in headless Chromium (WebGPU), incl. GPU<->CPU parity
 pnpm test:all         # both
 pnpm test:coverage    # both, with v8 coverage and per-area thresholds (report in coverage/index.html)
-pnpm build            # builds the playground (Vite)
+pnpm build            # builds every package into dist/ (tsc + scripts/fix-imports.mjs) and the playground (Vite)
+pnpm size             # gzip sizes against size-budget.json (after build)
+pnpm test:pack        # packs the packages, installs the tarballs in a temp project, runs them in Node and in Chromium (GPU)
 pnpm test:e2e         # smoke-tests the built playground in headless Chromium (run after build)
 pnpm test:ml          # the real SlimSAM, MI-GAN and Depth Anything models on ONNX Runtime WASM (downloads 69 MB once into .cache/models)
 pnpm test:e2e:ml      # the playground's Object, Remove object and Lens blur tools with the real models (after build; models served locally)
@@ -58,6 +60,7 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 - **Lengths in pixels are `unit: 'px'` params**, defined at the original image's resolution; chains scale them (`setSource({ scale })`, `runChainCpu({ scale })`).
 - **In filter WGSL, top-level declarations (`fn`, `const`, `struct`) start at column 0 and locals are indented.** Fusion prefixes top-level names by matching line starts; an indented top-level declaration would not be namespaced and could collide with another filter's.
 - **Public API changes are deliberate**: a new export goes into the package root and into its `api.test.ts` list; plumbing other packages or tests need (shaders, packing, caches) goes into `./internal`, outside semver.
+- **Library code must build with `types: ["@webgpu/types"]` only** (`tsconfig.build.json`): no Node APIs in `packages/*/src` (tests may use them).
 - **Zero runtime dependencies** in `packages/*`. `@rullino/ml` takes ONNX Runtime as an argument (optional peer dependency), it never imports it.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
 - Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing (and `pnpm build && pnpm test:e2e` when the playground or filter list changes). When piping their output (`| tail`), use `set -o pipefail`, or a failure slips through to the commit.
@@ -73,7 +76,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 | `playwright` pinned to 1.56.x | Matches the Chromium pre-installed in Claude Code cloud sessions (no download). CI installs its own browser. Bump deliberately. |
 | WGSL kept in TS template strings (`/* wgsl */`), not `.wgsl?raw` | Works in any bundler and in Node without a plugin; the library must not depend on Vite. |
 | Own float16 conversion (`half.ts`) | `Float16Array` is not available everywhere yet (Node 22). Round-to-nearest-even, tested against known bit patterns. |
-| Package `exports` point at `src/*.ts` | Packages are private until M5; no build step to keep in sync. Revisit when publishing (emit `dist/`, keep `src` for the workspace). |
+| Package `exports` point at `src/*.ts` in the workspace; the published tarball gets `dist/` through `publishConfig.exports` | No build step in the dev loop (Vite, Vitest and tsc read the sources); `pnpm pack` swaps the exports. The build is plain `tsc` (ESM + `.d.ts`, one file per module, no bundler, zero dependencies) plus `scripts/fix-imports.mjs`, because the sources use extensionless relative imports that Node ESM cannot resolve. `tsconfig.build.json` maps `@rullino/*` to the sibling `dist/*.d.ts` (so a package never compiles another's sources) and allows only `@webgpu/types`, so Node types cannot leak into library code. |
+| `pnpm test:pack` (tarball contents, Node ESM import + CPU run, Vite bundle + GPU filter in Chromium) runs in the `test` job | Nothing else ever loads `dist/`: the first run failed on a wrong call in the script, but mutations that skip the import rewrite or the `files` field both fail it. `@webgpu/types` is an optional peer dependency of core (the `.d.ts` mention `GPUDevice` etc.). |
+| Size budget in `size-budget.json` (gzip -9 of each package's dist JS, and of the playground's main and ONNX Runtime chunks), limits ~10% above the measured sizes | Measured at M5.2: core 34.7 KB, filters 32.8, presets 2.1, ml 5.2, playground main chunk 57.8, ORT chunk 37.4. A concatenated dist is a ceiling (consumers tree-shake); the budget catches accidental bloat, and raising a limit needs a reason in the PR. |
 | npm scope `@rullino/*`, `publishConfig.access: public` | The npm org exists (Free plan); scoped packages default to private, which Free cannot publish. |
 | Library packages keep `"private": true` until M5 | `exports` points at `.ts` sources, so an accidental publish would ship unusable packages. Remove it together with adding a real build. The playground stays private forever. |
 | Publishing via npm trusted publishing (OIDC) from Actions | No long-lived token. Never add an `NPM_TOKEN` secret. Set up in M5. |
@@ -188,6 +193,9 @@ npx vitest run packages/presets -u    # rewrite golden look snapshots after a de
 ## Traps
 
 Things that already bit us. Add new ones as they come up.
+
+- **Extensionless relative imports do not load under Node ESM**: `dist/` only works after `scripts/fix-imports.mjs` rewrites them (`./color` -> `./color.js`, `./gpu` -> `./gpu/index.js`); `pnpm test:pack` is what notices. New import forms (e.g. `import x from './x.json'`) need the script to know them.
+- **`runChainCpu(steps, src)`** takes the steps first.
 
 - **`navigator.gpu` needs a secure context.** In Chromium, `about:blank` and plain-HTTP non-localhost pages have no `navigator.gpu` even with `--enable-unsafe-webgpu`. Vitest serves from localhost, which counts as secure.
 - **Headless Chromium needs `--enable-unsafe-webgpu`** to expose WebGPU; without it `requestAdapter()` returns null. Set in `vitest.config.ts`.
