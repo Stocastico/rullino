@@ -1,6 +1,28 @@
 {
   "name": "@rullino/ml",
   "version": "0.0.0",
+  "description": "Optional ML tools for rullino (select, remove, depth). ONNX Runtime is passed in by the caller.",
+  "keywords": [
+    "webgpu",
+    "image-processing",
+    "image",
+    "filters",
+    "typescript",
+    "onnx",
+    "segmentation",
+    "inpainting",
+    "depth"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/ml"
+  },
+  "homepage": "https://github.com/Stocastico/rullino#readme",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
   "private": true,
   "publishConfig": {
     "access": "public"

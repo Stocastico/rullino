@@ -1,6 +1,24 @@
 {
   "name": "@rullino/presets",
   "version": "0.0.0",
+  "description": "Photo looks for rullino: LUT recipes plus vignette and grain.",
+  "keywords": [
+    "webgpu",
+    "image-processing",
+    "image",
+    "filters",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/presets"
+  },
+  "homepage": "https://github.com/Stocastico/rullino#readme",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
   "private": true,
   "publishConfig": {
     "access": "public"

@@ -1,6 +1,24 @@
 {
   "name": "@rullino/core",
   "version": "0.0.0",
+  "description": "Zero-dependency WebGPU image-processing core: filter schema, chains, masks, geometry, LUTs, export.",
+  "keywords": [
+    "webgpu",
+    "image-processing",
+    "image",
+    "filters",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Stocastico/rullino#readme",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
   "private": true,
   "publishConfig": {
     "access": "public"
