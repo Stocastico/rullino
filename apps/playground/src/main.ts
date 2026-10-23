@@ -1008,10 +1008,16 @@ async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } 
 
 async function startRenderer(): Promise<void> {
   try {
-    const gpu = await createGpuContext();
+    const gpu = await createGpuContext({
+      // Shader compile failures and other GPU errors: say so instead of showing a blank image.
+      onError: (e) => {
+        console.error(e);
+        announce(`GPU error: ${e.message.split('\n')[0]}`);
+      },
+    });
     gpuContext = gpu;
     renderer = gpuRenderer(gpu);
-    void gpu.device.lost.then((info) => {
+    void gpu.lost.then((info) => {
       if (gpu === gpuContext) void recoverFromDeviceLoss(info);
     });
   } catch (e) {

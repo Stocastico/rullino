@@ -1,4 +1,5 @@
-import type { GpuContext } from './context';
+import { reportGpuError, type GpuContext } from './context';
+import { ShaderCompileError, toGpuError } from './errors';
 
 /**
  * Copies a whole 2D texture into CPU memory, tightly packed.
@@ -56,11 +57,24 @@ export function cachedPipeline(
   if (!cache) pipelines.set(ctx.device, (cache = new Map()));
   let pipeline = cache.get(key);
   if (!pipeline) {
-    const module = ctx.device.createShaderModule({ label: key, code: code() });
+    const source = code();
+    // A shader that does not compile gives an invalid pipeline and, later, an all-zero image. The
+    // error scope catches it here and reports it with the shader's name and the compiler's lines.
+    ctx.device.pushErrorScope('validation');
+    const module = ctx.device.createShaderModule({ label: key, code: source });
     const explicit = layout
       ? ctx.device.createPipelineLayout({ bindGroupLayouts: [ctx.device.createBindGroupLayout({ label: key, entries: layout() })] })
       : 'auto';
     pipeline = ctx.device.createComputePipeline({ label: key, layout: explicit, compute: { module } });
+    void ctx.device
+      .popErrorScope()
+      .then(async (error) => {
+        if (!error) return;
+        const info = await module.getCompilationInfo();
+        const messages = info.messages.map((m) => ({ type: m.type, line: m.lineNum, column: m.linePos, message: m.message }));
+        reportGpuError(ctx, messages.some((m) => m.type === 'error') ? new ShaderCompileError(key, messages, source) : toGpuError(error));
+      })
+      .catch(() => {}); // the device was lost: `ctx.lost` tells
     cache.set(key, pipeline);
   }
   return pipeline;
