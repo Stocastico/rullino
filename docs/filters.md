@@ -1,6 +1,6 @@
 # Filter reference
 
-47 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
+49 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
 
 ## Adjust (18)
 
@@ -230,7 +230,7 @@ Multipass (1 pass).
 | `size` | Size (px) | number | 1 … 8 (step 0.1), in pixels of the full-resolution image | 1.5 |
 | `seed` | Seed | integer | 0 … 999 | 0 |
 
-## Classic (17)
+## Classic (19)
 
 ### Grayscale (`grayscale`)
 
@@ -382,6 +382,26 @@ Select what to remove with the brush, wand or Object tool, then press Fill with 
 | Parameter | Label | Type | Range / options | Default |
 |---|---|---|---|---|
 | `patch` | Image | image | an image set by the app, not serialisable | none |
+
+### Gradient (`gradient`)
+
+Multipass (1 pass).
+
+| Parameter | Label | Type | Range / options | Default |
+|---|---|---|---|---|
+| `method` | Operator | choice | `sobel` Sobel, `scharr` Scharr, `prewitt` Prewitt | `sobel` |
+| `output` | Output | choice | `magnitude` Magnitude, `horizontal` Horizontal, `vertical` Vertical | `magnitude` |
+| `strength` | Strength | number | 0 … 10 (step 0.01) | 1 |
+
+### Laplacian (`laplacian`)
+
+Multipass (1 pass).
+
+| Parameter | Label | Type | Range / options | Default |
+|---|---|---|---|---|
+| `connectivity` | Neighbours | choice | `four` 4 neighbours, `eight` 8 neighbours | `four` |
+| `output` | Output | choice | `signed` Signed, `magnitude` Magnitude | `signed` |
+| `strength` | Strength | number | 0 … 10 (step 0.01) | 1 |
 
 ## Stylize (9)
 
