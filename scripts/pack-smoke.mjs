@@ -5,7 +5,7 @@
 //   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -13,6 +13,7 @@ import { build, preview } from 'vite';
 
 const repo = new URL('..', import.meta.url).pathname;
 const PACKAGES = ['core', 'filters', 'presets', 'ml'];
+const version = JSON.parse(readFileSync(join(repo, 'packages/core/package.json'), 'utf8')).version;
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
 const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
@@ -31,7 +32,7 @@ try {
   const files = readdirSync(tarballs);
   check(files.length === PACKAGES.length, `expected ${PACKAGES.length} tarballs, got ${files.join(', ')}`);
   for (const name of PACKAGES) {
-    const tgz = join(tarballs, files.find((f) => f === `rullino-${name}-0.0.0.tgz`) ?? `missing-${name}`);
+    const tgz = join(tarballs, files.find((f) => f === `rullino-${name}-${version}.tgz`) ?? `missing-${name}`);
     const listing = run('tar', ['-tzf', tgz], work).split('\n').filter(Boolean);
     const stray = listing.filter((f) => !/^package\/(dist\/|package\.json$|README\.md$|LICENSE$)/.test(f));
     check(stray.length === 0, `${name}: unexpected files in the tarball: ${stray.slice(0, 5).join(', ')}`);
@@ -47,7 +48,7 @@ try {
   // 2. Install and run under Node.
   writeFileSync(
     join(project, 'package.json'),
-    JSON.stringify({ name: 'pack-smoke', private: true, type: 'module', dependencies: Object.fromEntries(PACKAGES.map((n) => [`@rullino/${n}`, `file:../tarballs/rullino-${n}-0.0.0.tgz`])) }),
+    JSON.stringify({ name: 'pack-smoke', private: true, type: 'module', dependencies: Object.fromEntries(PACKAGES.map((n) => [`@rullino/${n}`, `file:../tarballs/rullino-${n}-${version}.tgz`])) }),
   );
   run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], project);
 

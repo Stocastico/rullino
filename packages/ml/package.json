@@ -1,6 +1,6 @@
 {
   "name": "@rullino/ml",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.0",
   "description": "Optional ML tools for rullino (select, remove, depth). ONNX Runtime is passed in by the caller.",
   "keywords": [
     "webgpu",
@@ -23,7 +23,6 @@
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },
-  "private": true,
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -55,7 +54,8 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
   },
   "files": [
     "dist",

@@ -159,7 +159,17 @@ The user marks regions by hand; the library turns marks into masks and applies o
 - **M5.2** `dist/` build, pack smoke test, size budget — *done*.
 - **M5.3** filter reference generated from the schemas, README per package — *done*.
 - **M5.4** playground on GitHub Pages (`stefanomasneri.com`), documentation review — *in progress*.
-- **M5.5** release workflow (tag, npm trusted publishing with provenance), changelog, drop `private`, `0.1.0` (first an `rc` on the `next` tag).
+- **M5.5** release workflow (tag, npm trusted publishing with provenance), changelog, drop `private`, `0.1.0` (first an `rc` on the `next` tag) — workflow, changelog and `0.1.0-rc.0` prepared; waiting for the Trusted Publisher setup on npm, then tag `v0.1.0-rc.0`.
+
+### 0.2 (agreed, in this order)
+Creative effects from the shader world (Maxime Heckel's posts, Paper Shaders: Apache-2.0, algorithms only), all 2D image effects with CPU reference and parity:
+1. **Gradient map** (duotone / tritone: luminance through a colour ramp).
+2. **dither** and **halftone** extensions: blue / white noise next to Bayer and a 2-3 colour palette; ring and square dots, hex grid, "gooey" (smooth-min between neighbouring dots), CMYK "ink" type, moiré of two rotated grids.
+3. **Cell effects** on one pixelate-then-pattern skeleton: ASCII (built-in 5x7 glyph bitmaps, no dependency), LED panel with sub-pixels, receipt bars, Lego studs, crochet.
+4. **Outlines, hatching and tonal shadows** (Moebius style): Sobel on luminance and, with the ML depth map, on depth; crosshatch from luminance thresholds.
+5. **Fluted glass** (sine distortion, blur, dispersion) and a water / caustics distortion.
+6. **Anisotropic and Papari Kuwahara** (structure tensor, several passes): last, the most expensive.
+Out of scope: purely generative backgrounds (mesh gradient, warp, swirl, god rays; not filters on an image), mouse trails and animated depixelation (need time and state), volumetric light and raymarching (3D). Other 0.2 candidates: bicubic / Lanczos resize, non-local-means denoise, clarity / dehaze, blend modes, a `process()` facade, drop shadow, preset saving and `.cube` export, canvas blit helper, memory budget, Firefox / WebKit CI.
 
 ### Later
 - Tier-C filters (Hough, Harris, FFT, NLM, …), film simulations, possibly a WebGL2 backend if the user base asks for it.

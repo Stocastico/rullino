@@ -1,6 +1,6 @@
 {
   "name": "@rullino/core",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.0",
   "description": "Zero-dependency WebGPU image-processing core: filter schema, chains, masks, geometry, LUTs, export.",
   "keywords": [
     "webgpu",
@@ -19,7 +19,6 @@
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },
-  "private": true,
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -40,7 +39,8 @@
     "./internal": "./src/internal.ts"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
   },
   "files": [
     "dist",
