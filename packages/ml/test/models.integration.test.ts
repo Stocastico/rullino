@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { DEPTH_ANYTHING_V2_SMALL, MIGAN, SLIMSAM_77, type ModelFile } from '../src/models';
 
 // The descriptors' sha256 and size must be those of the real files (fetched by scripts/fetch-models.mjs).
+// The fp32 SlimSAM variant is not downloaded by CI (40 MB, unused by the tests): its hashes come from the Hub's LFS metadata.
 const files: ModelFile[] = [
-  ...Object.values(SLIMSAM_77.variants).flatMap((v) => [v.encoder, v.decoder]),
+  SLIMSAM_77.variants.quantized.encoder,
+  SLIMSAM_77.variants.quantized.decoder,
   MIGAN.model,
   DEPTH_ANYTHING_V2_SMALL.model,
 ];
