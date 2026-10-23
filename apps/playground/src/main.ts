@@ -23,6 +23,7 @@ import {
   Pipeline,
   readSrgb8,
   runChainCpu,
+  sampleImage,
   type ExportOptions,
   type Geometry,
   type Vec2,
@@ -40,11 +41,12 @@ import { renderGeometryControls, type Aspect, type EditMode } from './geometry-u
 import { createPerspectiveOverlay, UNIT_QUAD } from './perspective-overlay';
 import { drawHistogram } from './histogram-view';
 import { createMaskOverlay } from './mask-overlay';
-import { brushOptions, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
+import { brushOptions, brushSize, fitRaster, setImageSize, setMaskSource, tools, wandAt } from './mask-ui';
 import { samples } from './samples';
 import { History } from './history';
 import { decodeState, encodeState } from './share';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
+import { createDepthMapper } from './depth-estimate';
 import { createObjectRemover, REMOVE_GROW } from './object-remove';
 import { createObjectSelector, isSoftwareAdapter } from './object-select';
 
@@ -601,6 +603,57 @@ const gpuKind = async () => {
 };
 const objectSelector = createObjectSelector({ loadOrt, gpu: gpuKind, image: maskSourceImage, status: announce });
 const objectRemover = createObjectRemover({ loadOrt, gpu: gpuKind, status: announce });
+const depthMapper = createDepthMapper({ loadOrt, status: announce });
+
+/** "Estimate depth" on a lens blur step: the depth map of the original image becomes the step's `depth`. Shares the wand's queue. */
+function estimateDepth(uid: string): Promise<void> {
+  const job = wandQueue.then(async () => {
+    if (chain.steps.find((s) => s.uid === uid)?.filterId !== 'lensBlur') return;
+    const t0 = performance.now();
+    try {
+      const image = await maskSourceImage(...brushSize());
+      const map = await busyWhile(depthMapper.estimate(image));
+      chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? { ...s, params: { ...s.params, depth: map } } : s)) };
+      chainUi.set(chain, true);
+      void render();
+      announce(`Depth estimated (${(performance.now() - t0).toFixed(0)} ms). Use "Pick focus" and click the image.`);
+    } catch (e) {
+      announce(`Depth estimation failed: ${(e as Error).message}`);
+      console.error(e);
+    }
+  });
+  wandQueue = job;
+  return job;
+}
+
+/** The next click on the image sets the focus of this lens blur step to the depth under the pointer. */
+let focusPick: string | undefined;
+function pickFocus(uid: string): void {
+  focusPick = uid;
+  ui.stage.classList.add('picking');
+  announce('Click the image where it should be in focus.');
+}
+ui.stage.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (!focusPick) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const uid = focusPick;
+    focusPick = undefined;
+    ui.stage.classList.remove('picking');
+    const step = chain.steps.find((s) => s.uid === uid);
+    const depth = step?.params.depth as LinearImage | undefined;
+    if (!step || !depth) return;
+    const r = ui.after.getBoundingClientRect();
+    const focus = sampleImage(depth, Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)))[0];
+    chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? { ...s, params: { ...s.params, focus: Math.round(focus * 100) / 100 } } : s)) };
+    chainUi.set(chain, true);
+    void render();
+    announce(`Focus set to depth ${focus.toFixed(2)}`);
+  },
+  { capture: true },
+);
 
 /**
  * "Fill with AI" on a patch step: the masked area (grown a little) of the original image is
@@ -678,7 +731,7 @@ const chainUi = renderChain(
     void render();
   },
   looks.map((l) => ({ id: l.id, label: l.label, steps: () => lookSteps(l) })),
-  { fill: fillPatch },
+  { fill: fillPatch, estimateDepth, pickFocus },
 );
 ui.chain.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;

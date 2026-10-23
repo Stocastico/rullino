@@ -20,7 +20,7 @@ export interface SamInput {
 }
 
 /** Bilinear enlargement of a (premultiplied, linear) image; edges clamped. */
-function enlarge(src: LinearImage, w: number, h: number): LinearImage {
+export function enlarge(src: LinearImage, w: number, h: number): LinearImage {
   const out = createImage(w, h);
   const at = (x: number, y: number, c: number) =>
     src.data[(Math.min(src.height - 1, Math.max(0, y)) * src.width + Math.min(src.width - 1, Math.max(0, x))) * 4 + c]!;

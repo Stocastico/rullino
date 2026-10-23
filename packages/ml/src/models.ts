@@ -39,6 +39,21 @@ export const MIGAN = {
   bytes: 28_079_181,
 } as const;
 
+const DEPTH_REVISION = '4472b7362082ad9968fee890ca0f1e5aca36b93d';
+
+/**
+ * Depth Anything V2 Small (Apache-2.0; the larger sizes are not), Xenova's ONNX export, int8 (27 MB).
+ * Measured against the fp32 export (99 MB) on the sample photos: the same map. Depth Anything 3
+ * Small (105 MB, fp32 only) gave a blurrier map with coarser edges, so it is not used.
+ */
+export const DEPTH_ANYTHING_V2_SMALL = {
+  id: 'depth-anything-v2-small',
+  licence: 'Apache-2.0',
+  source: 'https://huggingface.co/onnx-community/depth-anything-v2-small',
+  model: `https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/${DEPTH_REVISION}/onnx/model_int8.onnx`,
+  bytes: 27_258_801,
+} as const;
+
 export interface FetchModelOptions {
   /** Called as bytes arrive: (received, total); total is 0 when the server does not say. */
   readonly onProgress?: (received: number, total: number) => void;
