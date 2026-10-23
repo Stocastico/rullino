@@ -4,15 +4,14 @@ GPU-first image processing for the web, built on **WebGPU** and written in **Typ
 
 rullino spans the whole arc from classic computer-vision operations (thresholds, convolutions, edge detection, morphology, Canny, Hough) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain). A companion **playground** lets you load a photo, chain filters and tweak their parameters live.
 
-> **Status:** pre-alpha. Done so far:
-> - **M0**: skeleton, CI, GPU/CPU parity.
-> - **M1**: parameter schema, `defineFilter()`, eleven pointwise filters, playground with generated UI and before/after.
-> - **M2**: filter chains with pointwise fusion, incremental recompute and reduced-resolution preview; multipass filters with repeated passes and GPU reductions; convolutions (Gaussian, box, sharpen, unsharp mask, custom kernel), Canny, Otsu and adaptive threshold.
-> - **M3**: curves (with an editor), levels, black point, shadows/highlights; 3D LUT engine (`.cube` / HaldCLUT) with intensity, vignette, grain; ten built-in looks in `@rullino/presets`; full-resolution export to PNG (8/16-bit), JPEG and WebP.
+> **Status:** pre-alpha, working towards a first `0.1.0` release (see [PLAN.md](./PLAN.md)). What exists:
+> - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, share-link serialisation.
+> - **Filters**: adjustments (exposure, curves, levels, white balance, colour mixer, grading...), convolutions, edges (Canny), thresholds, morphology, median, bilateral, histogram equalisation / CLAHE, inpainting, stylize (halftone, dither, Kuwahara, bloom...), lens blur.
+> - **Presets**: ten looks built from a LUT recipe, vignette and grain.
+> - **ML (optional, `@rullino/ml`)**: click-to-select objects (SlimSAM), object removal (MI-GAN) and depth for lens blur (Depth Anything V2 Small), with ONNX Runtime passed in by the caller.
+> - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links.
 >
-> Next is M4 (morphology, non-linear filters, histogram/CLAHE, geometry, masks and interactive editing).
->
-> See [PLAN.md](./PLAN.md) for the design and roadmap.
+> Not published yet: M5 adds builds, generated docs and npm releases.
 
 ## Why
 
@@ -40,6 +39,7 @@ packages/
   core/        WebGPU device, texture pool, pass graph, color conversions, I/O
   filters/     one module per filter: schema + WGSL + CPU reference
   presets/     looks = LUT + parameters
+  ml/          optional ML tools (select, remove, depth); ONNX Runtime is passed in, never imported
 apps/
   playground/  Vite demo site
 ```
@@ -56,6 +56,8 @@ pnpm test             # unit tests (Node)
 pnpm test:browser     # GPU tests in headless Chromium, incl. GPU <-> CPU parity
 pnpm build
 pnpm test:e2e         # smoke test of the built playground
+pnpm test:coverage    # unit + browser tests with coverage thresholds
+pnpm test:ml          # the real ML models on ONNX Runtime WASM (downloads ~69 MB once)
 ```
 
 Browser tests need Playwright's Chromium (`pnpm exec playwright install chromium`). WebGPU runs on SwiftShader when no GPU is present, so they also work in CI.
@@ -64,4 +66,4 @@ See [CLAUDE.md](./CLAUDE.md) for conventions and the reasoning behind key decisi
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE). The ML models are downloaded at run time under their own licences, see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
