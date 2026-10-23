@@ -52,6 +52,8 @@ jobs:
       - run: pnpm test:pack
       # Built playground in headless Chromium: WebGPU renderer, every filter, pixels actually change.
       - run: pnpm test:e2e
+      # The same build served from a sub-path, as on GitHub Pages: no root-absolute URLs, no 404s.
+      - run: pnpm test:e2e:base
       # Timings are not asserted (shared runners vary); this only checks that the benchmark runs.
       - run: pnpm bench
 

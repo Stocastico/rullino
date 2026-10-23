@@ -1,0 +1,44 @@
+name: Pages
+
+# Publishes the playground (apps/playground/dist) on GitHub Pages after every push to main, and on
+# demand. Needs Settings > Pages > Source = "GitHub Actions" in the repository. The build uses
+# relative URLs (Vite base './'), so it works at https://<user>.github.io/rullino/ and under a
+# custom domain, with or without a sub-path (CI's smoke-base test serves it from one).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push waits instead of cancelling a deploy in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The playground reads the packages' sources, so only the site needs building.
+      - run: pnpm --filter @rullino/playground build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/playground/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
