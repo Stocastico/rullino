@@ -68,6 +68,13 @@ out.filters = filters.length > 40;
 const img = core.createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0.1, 0.5]));
 const res = core.runChainCpu([{ filter: exposure, params: { ev: 1 } }], img);
 out.cpu = Math.abs(res.data[0] - 0.2) < 1e-6 && Math.abs(res.data[4] - 0.8) < 1e-6 && res.data[7] === 0.5;
+// The README examples of filters, presets and autoAdjust, on the packed packages.
+const blurred = core.runChainCpu([{ filter: filters.find((f) => f.id === 'gaussianBlur'), params: { sigma: 3 } }, { filter: filters.find((f) => f.id === 'vignette') }], core.createImage(64, 64));
+out.readmeFilters = blurred.width === 64 && Object.keys(filters.find((f) => f.id === 'gaussianBlur').params).join() === 'sigma';
+const looked = core.runChainCpu(presets.lookSteps(presets.looks[0], { intensity: 0.8 }), core.createImage(16, 16));
+out.readmePresets = looked.width === 16 && presets.looks.length >= 10;
+const { autoAdjust } = await import('@rullino/filters');
+out.readmeAuto = typeof autoAdjust(core.createImage(32, 32)) === 'object';
 console.log(JSON.stringify(out));
 `,
   );
@@ -78,7 +85,7 @@ console.log(JSON.stringify(out));
   writeFileSync(join(project, 'index.html'), '<!doctype html><html><body><script type="module" src="./main.js"></script></body></html>');
   writeFileSync(
     join(project, 'main.js'),
-    `import { createGpuContext, createImage, fromFloat16Array, readImage, runFilter, toFloat16Array, uploadImage } from '@rullino/core';
+    `import { createGpuContext, createImage, fromFloat16Array, importImage, Pipeline, readImage, readSrgb8, runFilter, toFloat16Array, uploadImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
 const ctx = await createGpuContext();
 const w = 17, h = 9; // odd sizes: workgroup bounds, row padding
@@ -97,6 +104,14 @@ for (const [id, params] of [['exposure', { ev: 0.7 }], ['gaussianBlur', { sigma:
   for (let i = 0; i < cpu.data.length; i++) worst = Math.max(worst, Math.abs(gpu.data[i] - cpu.data[i]));
   result[id] = worst;
 }
+// The core README quick start: a Pipeline over an imported image, read back as sRGB.
+const exposure = filters.find((x) => x.id === 'exposure');
+const flat = new ImageData(4, 4);
+for (let i = 0; i < 16; i++) flat.data.set([100, 150, 200, 255], i * 4);
+const pipeline = new Pipeline(ctx);
+pipeline.setSource(importImage(ctx, await createImageBitmap(flat, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })));
+const rgba = await readSrgb8(ctx, pipeline.run([{ filter: exposure, params: { ev: 0 } }]));
+result.quickstartPixel = Math.max(Math.abs(rgba[0] - 100), Math.abs(rgba[1] - 150), Math.abs(rgba[2] - 200), Math.abs(rgba[3] - 255)); // an ev 0 chain returns the image (8-bit rounding)
 window.__result = result;
 `,
   );
@@ -105,11 +120,12 @@ window.__result = result;
   const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
   try {
     const page = await browser.newPage();
-    page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
+    page.on('pageerror', (e) => { failures.push(`page error: ${e.message}`); console.error('page error:', e.message); });
+    page.on('console', (m) => m.type() === 'error' && console.error('console:', m.text()));
     await page.goto(server.resolvedUrls.local[0]);
     await page.waitForFunction(() => window.__result, null, { timeout: 60000 });
     const result = await page.evaluate(() => window.__result);
-    for (const [id, worst] of Object.entries(result)) check(worst < 5e-3, `${id}: GPU and CPU differ by ${worst} through the packed packages`);
+    for (const [id, worst] of Object.entries(result)) check(id === 'quickstartPixel' ? worst <= 1 : worst < 5e-3, `${id}: GPU and CPU differ by ${worst} through the packed packages`);
     console.log(`pack-smoke: GPU vs CPU max difference ${JSON.stringify(result)}`);
   } finally {
     await browser.close();

@@ -44,6 +44,12 @@ apps/
   playground/  Vite demo site
 ```
 
+## Documentation
+
+- [Filter reference](./docs/filters.md): every filter with its parameters, ranges and defaults, generated from the schemas.
+- Per package: [core](./packages/core/README.md), [filters](./packages/filters/README.md), [presets](./packages/presets/README.md), [ml](./packages/ml/README.md). Their `ts` examples are type-checked against the sources.
+- [PLAN.md](./PLAN.md) for the design and roadmap, [CLAUDE.md](./CLAUDE.md) for conventions and the reasoning behind decisions.
+
 ## Development
 
 Requirements: Node.js ≥ 22.12, pnpm 10, a browser with WebGPU (recent Chrome/Edge, or Safari/Firefox with WebGPU enabled).
