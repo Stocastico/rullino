@@ -3,7 +3,7 @@
   "packages/core": 38000,
   "packages/filters": 36000,
   "packages/presets": 3000,
-  "packages/ml": 6000,
+  "packages/ml": 6900,
   "playground/main-chunk": 65000,
   "playground/ort-chunk": 42000
 }

@@ -25,7 +25,7 @@ function scene(w: number, h: number) {
 describe('SlimSAM on ONNX Runtime (WASM)', () => {
   it('selects the disk that was clicked', { timeout: 180_000 }, async () => {
     ort.env.wasm.numThreads = 1;
-    const sam = await createSamSegmenter(ort as unknown as OrtModule, { encoder: file(model.encoder), decoder: file(model.decoder) });
+    const sam = await createSamSegmenter(ort as unknown as OrtModule, { encoder: file(model.encoder.url), decoder: file(model.decoder.url) });
     const [w, h] = [320, 200];
     const embedding = await sam.encode(scene(w, h));
     const { mask, score } = await sam.segment(embedding, [{ x: 0.35, y: 0.5, positive: true }], w, h);

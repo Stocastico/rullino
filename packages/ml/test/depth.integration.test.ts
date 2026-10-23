@@ -7,7 +7,7 @@ import { createDepthEstimator, DEPTH_ANYTHING_V2_SMALL, type OrtModule } from '.
 // The real Depth Anything V2 Small (int8) on ONNX Runtime's WASM backend (Node), downloaded by
 // scripts/fetch-models.mjs (`pnpm test:ml`).
 
-const bytes = new Uint8Array(readFileSync(new URL(`../../../.cache/models/${DEPTH_ANYTHING_V2_SMALL.model.split('/').at(-1)}`, import.meta.url)));
+const bytes = new Uint8Array(readFileSync(new URL(`../../../.cache/models/${DEPTH_ANYTHING_V2_SMALL.model.url.split('/').at(-1)}`, import.meta.url)));
 
 /** Sky above a horizon, a tiled floor below it whose tiles shrink towards the horizon, and a box standing on the floor. */
 function scene(w: number, h: number) {

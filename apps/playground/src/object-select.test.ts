@@ -33,8 +33,8 @@ function setup(gpu: { software: boolean } | undefined = { software: false }) {
       return images.get(key)!;
     },
     status: (m) => statuses.push(m),
-    fetchModel: async (url, o) => {
-      calls.models.push(url.split('/').at(-1)!);
+    fetchModel: async (f, o) => {
+      calls.models.push((typeof f === 'string' ? f : f.url).split('/').at(-1)!);
       o?.onProgress?.(10, 0);
       return new Uint8Array(1);
     },
