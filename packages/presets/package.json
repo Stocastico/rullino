@@ -1,6 +1,6 @@
 {
   "name": "@rullino/presets",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.0",
   "description": "Photo looks for rullino: LUT recipes plus vignette and grain.",
   "keywords": [
     "webgpu",
@@ -19,7 +19,6 @@
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },
-  "private": true,
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -39,7 +38,8 @@
     "@rullino/filters": "workspace:*"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
   },
   "files": [
     "dist",

@@ -1,6 +1,6 @@
 {
   "name": "@rullino/filters",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.0",
   "description": "WebGPU image filters with CPU reference implementations: adjustments, convolutions, edges, morphology, stylize, lens blur.",
   "keywords": [
     "webgpu",
@@ -19,7 +19,6 @@
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },
-  "private": true,
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -38,7 +37,8 @@
     "@rullino/core": "workspace:*"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
   },
   "files": [
     "dist",

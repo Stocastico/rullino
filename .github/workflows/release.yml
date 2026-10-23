@@ -1,0 +1,80 @@
+name: Release
+
+# Publishes the four @rullino/* packages to npm when a version tag is pushed:
+#   git tag v0.1.0-rc.0 && git push origin v0.1.0-rc.0   (pre-release: npm tag `next`)
+#   git tag v0.1.0      && git push origin v0.1.0        (npm tag `latest`)
+# No npm token: npm trusted publishing (OIDC) with provenance. Each package has this workflow
+# (`release.yml`, repository Stocastico/rullino, no environment) registered as its Trusted Publisher
+# on npmjs.com. See CLAUDE.md "Decisions" and the checklist in CHANGELOG.md's header.
+on:
+  push:
+    tags: ['v*.*.*']
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # npm trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          # npm >= 11.5.1 (trusted publishing) ships with Node 24.
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Tag is a version, matches every package, and is on main
+        id: info
+        run: |
+          node scripts/release-info.mjs "$GITHUB_REF_NAME" | tee -a "$GITHUB_OUTPUT"
+          git branch -r --contains "$GITHUB_SHA" | grep -q 'origin/main$' || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+          awk -v v="$(grep '^version=' "$GITHUB_OUTPUT" | cut -d= -f2)" 'index($0, "## [" v "]") == 1 { f = 1; next } /^## \[/ { f = 0 } f' CHANGELOG.md > release-notes.md
+          test -s release-notes.md || { echo "::error::CHANGELOG.md has no section for this version"; exit 1; }
+
+      # The same checks as CI, minus coverage and the e2e runs of the playground.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm size
+      - run: pnpm test:pack
+
+      # Publish the tarballs `pnpm pack` makes (dist exports, workspace ranges resolved), never the
+      # package directories: see scripts/refuse-publish.mjs. Re-running a half-failed release skips
+      # what is already on npm.
+      - name: Pack
+        run: |
+          mkdir tarballs
+          for p in core filters presets ml; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
+      - name: Publish
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          NPM_TAG: ${{ steps.info.outputs.tag }}
+        run: |
+          for p in core filters presets ml; do
+            if npm view "@rullino/$p@$VERSION" version >/dev/null 2>&1; then
+              echo "@rullino/$p@$VERSION is already on npm, skipping"
+              continue
+            fi
+            npm publish "tarballs/rullino-$p-$VERSION.tgz" --access public --provenance --tag "$NPM_TAG"
+          done
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ steps.info.outputs.prerelease }}
+        run: |
+          flags=""
+          [ "$PRERELEASE" = "true" ] && flags="--prerelease"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file release-notes.md $flags
