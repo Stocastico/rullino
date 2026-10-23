@@ -30,6 +30,7 @@ import { inpaint } from './inpaint';
 import { patch } from './patch';
 import { invert } from './invert';
 import { kuwahara } from './kuwahara';
+import { lensBlur } from './lensBlur';
 import { levels } from './levels';
 import { median } from './median';
 import { morphology } from './morphology';
@@ -78,6 +79,7 @@ export {
   patch,
   invert,
   kuwahara,
+  lensBlur,
   levels,
   median,
   morphology,
@@ -144,4 +146,5 @@ export const filters: readonly Filter<any>[] = [
   bloom,
   chromaticAberration,
   kuwahara,
+  lensBlur,
 ];
