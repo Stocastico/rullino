@@ -37,7 +37,7 @@ jobs:
       # The playground reads the packages' sources, so only the site needs building.
       - run: pnpm --filter @rullino/playground build
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/playground/dist
       - id: deployment
