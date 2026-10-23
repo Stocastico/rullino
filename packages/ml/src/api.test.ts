@@ -5,7 +5,7 @@ import * as api from './index';
 describe('@rullino/ml public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'DEPTH_ANYTHING_V2_SMALL', 'DEPTH_SIDE', 'MIGAN', 'SLIMSAM_77', 'createDepthEstimator',
+    'DEPTH_ANYTHING_V2_SMALL', 'DEPTH_SIDE', 'MIGAN', 'ModelIntegrityError', 'SLIMSAM_77', 'createDepthEstimator',
     'createMiganInpainter', 'createSamSegmenter', 'fetchModel', 'growMask',
     ]);
   });

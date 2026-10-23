@@ -19,8 +19,8 @@ function setup(failFirstLoad = false) {
       return {} as never;
     },
     status: (m) => statuses.push(m),
-    fetchModel: async (url, o) => {
-      calls.models.push(url.split('/').at(-1)!);
+    fetchModel: async (f, o) => {
+      calls.models.push((typeof f === 'string' ? f : f.url).split('/').at(-1)!);
       o?.onProgress?.(13_629_400, 27_258_801);
       return new Uint8Array(1);
     },

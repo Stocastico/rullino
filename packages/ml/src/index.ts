@@ -1,4 +1,4 @@
-export { fetchModel, DEPTH_ANYTHING_V2_SMALL, MIGAN, SLIMSAM_77, type FetchModelOptions, type ModelFiles } from './models';
+export { fetchModel, DEPTH_ANYTHING_V2_SMALL, MIGAN, ModelIntegrityError, SLIMSAM_77, type FetchModelOptions, type ModelFile, type ModelFiles } from './models';
 export { createDepthEstimator, DEPTH_SIDE, type DepthEstimator, type DepthEstimatorOptions } from './depth';
 export { createMiganInpainter, growMask, type Inpainter, type InpainterOptions } from './migan';
 export {

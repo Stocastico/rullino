@@ -22,8 +22,8 @@ function setup(gpu: { software: boolean } | undefined = { software: false }, fai
     },
     gpu: async () => gpu,
     status: (m) => statuses.push(m),
-    fetchModel: async (url, o) => {
-      calls.models.push(url.split('/').at(-1)!);
+    fetchModel: async (f, o) => {
+      calls.models.push((typeof f === 'string' ? f : f.url).split('/').at(-1)!);
       o?.onProgress?.(14_039_590, 28_079_181);
       return new Uint8Array(1);
     },

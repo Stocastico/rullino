@@ -7,7 +7,7 @@ import { createMiganInpainter, MIGAN, type OrtModule } from '../src';
 // The real MI-GAN pipeline model on ONNX Runtime's WASM backend (Node), downloaded by
 // scripts/fetch-models.mjs (`pnpm test:ml`).
 
-const bytes = new Uint8Array(readFileSync(new URL(`../../../.cache/models/${MIGAN.model.split('/').at(-1)}`, import.meta.url)));
+const bytes = new Uint8Array(readFileSync(new URL(`../../../.cache/models/${MIGAN.model.url.split('/').at(-1)}`, import.meta.url)));
 
 /** A smooth sRGB background (blue sky above, green below) with a red disk of radius 0.12 w at (0.5, 0.5). */
 const background = (x: number, y: number, w: number, h: number) => (y < h / 2 ? [0.3, 0.5 + 0.2 * (y / h), 0.9] : [0.3, 0.7, 0.3 + 0.1 * (y / h)]);
