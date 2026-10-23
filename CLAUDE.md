@@ -199,6 +199,8 @@ npx vitest run packages/filters -u    # rewrite docs/filters.md (the generated f
 
 Things that already bit us. Add new ones as they come up.
 
+- **A texture must have exactly one owner: pooled (`releaseTexture`) or destroyed, never both.** The playground gave the previous image's raw textures to the pool (it judged ownership against the *new* image) and then destroyed them; the pool handed out destroyed textures and every later frame failed with "Destroyed texture used in a submit". Browsers log such errors as warnings, so it went unseen until `createGpuContext({ onError })` made them `console.error` and the e2e smoke test (which fails on console errors) caught it. Track ownership explicitly (a Set of the textures a renderer made), not by comparison.
+
 - **`uncapturederror` events reach a listener only after a round trip to the GPU process** in headless Chromium: a test that triggers an error and waits on a timer sees nothing; `await device.queue.onSubmittedWorkDone()` first (or an error scope's `popErrorScope()`). An adapter can create one device only ("adapter is consumed"): request a new adapter per device.
 
 - **Changing a dependency field of a `package.json` (also a peer dependency) needs `pnpm install` and the lockfile in the commit**: CI installs with `--frozen-lockfile` and fails both jobs in seconds otherwise.

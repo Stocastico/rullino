@@ -180,10 +180,24 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   /** Geometry-applied display and preview textures (the raw ones when the geometry is the identity). */
   let framedDisplay: GPUTexture | undefined;
   let framedPreview: GPUTexture | undefined;
-  const owned = (t: GPUTexture | undefined) => t && t !== raw?.display && t !== raw?.preview;
+  // The framed textures this renderer made (geometry applied) and so must give back to the pool.
+  // The raw ones are not: `load` destroys them. Judging by "is it the current raw texture" got this
+  // wrong when a new image replaced `raw` first: the previous image's raw textures looked owned, went
+  // into the pool, were destroyed by `load`, and the pool then handed out destroyed textures.
+  const framed = new Set<GPUTexture>();
+  const owned = (t: GPUTexture | undefined) => t !== undefined && framed.has(t);
+  const giveBack = (t: GPUTexture) => {
+    framed.delete(t);
+    releaseTexture(gpu, t);
+  };
   let displayTex: GPUTexture | undefined;
   const maskSources = new Map<string, Promise<LinearImage>>();
-  const reframe = (t: GPUTexture) => (isIdentityGeometry(geometry) ? t : applyGeometry(gpu, t, geometry));
+  const reframe = (t: GPUTexture) => {
+    if (isIdentityGeometry(geometry)) return t;
+    const out = applyGeometry(gpu, t, geometry);
+    framed.add(out);
+    return out;
+  };
 
   /** Applies the geometry to the display and preview images and makes them the pipelines' sources. */
   async function frame(g: Geometry, previewOnly = false): Promise<[number, number]> {
@@ -193,7 +207,7 @@ function gpuRenderer(gpu: GpuContext): Renderer {
       // While dragging only the preview is shown: skip the display-size resample and readback.
       const preview = reframe(raw.preview);
       small.setSource(preview, { scale: raw.previewScale });
-      if (owned(framedPreview) && framedPreview !== framedDisplay) releaseTexture(gpu, framedPreview!);
+      if (owned(framedPreview) && framedPreview !== framedDisplay) giveBack(framedPreview!);
       framedPreview = preview;
       const f = geometryFrame(g, raw.display.width, raw.display.height);
       return [f.width, f.height];
@@ -202,7 +216,7 @@ function gpuRenderer(gpu: GpuContext): Renderer {
     const preview = raw.preview === raw.display ? display : reframe(raw.preview);
     full.setSource(display, { scale: raw.displayScale });
     small.setSource(preview, { scale: raw.previewScale });
-    for (const t of new Set([framedDisplay, framedPreview])) if (owned(t)) releaseTexture(gpu, t!);
+    for (const t of new Set([framedDisplay, framedPreview])) if (owned(t)) giveBack(t!);
     framedDisplay = display;
     framedPreview = preview;
     displayTex = display;
