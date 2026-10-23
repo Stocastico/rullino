@@ -18,6 +18,8 @@ import { convolve } from './convolve';
 import { curves } from './curves';
 import { dither } from './dither';
 import { emboss } from './emboss';
+import { gradient } from './gradient';
+import { laplacian } from './laplacian';
 import { equalize } from './equalize';
 import { exposure } from './exposure';
 import { gamma } from './gamma';
@@ -67,6 +69,8 @@ export {
   curves,
   dither,
   emboss,
+  gradient,
+  laplacian,
   equalize,
   exposure,
   gamma,
@@ -142,6 +146,8 @@ export const filters: readonly Filter<any>[] = [
   halftone,
   dither,
   emboss,
+  gradient,
+  laplacian,
   sketch,
   bloom,
   chromaticAberration,

@@ -8,7 +8,7 @@ describe('@rullino/filters public API', () => {
     'adaptiveThreshold', 'applyLut', 'autoAdjust', 'bilateral', 'blackPoint', 'bloom', 'boxBlur',
     'brightness', 'canny', 'channelMixer', 'chromaticAberration', 'clahe', 'colorGrading', 'colorMixer',
     'contrast', 'convolve', 'curves', 'dither', 'emboss', 'equalize', 'exposure', 'filters', 'gamma',
-    'gaussianBlur', 'grain', 'grayscale', 'halftone', 'hue', 'inpaint', 'invert', 'kuwahara', 'lensBlur',
+    'gaussianBlur', 'gradient', 'grain', 'grayscale', 'halftone', 'hue', 'inpaint', 'invert', 'kuwahara', 'laplacian', 'lensBlur',
     'levels', 'median', 'morphology', 'otsu', 'patch', 'pixelate', 'posterize', 'saturation',
     'shadowsHighlights', 'sharpen', 'sketch', 'threshold', 'transparency', 'unsharpMask', 'vibrance',
     'vignette', 'whiteBalance',
