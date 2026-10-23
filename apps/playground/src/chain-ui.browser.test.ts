@@ -175,4 +175,30 @@ describe('renderChain', () => {
     root.querySelector<HTMLButtonElement>('[data-action=fill]')!.click();
     expect(filled).toEqual([states.at(-1)!.steps[0]!.uid]);
   });
+
+  it('the lens blur filter offers "Estimate depth", and "Pick focus" once there is a depth map', async () => {
+    const empty = createImage(1, 1);
+    const lens = { ...filters[0]!, id: 'lensBlur', kind: 'multipass', params: { depth: { type: 'image', default: empty, label: 'Depth map' } }, passes: [] } as never;
+    const root = document.createElement('div');
+    document.body.append(root);
+    const states: ChainState[] = [];
+    const calls: string[] = [];
+    const chain = renderChain(root, [lens], { steps: [], selected: undefined }, (s) => states.push(s), [], {
+      estimateDepth: async (uid) => void calls.push(`depth:${uid}`),
+      pickFocus: (uid) => void calls.push(`focus:${uid}`),
+    });
+    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
+    sel.value = 'lensBlur';
+    sel.dispatchEvent(new Event('change'));
+    const uid = states.at(-1)!.steps[0]!.uid;
+    expect(states.at(-1)!.steps[0]!.mask).toBeUndefined();
+    const pick = () => root.querySelector<HTMLButtonElement>('[data-action=pick-focus]')!;
+    expect(pick().disabled).toBe(true);
+    root.querySelector<HTMLButtonElement>('[data-action=depth]')!.click();
+    expect(calls).toEqual([`depth:${uid}`]);
+    chain.set({ ...states.at(-1)!, steps: states.at(-1)!.steps.map((s) => ({ ...s, params: { depth: createImage(4, 4) } })) }, true);
+    expect(pick().disabled).toBe(false);
+    pick().click();
+    expect(calls).toEqual([`depth:${uid}`, `focus:${uid}`]);
+  });
 });

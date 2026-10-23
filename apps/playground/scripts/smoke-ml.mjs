@@ -3,6 +3,8 @@
 //  1. Object tool (SlimSAM): clicks a tiger cub; a masked exposure step brightens the cub, not the hay.
 //  2. Remove object (MI-GAN): selects the cub with the Object tool and fills it; the cub's pixels
 //     change a lot, the hay far away does not.
+//  3. Lens blur (Depth Anything V2): estimates the depth of the still life, focuses on the flowers;
+//     the background loses its fine detail, the flowers keep theirs.
 // Slow on SwiftShader (the app picks WASM there): about a minute of inference in all.
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -94,6 +96,47 @@ try {
   check(change.cub > 40, `the cub should be gone: ${JSON.stringify(change)}`);
   check(change.hay < 10, `the hay should be unchanged: ${JSON.stringify(change)}`);
   console.log(`smoke-ml: ${filled}; pixel change ${JSON.stringify(change)}`);
+
+  // 3. Lens blur, on a fresh page.
+  const lens = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  lens.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
+  await lens.route('https://huggingface.co/**', (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').at(-1);
+    route.fulfill({ status: 200, body: readFileSync(new URL(name, models)), headers: { 'content-type': 'application/octet-stream' } });
+  });
+  await lens.goto(`${url}?sample=still-life`);
+  await lens.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 60000 });
+  await lens.selectOption('#chain select[data-action=add]', 'lensBlur');
+  await lens.click('#chain [data-action=depth]');
+  await lens.waitForFunction(() => /Depth estimated|failed/.test(document.getElementById('announce').textContent), null, { timeout: 300000 });
+  const depthSaid = await lens.textContent('#announce');
+  check(/Depth estimated/.test(depthSaid), `depth: ${depthSaid}`);
+  await lens.click('#chain [data-action=pick-focus]');
+  const box3 = await lens.locator('#after').boundingBox();
+  // The bouquet (uv 0.3, 0.3) is the nearest thing in the picture.
+  await lens.mouse.click(box3.x + box3.width * 0.3, box3.y + box3.height * 0.3);
+  check(/Focus set/.test(await lens.textContent('#announce')), `focus: ${await lens.textContent('#announce')}`);
+  // High-frequency energy (mean absolute difference of neighbouring pixels) of a window, after / before.
+  const energy = () =>
+    lens.evaluate(() => {
+      const e = (id, u, v) => {
+        const c = document.getElementById(id);
+        const [w, h] = [32, 32];
+        const d = c.getContext('2d').getImageData(Math.floor(u * c.width) - 16, Math.floor(v * c.height) - 16, w, h).data;
+        let sum = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w - 1; x++) for (let k = 0; k < 3; k++) sum += Math.abs(d[(y * w + x) * 4 + k] - d[(y * w + x + 1) * 4 + k]);
+        return sum / (h * (w - 1) * 3);
+      };
+      return { background: e('after', 0.9, 0.15) / e('before', 0.9, 0.15), flowers: e('after', 0.3, 0.3) / e('before', 0.3, 0.3) };
+    });
+  let ratio = await energy();
+  for (let i = 0; i < 40 && !(ratio.background < 0.7 && ratio.flowers > 0.8); i++) {
+    await lens.waitForTimeout(500);
+    ratio = await energy();
+  }
+  check(ratio.background < 0.7, `the background should lose detail: ${JSON.stringify(ratio)}`);
+  check(ratio.flowers > 0.8, `the flowers should stay sharp: ${JSON.stringify(ratio)}`);
+  console.log(`smoke-ml: ${depthSaid}; detail kept ${JSON.stringify(ratio)}`);
 } finally {
   await browser.close();
   await server.close();

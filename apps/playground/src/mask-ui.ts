@@ -17,8 +17,10 @@ let imageSize: [number, number] = [1, 1];
 export function setImageSize(w: number, h: number): void {
   imageSize = [w, h];
 }
+/** Size of the brush rasters (and of the image the mask tools and ML work on) for the current image. */
+export const brushSize = (): [number, number] => fitWithin(imageSize[0], imageSize[1], BRUSH_RASTER_SIDE);
 /** A new, empty brush mask at the current image's proportions. */
-export const emptyBrush = (): Mask => ({ kind: 'raster', raster: createRasterMask(...fitWithin(imageSize[0], imageSize[1], BRUSH_RASTER_SIDE)) });
+export const emptyBrush = (): Mask => ({ kind: 'raster', raster: createRasterMask(...brushSize()) });
 
 /** Tool settings, shared by every brush mask (tools, not part of the mask). */
 export const tools = {

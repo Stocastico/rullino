@@ -23,6 +23,10 @@ export interface ChainState {
 export interface ChainActions {
   /** Fills a patch step's image (object removal) from its mask. */
   fill?(uid: string): Promise<void>;
+  /** Estimates the depth map of a lens blur step. */
+  estimateDepth?(uid: string): Promise<void>;
+  /** The next click on the image sets the lens blur step's focus to the depth there. */
+  pickFocus?(uid: string): void;
 }
 
 export interface ChainUi {
@@ -37,7 +41,7 @@ export function withMask(step: StepState, mask: Mask | undefined): StepState {
 }
 
 /** Filters that act where a mask says (inpainting) or show an image only there (patch): they always have a mask. */
-const wantsMask = (f: Filter<any>) => f.kind === 'multipass' && (!!f.usesMask || Object.values(f.params as ParamSchema).some((p) => p.type === 'image'));
+const wantsMask = (f: Filter<any>) => f.kind === 'multipass' && (!!f.usesMask || f.id === 'patch');
 
 let nextUid = 0;
 /** A step with default params; filters that need a mask start with an empty brush mask to paint. */
@@ -160,6 +164,18 @@ export function renderChain(
             void actions.fill!(step.uid).finally(() => (fill.disabled = false));
           });
           body.append(fill);
+        }
+        if (filter.id === 'lensBlur' && actions.estimateDepth) {
+          const estimate = button('Estimate depth', 'depth', 'Estimate the depth map with AI');
+          estimate.className = 'primary';
+          estimate.addEventListener('click', () => {
+            estimate.disabled = true;
+            void actions.estimateDepth!(step.uid).finally(() => (estimate.disabled = false));
+          });
+          const pick = button('Pick focus', 'pick-focus', 'Click the image to focus there');
+          pick.disabled = step.params.depth === (filter.params as ParamSchema).depth?.default;
+          pick.addEventListener('click', () => actions.pickFocus?.(step.uid));
+          body.append(estimate, pick);
         }
         item.append(body);
       }
