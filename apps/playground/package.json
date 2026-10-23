@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node scripts/smoke.mjs",
-    "smoke:ml": "node scripts/smoke-ml.mjs"
+    "smoke:ml": "node scripts/smoke-ml.mjs",
+    "smoke:base": "node scripts/smoke-base.mjs"
   },
   "dependencies": {
     "@rullino/core": "workspace:*",

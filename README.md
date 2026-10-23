@@ -2,7 +2,7 @@
 
 GPU-first image processing for the web, built on **WebGPU** and written in **TypeScript**.
 
-rullino spans the whole arc from classic computer-vision operations (thresholds, convolutions, edge detection, morphology, Canny, Hough) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain). A companion **playground** lets you load a photo, chain filters and tweak their parameters live.
+rullino spans the arc from classic computer-vision operations (thresholds, convolutions, Canny edges, morphology, median, bilateral, CLAHE) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain), with a few optional AI tools. A companion **playground** lets you load a photo, chain filters and tweak their parameters live: **[try it](https://stocastico.github.io/rullino/)**. Photos are processed on your machine and never uploaded.
 
 > **Status:** pre-alpha, working towards a first `0.1.0` release (see [PLAN.md](./PLAN.md)). What exists:
 > - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, share-link serialisation.
@@ -11,7 +11,7 @@ rullino spans the whole arc from classic computer-vision operations (thresholds,
 > - **ML (optional, `@rullino/ml`)**: click-to-select objects (SlimSAM), object removal (MI-GAN) and depth for lens blur (Depth Anything V2 Small), with ONNX Runtime passed in by the caller.
 > - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links.
 >
-> Not published yet: M5 adds builds, generated docs and npm releases.
+> Not published to npm yet. Input is 8-bit sRGB (what the browser decodes); not done yet: Sobel / Scharr / Laplacian, Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
 
 ## Why
 
@@ -43,6 +43,17 @@ packages/
 apps/
   playground/  Vite demo site
 ```
+
+## Install
+
+Not on npm yet; once published:
+
+```sh
+npm install @rullino/core @rullino/filters
+npm install -D @webgpu/types   # TypeScript only: the declarations mention GPUDevice, GPUTexture...
+```
+
+The per-package READMEs below have the quick starts.
 
 ## Documentation
 
