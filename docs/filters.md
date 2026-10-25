@@ -435,6 +435,8 @@ Multipass (1 pass).
 | `size` | Dot spacing (px) | number | 2 … 64 (step 0.5), in pixels of the full-resolution image | 8 |
 | `angle` | Angle (°) | number | 0 … 90 (step 1) | 45 |
 | `mode` | Inks | choice | `mono` Mono, `cmy` CMY | `mono` |
+| `shape` | Dot shape | choice | `circle` Round, `square` Square, `ring` Ring | `circle` |
+| `grid` | Grid | choice | `square` Square grid, `hex` Hex grid | `square` |
 
 ### Dither (`dither`)
 
