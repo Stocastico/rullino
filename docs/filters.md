@@ -443,7 +443,8 @@ Multipass (1 pass).
 | Parameter | Label | Type | Range / options | Default |
 |---|---|---|---|---|
 | `levels` | Levels | integer | 2 … 16 | 2 |
-| `matrix` | Pattern | choice | `bayer2` Bayer 2×2, `bayer4` Bayer 4×4, `bayer8` Bayer 8×8 | `bayer4` |
+| `matrix` | Pattern | choice | `bayer2` Bayer 2×2, `bayer4` Bayer 4×4, `bayer8` Bayer 8×8, `white` White noise, `gradient` R2 (evenly spread) | `bayer4` |
+| `seed` | Noise seed | integer | 0 … 999 | 0 |
 | `mode` | Colours | choice | `mono` Mono, `color` Colour | `mono` |
 | `scale` | Cell size (px) | integer | 1 … 16, in pixels of the full-resolution image | 1 |
 

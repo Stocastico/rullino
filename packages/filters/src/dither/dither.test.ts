@@ -1,7 +1,7 @@
 import { linearToSrgb, srgbToLinear } from '@rullino/core';
 import { describe, expect, it } from 'vitest';
 import { imageOf } from '../test-utils';
-import { bayer, dither } from './index';
+import { bayer, dither, r2, whiteNoise } from './index';
 
 const flat = (v: number, w = 16, h = 16) => imageOf(w, h, () => [srgbToLinear(v), srgbToLinear(v), srgbToLinear(v)]);
 const encodedValues = (img: { data: Float32Array }, c = 0) => {
@@ -51,5 +51,44 @@ describe('dither', () => {
     expect(two[0]).toBe(two[1]);
     expect(two[0]).toBe(one[0]);
     expect(dither.params.scale.unit).toBe('px');
+  });
+
+  describe('noise patterns', () => {
+    const big = (v: number) => flat(v, 64, 64);
+
+    it('white noise is a hash: uniform in [0, 1), deterministic, different per seed', () => {
+      const ts = [...Array(4096)].map((_, i) => whiteNoise(i % 64, i >> 6, 0));
+      expect(Math.min(...ts)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...ts)).toBeLessThan(1);
+      expect(mean(ts)).toBeCloseTo(0.5, 1);
+      expect(whiteNoise(5, 9, 0)).toBe(whiteNoise(5, 9, 0));
+      expect(whiteNoise(5, 9, 0)).not.toBe(whiteNoise(5, 9, 1));
+    });
+
+    it('R2 follows the plastic-ratio lattice, in exact 32-bit arithmetic', () => {
+      expect(r2(0, 0)).toBe(0);
+      expect(r2(1, 0)).toBeCloseTo(0.7548776662, 6);
+      expect(r2(0, 1)).toBeCloseTo(0.569840291, 6);
+      expect(r2(1, 1)).toBeCloseTo((0.7548776662 + 0.569840291) % 1, 6);
+      expect(r2(4096, 4096)).toBeGreaterThanOrEqual(0); // wraps instead of overflowing
+    });
+
+    it.each(['white', 'gradient'] as const)('%s keeps the mean tone and outputs only the two levels', (matrix) => {
+      for (const v of [0.2, 0.5, 0.83]) {
+        const out = encodedValues(dither.cpu(big(v), { levels: 2, matrix }));
+        expect(new Set(out)).toEqual(new Set([0, 1]));
+        expect(Math.abs(mean(out) - v)).toBeLessThan(0.03);
+      }
+    });
+
+    it('they are not the Bayer pattern, and the cell size and seed act on them', () => {
+      const flat5 = (matrix: 'bayer4' | 'white' | 'gradient', extra = {}) => encodedValues(dither.cpu(big(0.5), { matrix, ...extra }));
+      expect(flat5('white')).not.toEqual(flat5('bayer4'));
+      expect(flat5('gradient')).not.toEqual(flat5('bayer4'));
+      expect(flat5('white', { seed: 1 })).not.toEqual(flat5('white'));
+      const cells = encodedValues(dither.cpu(big(0.5), { matrix: 'white', scale: 2 }));
+      expect(cells[0]).toBe(cells[1]); // 2x2 blocks share one threshold
+      expect(cells[0]).toBe(cells[64]);
+    });
   });
 });
