@@ -16,10 +16,29 @@ export function bayer(x: number, y: number, n: number): number {
 
 const SIZES = { bayer2: 2, bayer4: 4, bayer8: 8 } as const;
 
+/** PCG hash (O'Neill), u32 -> u32; identical on CPU and GPU (as in grain). */
+function pcg(v: number): number {
+  const s = (Math.imul(v, 747796405) + 2891336453) >>> 0;
+  const w = Math.imul(((s >>> ((s >>> 28) + 4)) ^ s) >>> 0, 277803737) >>> 0;
+  return ((w >>> 22) ^ w) >>> 0;
+}
+
+/** White-noise threshold in [0, 1) for a cell: a 24-bit hash, so the f32 conversion is exact. */
+export const whiteNoise = (x: number, y: number, seed: number) => (pcg((x + pcg((y + pcg(seed)) >>> 0)) >>> 0) >>> 8) / 16777216;
+
 /**
- * Ordered (Bayer) dithering to `levels` levels per channel, in sRGB-encoded units: each value is
- * rounded down or up by comparing it with a threshold from the matrix, so the local mean of the
- * pattern keeps the tone. Mono dithers luminance into greys. `scale` enlarges the pattern cells.
+ * R2 threshold in [0, 1) for a cell: Roberts' plastic-ratio lattice, fract(x·0.7548776662 + y·0.5698402910)
+ * in 32-bit fixed point (the constants times 2³²), so CPU and GPU agree exactly. A well-spread pattern
+ * (no clumps, no grid) without a noise texture: the cheap stand-in for blue noise.
+ */
+export const r2 = (x: number, y: number) => ((Math.imul(x, 3242174889) + Math.imul(y, 2447445414)) >>> 8) / 16777216;
+
+/**
+ * Dithering to `levels` levels per channel, in sRGB-encoded units: each value is rounded down or
+ * up by comparing it with a threshold, so the local mean of the pattern keeps the tone. The
+ * threshold comes from a Bayer matrix (ordered, regular), white noise (a hash, seeded) or the R2
+ * lattice (evenly spread, no visible grid). Mono dithers luminance into greys (a `gradientMap`
+ * after it turns them into any two or three colours). `scale` enlarges the pattern cells.
  */
 export const dither = defineFilter({
   id: 'dither',
@@ -28,7 +47,13 @@ export const dither = defineFilter({
   kind: 'multipass',
   params: {
     levels: { type: 'int', min: 2, max: 16, default: 2, label: 'Levels' },
-    matrix: { type: 'enum', options: { bayer2: 'Bayer 2×2', bayer4: 'Bayer 4×4', bayer8: 'Bayer 8×8' }, default: 'bayer4', label: 'Pattern' },
+    matrix: {
+      type: 'enum',
+      options: { bayer2: 'Bayer 2×2', bayer4: 'Bayer 4×4', bayer8: 'Bayer 8×8', white: 'White noise', gradient: 'R2 (evenly spread)' },
+      default: 'bayer4',
+      label: 'Pattern',
+    },
+    seed: { type: 'int', min: 0, max: 999, default: 0, label: 'Noise seed' },
     mode: { type: 'enum', options: { mono: 'Mono', color: 'Colour' }, default: 'mono', label: 'Colours' },
     scale: { type: 'int', min: 1, max: 16, default: 1, unit: 'px', label: 'Cell size (px)' },
   },
@@ -37,9 +62,21 @@ export const dither = defineFilter({
       name: 'out',
       inputs: ['input'],
       wgsl: /* wgsl */ `
+fn pcg(v: u32) -> u32 {
+  let s = v * 747796405u + 2891336453u;
+  let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+  return (w >> 22u) ^ w;
+}
+
 fn threshold(xy: vec2i) -> f32 {
-  let n = 2 << params.matrix;
   let q = xy / params.scale;
+  if (params.matrix == 3u) {
+    return f32(pcg(u32(q.x) + pcg(u32(q.y) + pcg(u32(params.seed)))) >> 8u) / 16777216.0;
+  }
+  if (params.matrix == 4u) {
+    return f32((u32(q.x) * 3242174889u + u32(q.y) * 2447445414u) >> 8u) / 16777216.0;
+  }
+  let n = 2 << params.matrix;
   var v = 0;
   var s = 1;
   for (var level = 0; s < n; level++) {
@@ -65,9 +102,8 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  cpu: (src, { levels, matrix, mode, scale }) => {
+  cpu: (src, { levels, matrix, seed, mode, scale }) => {
     const out = createImage(src.width, src.height);
-    const size = SIZES[matrix];
     const n = levels - 1;
     for (let y = 0; y < src.height; y++)
       for (let x = 0; x < src.width; x++) {
@@ -77,7 +113,8 @@ fn run(xy: vec2i, p: Params) -> vec4f {
           out.data.set(src.data.subarray(i, i + 4), i);
           continue;
         }
-        const t = (bayer(Math.floor(x / scale), Math.floor(y / scale), size) + 0.5) / (size * size);
+        const [cx, cy] = [Math.floor(x / scale), Math.floor(y / scale)];
+        const t = matrix === 'white' ? whiteNoise(cx, cy, seed) : matrix === 'gradient' ? r2(cx, cy) : (bayer(cx, cy, SIZES[matrix]) + 0.5) / (SIZES[matrix] * SIZES[matrix]);
         const [r, g, b] = [0, 1, 2].map((c) => src.data[i + c]! / a) as [number, number, number];
         const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
         const e = mode === 'mono' ? Array<number>(3).fill(clamp01(linearToSrgb(luminance(r, g, b)))) : [r, g, b].map((v) => clamp01(linearToSrgb(v)));
