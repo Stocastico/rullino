@@ -1,6 +1,6 @@
 # Filter reference
 
-50 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
+51 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
 
 ## Adjust (18)
 
@@ -416,7 +416,19 @@ Multipass (1 pass).
 | `output` | Output | choice | `signed` Signed, `magnitude` Magnitude | `signed` |
 | `strength` | Strength | number | 0 … 10 (step 0.01) | 1 |
 
-## Stylize (9)
+## Stylize (10)
+
+### ASCII art (`ascii`)
+
+Multipass (1 pass).
+
+| Parameter | Label | Type | Range / options | Default |
+|---|---|---|---|---|
+| `cell` | Cell size (px) | integer | 4 … 32, in pixels of the full-resolution image | 8 |
+| `color` | Glyph colour | choice | `fixed` Ink colour, `source` Image colours | `fixed` |
+| `ink` | Ink | colour | sRGB colour | #d9ffd9 |
+| `paper` | Paper | colour | sRGB colour | #0a120d |
+| `invert` | Dark = dense | on / off |  | off |
 
 ### Pixelate (`pixelate`)
 
