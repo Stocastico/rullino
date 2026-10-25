@@ -19,6 +19,7 @@ import { curves } from './curves';
 import { dither } from './dither';
 import { emboss } from './emboss';
 import { gradient } from './gradient';
+import { gradientMap } from './gradientMap';
 import { laplacian } from './laplacian';
 import { equalize } from './equalize';
 import { exposure } from './exposure';
@@ -70,6 +71,7 @@ export {
   dither,
   emboss,
   gradient,
+  gradientMap,
   laplacian,
   equalize,
   exposure,
@@ -147,6 +149,7 @@ export const filters: readonly Filter<any>[] = [
   dither,
   emboss,
   gradient,
+  gradientMap,
   laplacian,
   sketch,
   bloom,

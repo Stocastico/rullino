@@ -1,6 +1,6 @@
 # Filter reference
 
-49 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
+50 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
 
 ## Adjust (18)
 
@@ -198,7 +198,7 @@ Makes the image (or, with a mask, part of it) transparent. Export as PNG to keep
 |---|---|---|---|---|
 | `amount` | Amount | number | 0 … 1 (step 0.01) | 1 |
 
-## Look (3)
+## Look (4)
 
 ### LUT (`applyLut`)
 
@@ -229,6 +229,19 @@ Multipass (1 pass).
 | `amount` | Amount | number | 0 … 1 (step 0.01) | 0.3 |
 | `size` | Size (px) | number | 1 … 8 (step 0.1), in pixels of the full-resolution image | 1.5 |
 | `seed` | Seed | integer | 0 … 999 | 0 |
+
+### Gradient map (`gradientMap`)
+
+Pointwise, straight alpha.
+
+| Parameter | Label | Type | Range / options | Default |
+|---|---|---|---|---|
+| `shadows` | Shadows | colour | sRGB colour | #140a40 |
+| `highlights` | Highlights | colour | sRGB colour | #ffd98c |
+| `tritone` | Midtone colour | on / off |  | off |
+| `midtones` | Midtones | colour | sRGB colour | #cc4059 |
+| `midpoint` | Midpoint | number | 0.05 … 0.95 (step 0.01) | 0.5 |
+| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 |
 
 ## Classic (19)
 
