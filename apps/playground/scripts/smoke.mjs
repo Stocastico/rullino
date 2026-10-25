@@ -172,6 +172,44 @@ try {
   await after(() => page.click('#chain li[data-step] .step-title'));
   const [wtop, wbottom] = await rowDiff();
   check(wtop > 10 && wbottom > 10, `with nothing selected the step acts everywhere: top ${wtop.toFixed(1)}, bottom ${wbottom.toFixed(1)}`);
+  // Shape tools: a rectangle dragged on the image becomes the selection (lower right quarter).
+  const patchDiff = () =>
+    page.evaluate(() => {
+      const px = (id) => { const c = document.getElementById(id); return [c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height]; };
+      const [[a, w, h], [b]] = [px('before'), px('after')];
+      const patch = (fx, fy) => { let n = 0; const [x0, y0] = [Math.floor(w * fx), Math.floor(h * fy)]; for (let y = y0; y < y0 + 4; y++) for (let x = x0; x < x0 + 4; x++) for (let c = 0; c < 3; c++) n += Math.abs(a[(y * w + x) * 4 + c] - b[(y * w + x) * 4 + c]); return n / 48; };
+      return [patch(0.75, 0.75), patch(0.15, 0.15), patch(0.75, 0.15)];
+    });
+  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'brush'));
+  await page.click('#chain [data-selection] button[data-action=tool-rect]');
+  await after(async () => {
+    const box = await page.locator('#after').boundingBox();
+    await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.55);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.95, box.y + box.height * 0.95, { steps: 4 });
+    await page.mouse.up();
+  });
+  await after(() => page.click('#chain li[data-step] .step-title'));
+  await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const [inRect, outLeft, outTop] = await patchDiff();
+  check(inRect > 10 && outLeft < 1 && outTop < 1, `rectangle selection: inside differs by ${inRect.toFixed(1)}, left ${outLeft.toFixed(1)}, top ${outTop.toFixed(1)}`);
+  // Alt+drag over the same box removes it again.
+  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(async () => {
+    const box = await page.locator('#after').boundingBox();
+    await page.keyboard.down('Alt');
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.99, box.y + box.height * 0.99, { steps: 4 });
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+  });
+  const [gone] = await patchDiff();
+  check(gone < 1, `Alt+drag should remove the rectangle again: inside differs by ${gone.toFixed(1)}`);
+  await page.click('#chain [data-selection] button[data-action=tool-paint]'); // the tool is shared: back to the brush for the checks below
+  await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'none'));
+  await after(() => page.click('#chain li[data-step] .step-title'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true })); }));
 
   // Brush: an empty mask changes nothing; a stroke across the middle changes only that band.

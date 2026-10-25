@@ -155,3 +155,5 @@ button.primary { border-color: var(--accent); color: var(--accent); }
 .look-card { display: flex; flex-direction: column; gap: 3px; padding: 3px; font-size: 11px; cursor: pointer; }
 .look-card canvas { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 3px; background: rgb(255 255 255 / 0.05); }
 .look-card:hover { border-color: var(--accent); }
+
+.shape-preview { fill: color-mix(in srgb, var(--accent) 25%, transparent); stroke: var(--accent); stroke-width: calc(2 * var(--px, 1)); stroke-dasharray: calc(6 * var(--px, 1)); pointer-events: none; }

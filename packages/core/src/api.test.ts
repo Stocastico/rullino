@@ -9,7 +9,7 @@ describe('@rullino/core public API', () => {
     'ShaderCompileError', 'WebGpuUnavailableError', 'activeSteps', 'applyGeometry', 'applyGeometryCpu',
     'applyLutCpu', 'blendMasked', 'compareImages', 'createGpuContext', 'createImage', 'createLut',
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
-    'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fitWithin', 'flipGeometry',
+    'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
     'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
     'isIdentityGeometry', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
     'maskImage', 'maskValue', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseHald',

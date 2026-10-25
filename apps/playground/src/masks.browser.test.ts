@@ -83,6 +83,64 @@ describe('mask overlay', () => {
     overlay.show(undefined, 400, 200);
     expect([svg.children.length, svg.classList.contains('painting'), svg.onpointerdown]).toEqual([0, false, null]);
   });
+
+  describe('selection shapes', () => {
+    const raster = () => ({ kind: 'raster', raster: createRasterMask(40, 20) }) as RasterMask;
+    const value = (m: Mask, x: number, y: number) => (m as RasterMask).raster.data[y * (m as RasterMask).raster.width + x]!;
+
+    it('a rectangle: a preview follows the drag, the box is filled on release (Alt removes it)', () => {
+      tools.tool = 'rect';
+      const { svg, changes, drags } = setup(raster());
+      const g = press(svg, ...at(svg, 0.25, 0.25));
+      expect(drags()).toBe(1);
+      g.move(...at(svg, 0.75, 0.75));
+      expect(svg.querySelector('.shape-preview')).not.toBeNull();
+      expect(changes).toHaveLength(0);
+      g.up();
+      expect(svg.querySelector('.shape-preview')).toBeNull();
+      expect(changes).toHaveLength(1);
+      expect([value(changes[0]!, 20, 10), value(changes[0]!, 5, 10), value(changes[0]!, 20, 2)]).toEqual([1, 0, 0]);
+      // Alt on the same box takes it away again (the overlay keeps the mask it edited)
+      const sub = press(svg, ...at(svg, 0.25, 0.25), { altKey: true });
+      sub.move(...at(svg, 0.75, 0.75));
+      sub.up();
+      expect(coverage(changes.at(-1)!)).toBe(0);
+    });
+
+    it('an ellipse fills the ellipse in its box, not the corners', () => {
+      tools.tool = 'ellipse';
+      const { svg, changes } = setup(raster());
+      const g = press(svg, ...at(svg, 0.1, 0.1));
+      g.move(...at(svg, 0.9, 0.9));
+      expect(svg.querySelector('.shape-preview')!.tagName).toBe('ellipse');
+      g.up();
+      expect([value(changes[0]!, 20, 10), value(changes[0]!, 4, 2)]).toEqual([1, 0]);
+    });
+
+    it('a lasso follows the pointer and fills the closed outline on release', () => {
+      tools.tool = 'lasso';
+      const { svg, changes } = setup(raster());
+      const g = press(svg, ...at(svg, 0.2, 0.2));
+      g.move(...at(svg, 0.8, 0.2));
+      g.move(...at(svg, 0.8, 0.8));
+      expect(svg.querySelector('.shape-preview')!.tagName).toBe('polyline');
+      g.up();
+      expect(svg.querySelector('.shape-preview')).toBeNull();
+      // the triangle (0.2, 0.2) (0.8, 0.2) (0.8, 0.8): inside near its right edge, outside the lower left
+      expect([value(changes[0]!, 30, 8), value(changes[0]!, 10, 15)]).toEqual([1, 0]);
+    });
+
+    it('a click without a drag fills nothing and records no edit', () => {
+      for (const tool of ['rect', 'ellipse', 'lasso'] as const) {
+        tools.tool = tool;
+        const { svg, changes } = setup(raster());
+        const g = press(svg, ...at(svg, 0.5, 0.5));
+        g.up();
+        expect(changes, tool).toHaveLength(0);
+        expect(svg.querySelector('.shape-preview')).toBeNull();
+      }
+    });
+  });
 });
 
 describe('mask panel', () => {
@@ -114,6 +172,16 @@ describe('mask panel', () => {
     expect(mask()).toBeUndefined();
     const required = setup(emptyBrush(), true);
     expect([...required.q<HTMLSelectElement>('[data-action=mask-kind]')!.options].map((o) => o.value)).toEqual(['linear', 'radial', 'brush']);
+  });
+
+  it('offers the shape tools, with a hint', () => {
+    const { q, root } = setup({ kind: 'raster', raster: createRasterMask(30, 10) });
+    for (const [action, tool] of [['tool-rect', 'rect'], ['tool-ellipse', 'ellipse'], ['tool-lasso', 'lasso']] as const) {
+      q<HTMLButtonElement>(`[data-action=${action}]`)!.click();
+      expect(tools.tool).toBe(tool);
+      expect(root.querySelector('.hint')!.textContent).toMatch(/drag|Drag/);
+      expect(root.querySelector('[data-action=brush-size]')).toBeNull(); // no brush settings for a shape
+    }
   });
 
   it('the Object tool starts a new object session when chosen and on "New object"', () => {
