@@ -48,4 +48,46 @@ describe('halftone', () => {
       expect(out.data[i]).toBeLessThanOrEqual(0.5);
     }
   });
+
+  describe('shapes and grids', () => {
+    const enc = (img: { width: number; data: Float32Array }, x: number, y: number) => linearToSrgb(img.data[(y * img.width + x) * 4]!);
+    const grey = flat(0.5);
+
+    it('square dots keep the tone like round ones (dot area = coverage)', () => {
+      for (const v of [0.25, 0.5, 0.75]) expect(meanEncoded(halftone.cpu(flat(v), { size: 8, shape: 'square' }))).toBeCloseTo(v, 1);
+    });
+
+    it('ring dots keep the tone while they fit their cell (beyond ~70% ink the ring outgrows it and is clipped)', () => {
+      for (const v of [0.4, 0.5, 0.75, 0.9]) expect(meanEncoded(halftone.cpu(flat(v), { size: 8, shape: 'ring' }))).toBeCloseTo(v, 1);
+    });
+
+    it('a square dot reaches the corners a round one of the same area does not', () => {
+      // size 10, angle 0, tone 0.5: cell centre (5, 5); pixel (1, 1) is 3.5 px away on both axes
+      const [round, square] = (['circle', 'square'] as const).map((shape) => halftone.cpu(grey, { size: 10, angle: 0, shape }));
+      expect(enc(round!, 1, 1)).toBeGreaterThan(0.9); // outside the circle (distance 4.95 > 3.99)
+      expect(enc(square!, 1, 1)).toBeLessThan(0.6); // inside the square (3.5 < 3.54)
+    });
+
+    it('a ring is hollow at its centre', () => {
+      const ring = halftone.cpu(grey, { size: 10, angle: 0, shape: 'ring' });
+      expect(enc(ring, 5, 5)).toBeGreaterThan(0.95); // the hole
+      expect(enc(ring, 1, 5)).toBeLessThan(0.1); // the band
+      expect(enc(halftone.cpu(grey, { size: 10, angle: 0 }), 5, 5)).toBeLessThan(0.1); // a round dot is solid
+    });
+
+    it('a hex grid offsets every other row by half a spacing and keeps the tone', () => {
+      for (const v of [0.25, 0.5, 0.75]) expect(meanEncoded(halftone.cpu(flat(v), { size: 8, grid: 'hex' }))).toBeCloseTo(v, 1);
+      // tiny dots (tone 0.9), size 12, angle 0: row 0 has centres at x = 6, 18, ...; row 1 (y ≈ 15.6) at x = 0, 12, ...
+      const img = halftone.cpu(flat(0.9), { size: 12, angle: 0, grid: 'hex' });
+      expect(enc(img, 6, 5)).toBeLessThan(0.7);
+      expect(enc(img, 0, 5)).toBeGreaterThan(0.99);
+      expect(enc(img, 12, 15)).toBeLessThan(0.7);
+      expect(enc(img, 6, 15)).toBeGreaterThan(0.99);
+    });
+
+    it('the default stays round dots on a square grid', () => {
+      expect(halftone.params.shape.default).toBe('circle');
+      expect(halftone.params.grid.default).toBe('square');
+    });
+  });
 });
