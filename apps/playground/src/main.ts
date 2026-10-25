@@ -29,13 +29,14 @@ import {
   type Vec2,
   type GpuContext,
   type LinearImage,
+  type Mask,
   type RasterMask,
   type Step,
 } from '@rullino/core';
 import { autoAdjust, filters } from '@rullino/filters';
 import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
 import { lookLut, looks, lookSteps } from '@rullino/presets';
-import { newStep, renderChain, withMask, type ChainState } from './chain-ui';
+import { effectiveMask, newStep, renderChain, SELECTION, withMask, withSelection, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
 import { renderGeometryControls, type Aspect, type EditMode } from './geometry-ui';
 import { createPerspectiveOverlay, UNIT_QUAD } from './perspective-overlay';
@@ -122,7 +123,10 @@ let chain: ChainState = (() => {
 })();
 
 const toSteps = (s: ChainState): Step[] =>
-  s.steps.map((st) => ({ filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled, ...(st.mask ? { mask: st.mask } : {}) }));
+  s.steps.map((st) => {
+    const mask = effectiveMask(s, st);
+    return { filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled, ...(mask ? { mask } : {}) };
+  });
 
 /** Size of the after canvas for the current image; applied when a frame is ready, not on load. */
 let displaySize: [number, number] = [0, 0];
@@ -569,11 +573,17 @@ ui.exportButton.addEventListener('click', () => void exportFile());
 ui.exportFormat.addEventListener('change', () => (ui.exportQuality.disabled = !['jpeg', 'webp'].includes(ui.exportFormat.value)));
 ui.exportQuality.disabled = true;
 
-const selectedMask = () => chain.steps.find((s) => s.uid === chain.selected)?.mask;
+/** The mask edited under `uid`: a step's own, or the selection (uid = SELECTION). */
+const maskOf = (uid: string | undefined) => (uid === SELECTION ? chain.selection : chain.steps.find((s) => s.uid === uid)?.mask);
+/** The chain with the mask under `uid` replaced. */
+const withMaskOf = (uid: string | undefined, mask: Mask | undefined): ChainState =>
+  uid === SELECTION ? withSelection(chain, mask) : { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? withMask(s, mask) : s)) };
+/** What the image overlay edits: the selection, or the selected step's own mask (none while the step uses the selection). */
+const selectedMask = () => (chain.selected === SELECTION ? chain.selection : chain.steps.find((s) => s.uid === chain.selected && !s.useSelection)?.mask);
 const overlay = createMaskOverlay(
   ui.overlay,
   (mask) => {
-    chain = { ...chain, steps: chain.steps.map((s) => (s.uid === chain.selected ? withMask(s, mask) : s)) };
+    chain = withMaskOf(chain.selected, mask);
     chainUi.set(chain, false);
     void render();
   },
@@ -591,14 +601,14 @@ let wandQueue: Promise<void> = Promise.resolve();
 function wandClick(uv: Vec2, subtract: boolean): void {
   const uid = chain.selected;
   wandQueue = wandQueue.then(async () => {
-    const mask = chain.steps.find((s) => s.uid === uid)?.mask;
+    const mask = maskOf(uid);
     if (mask?.kind !== 'raster') return;
     const next = await wandAt(mask, uv, subtract).catch((e: Error) => {
       announce(`Wand failed: ${e.message}`);
       return undefined;
     });
     if (!next) return;
-    chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? withMask(s, next) : s)) };
+    chain = withMaskOf(uid, next);
     chainUi.set(chain, false);
     showOverlay();
     void render();
@@ -711,7 +721,7 @@ let objectSession: { uid: string; id: number; base: RasterMask; points: SamPoint
 function objectClick(uv: Vec2, subtract: boolean): void {
   const uid = chain.selected;
   wandQueue = wandQueue.then(async () => {
-    const mask = chain.steps.find((s) => s.uid === uid)?.mask;
+    const mask = maskOf(uid);
     if (mask?.kind !== 'raster' || !uid) return;
     if (!objectSession || objectSession.uid !== uid || objectSession.id !== tools.objectSession) {
       objectSession = { uid, id: tools.objectSession, base: fitRaster(mask), points: [] };
@@ -722,7 +732,7 @@ function objectClick(uv: Vec2, subtract: boolean): void {
     try {
       const raster = await busyWhile(objectSelector.select(session.base.raster, session.points));
       const next = { ...session.base, raster };
-      chain = { ...chain, steps: chain.steps.map((s) => (s.uid === uid ? withMask(s, next) : s)) };
+      chain = withMaskOf(uid, next);
       chainUi.set(chain, false);
       showOverlay();
       void render();
@@ -845,7 +855,7 @@ const lookCards = looks.map((look) => {
   card.append(canvas, Object.assign(document.createElement('span'), { textContent: look.label }));
   card.addEventListener('click', () => {
     const added = lookSteps(look).map((s) => ({ ...newStep(s.filter), params: { ...defaultParams(s.filter.params), ...s.params } }));
-    chain = { steps: [...chain.steps, ...added], selected: added[0]?.uid ?? chain.selected };
+    chain = { ...chain, steps: [...chain.steps, ...added], selected: added[0]?.uid ?? chain.selected };
     chainUi.set(chain, true);
     showOverlay();
     void render();
@@ -899,7 +909,7 @@ ui.auto.addEventListener('click', async () => {
       else missing.push({ ...newStep(byId.get(id)!), params: { ...defaultParams(byId.get(id)!.params), ...patch[id] } });
     }
     steps = [...missing, ...steps];
-    chain = { steps, selected: steps.find((st) => st.filterId === 'levels')!.uid };
+    chain = { ...chain, steps, selected: steps.find((st) => st.filterId === 'levels')!.uid };
     chainUi.set(chain, true);
     showOverlay();
     void render();
@@ -922,7 +932,7 @@ interface Snapshot {
 // States are immutable, so a snapshot is two references. The selection is not an edit.
 const history = new History<Snapshot>(
   { chain, geometry },
-  { same: (a, b) => a.chain.steps === b.chain.steps && a.geometry === b.geometry },
+  { same: (a, b) => a.chain.steps === b.chain.steps && a.chain.selection === b.chain.selection && a.geometry === b.geometry },
 );
 const updateHistoryButtons = () => {
   ui.undo.disabled = !history.canUndo;
@@ -936,7 +946,7 @@ function recordHistory(): void {
 }
 function applySnapshot(s: Snapshot): void {
   // Keep the selected step if it still exists.
-  const selected = s.chain.steps.some((st) => st.uid === chain.selected) ? chain.selected : s.chain.selected;
+  const selected = chain.selected === SELECTION || s.chain.steps.some((st) => st.uid === chain.selected) ? chain.selected : s.chain.selected;
   chain = { ...s.chain, selected };
   chainUi.set(chain, true);
   if (s.geometry !== geometry) {

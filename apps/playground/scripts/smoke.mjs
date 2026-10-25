@@ -144,6 +144,36 @@ try {
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
   check((await page.$$('#overlay [data-handle]')).length === 0, 'mask handles should disappear with the mask');
 
+  // Selection: one shared area (here a linear gradient, bottom half) that steps opt into with "Only in selection".
+  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  check((await page.$$('#chain [data-selection] select[data-action=mask-kind]')).length === 1, 'the Selection entry should show its mask controls when selected');
+  await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'linear'));
+  const [stop, sbottom] = await rowDiff();
+  check(stop > 10 && sbottom > 10, `a selection alone changes nothing about the steps: top ${stop.toFixed(1)}, bottom ${sbottom.toFixed(1)}`);
+  await after(() => page.click('#chain li[data-step] .step-title'));
+  await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const [utop, ubottom] = await rowDiff();
+  check(utop < 1 && ubottom > 10, `"Only in selection": top row differs by ${utop.toFixed(1)}, bottom by ${ubottom.toFixed(1)}`);
+  // A second step shares the same selection.
+  await after(() => page.selectOption('#chain select[data-action=add]', 'invert'));
+  await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+  const [ntop, nbottom] = await rowDiff();
+  check(ntop < 1 && nbottom > 10, `two steps in the same selection: top row differs by ${ntop.toFixed(1)}, bottom by ${nbottom.toFixed(1)}`);
+  // Removing the invert step; clearing the selection then makes the Exposure step act on the whole image.
+  await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+  check(JSON.stringify(await stepTitles()) === JSON.stringify(['Exposure']), `removing the invert step: ${await stepTitles()}`);
+  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'none'));
+  // The selection is part of the undo history.
+  check((await page.textContent('#chain [data-selection] .selection-summary')) === 'whole image', 'clearing the selection should say "whole image"');
+  await after(() => page.keyboard.press('Control+z'));
+  check((await page.textContent('#chain [data-selection] .selection-summary')) === 'set', 'undo should bring the selection back');
+  await after(() => page.keyboard.press('Control+Shift+z'));
+  await after(() => page.click('#chain li[data-step] .step-title'));
+  const [wtop, wbottom] = await rowDiff();
+  check(wtop > 10 && wbottom > 10, `with nothing selected the step acts everywhere: top ${wtop.toFixed(1)}, bottom ${wbottom.toFixed(1)}`);
+  await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true })); }));
+
   // Brush: an empty mask changes nothing; a stroke across the middle changes only that band.
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'brush'));
   check((await differs()) < 0.01, 'an empty brush mask should leave the image unchanged');

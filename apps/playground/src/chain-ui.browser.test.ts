@@ -1,6 +1,6 @@
 import { createImage, defineFilter } from '@rullino/core';
 import { describe, expect, it } from 'vitest';
-import { renderChain, type ChainState } from './chain-ui';
+import { effectiveMask, renderChain, SELECTION, type ChainState, type StepState } from './chain-ui';
 
 const mk = (id: string) =>
   defineFilter({
@@ -200,5 +200,73 @@ describe('renderChain', () => {
     expect(pick().disabled).toBe(false);
     pick().click();
     expect(calls).toEqual([`depth:${uid}`, `focus:${uid}`]);
+  });
+
+  describe('selection', () => {
+    const linear = { kind: 'linear', from: [0, 0], to: [0, 1] } as const;
+    const radial = { kind: 'radial', center: [0.5, 0.5], radius: [0.2, 0.2], feather: 0.5 } as const;
+    const step = (extra: Partial<StepState> = {}): StepState => ({ uid: 's1', filterId: 'alpha', params: {}, enabled: true, ...extra });
+
+    it('a step uses the selection only when asked, instead of its own mask', () => {
+      expect(effectiveMask({ steps: [], selected: undefined }, step())).toBeUndefined();
+      expect(effectiveMask({ steps: [], selected: undefined, selection: linear }, step())).toBeUndefined();
+      expect(effectiveMask({ steps: [], selected: undefined, selection: linear }, step({ mask: radial }))).toBe(radial);
+      expect(effectiveMask({ steps: [], selected: undefined, selection: linear }, step({ useSelection: true, mask: radial }))).toBe(linear);
+      // nothing selected: the whole image, like an editor without a selection
+      expect(effectiveMask({ steps: [], selected: undefined }, step({ useSelection: true, mask: radial }))).toBeUndefined();
+    });
+
+    it('the chain always has a Selection entry; selecting it shows the mask controls of the selection', () => {
+      const { root, last, add } = setup();
+      add('alpha');
+      expect(root.querySelector('[data-selection]')).not.toBeNull();
+      // the step's own mask controls are open, not the selection's
+      expect(root.querySelectorAll('[data-action=mask-kind]')).toHaveLength(1);
+      root.querySelector<HTMLElement>('[data-selection] [data-action=select]')!.click();
+      expect(last().selected).toBe(SELECTION);
+      const kind = root.querySelector<HTMLSelectElement>('[data-selection] [data-action=mask-kind]')!;
+      expect(kind.value).toBe('none');
+      expect(root.querySelectorAll('[data-action=mask-kind]')).toHaveLength(1);
+      kind.value = 'linear';
+      kind.dispatchEvent(new Event('change'));
+      expect(last().selection?.kind).toBe('linear');
+      expect(last().steps).toHaveLength(1);
+    });
+
+    it('"Only in selection" switches a step to the shared selection and hides its own mask controls', () => {
+      const { root, last, add } = setup();
+      add('alpha');
+      const uid = last().steps[0]!.uid;
+      const check = () => root.querySelector<HTMLInputElement>('[data-step] [data-action=use-selection]')!;
+      expect(check().checked).toBe(false);
+      check().checked = true;
+      check().dispatchEvent(new Event('change'));
+      expect(last().steps.find((s) => s.uid === uid)!.useSelection).toBe(true);
+      expect(root.querySelector('[data-step] [data-action=mask-kind]')).toBeNull();
+      check().checked = false;
+      check().dispatchEvent(new Event('change'));
+      expect(last().steps[0]!.useSelection).toBeFalsy();
+      expect(root.querySelector('[data-step] [data-action=mask-kind]')).not.toBeNull();
+    });
+
+    it('filters that need their own mask (inpainting) do not offer it', () => {
+      const needsMask = { ...filters[0]!, id: 'needs', kind: 'multipass', usesMask: true, passes: [] } as never;
+      const root = document.createElement('div');
+      document.body.append(root);
+      renderChain(root, [needsMask], { steps: [], selected: undefined }, () => {});
+      const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
+      sel.value = 'needs';
+      sel.dispatchEvent(new Event('change'));
+      expect(root.querySelector('[data-action=use-selection]')).toBeNull();
+    });
+
+    it('editing the chain keeps the selection (removing, adding)', () => {
+      const { last, add, click } = setup({ steps: [], selected: undefined, selection: linear });
+      add('alpha');
+      add('beta');
+      expect(last().selection).toBe(linear);
+      click(1, 'remove');
+      expect(last().selection).toBe(linear);
+    });
   });
 });
