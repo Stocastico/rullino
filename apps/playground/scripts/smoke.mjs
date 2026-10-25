@@ -207,6 +207,7 @@ try {
   });
   const [gone] = await patchDiff();
   check(gone < 1, `Alt+drag should remove the rectangle again: inside differs by ${gone.toFixed(1)}`);
+  await page.click('#chain [data-selection] button[data-action=tool-paint]'); // the tool is shared: back to the brush for the checks below
   await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'none'));
   await after(() => page.click('#chain li[data-step] .step-title'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true })); }));
