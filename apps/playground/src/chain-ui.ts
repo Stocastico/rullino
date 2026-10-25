@@ -12,11 +12,24 @@ export interface StepState {
   readonly params: Readonly<Record<string, unknown>>;
   readonly enabled: boolean;
   readonly mask?: Mask;
+  /** Act where the chain's selection says, instead of through the step's own `mask`. */
+  readonly useSelection?: boolean;
 }
+
+/** `ChainState.selected` while the selection (not a step) is being edited. */
+export const SELECTION = 'selection';
 
 export interface ChainState {
   readonly steps: readonly StepState[];
+  /** A step's uid, or SELECTION. */
   readonly selected: string | undefined;
+  /** The area steps with `useSelection` act on; undefined = the whole image. */
+  readonly selection?: Mask;
+}
+
+/** The mask a step is rendered with: the selection if it asks for it (and there is one), else its own. */
+export function effectiveMask(state: ChainState, step: StepState): Mask | undefined {
+  return step.useSelection ? state.selection : step.mask;
 }
 
 /** Things the chain editor cannot do itself. */
@@ -38,6 +51,12 @@ export interface ChainUi {
 export function withMask(step: StepState, mask: Mask | undefined): StepState {
   const { mask: _, ...rest } = step;
   return mask ? { ...rest, mask } : rest;
+}
+
+/** The state with the selection set, or removed when undefined. */
+export function withSelection(state: ChainState, selection: Mask | undefined): ChainState {
+  const { selection: _, ...rest } = state;
+  return selection ? { ...rest, selection } : rest;
 }
 
 /** Filters that act where a mask says (inpainting) or show an image only there (patch): they always have a mask. */
@@ -95,8 +114,46 @@ export function renderChain(
     commit({ ...state, steps }, true);
   };
 
+  /** The "Selection" entry above the steps: one shared area that steps can opt into. */
+  function selectionEntry(): HTMLElement {
+    const entry = document.createElement('div');
+    entry.className = 'selection-entry';
+    entry.dataset.selection = '';
+    entry.classList.toggle('selected', state.selected === SELECTION);
+    const header = document.createElement('div');
+    header.className = 'step-header';
+    const title = button('Selection', 'select', 'Choose the area filters act on');
+    title.className = 'step-title';
+    title.addEventListener('click', () => commit({ ...state, selected: SELECTION }, true));
+    const summary = Object.assign(document.createElement('span'), { className: 'selection-summary', textContent: state.selection ? 'set' : 'whole image' });
+    header.append(title, summary);
+    entry.append(header);
+    if (state.selected === SELECTION) {
+      const body = document.createElement('div');
+      body.className = 'step-body';
+      body.append(
+        Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Select an area once, then tick "Only in selection" on any filter.' }),
+      );
+      const controls = document.createElement('div');
+      controls.className = 'mask-controls';
+      renderMaskControls(
+        controls,
+        () => state.selection,
+        (selection) => {
+          summary.textContent = selection ? 'set' : 'whole image';
+          commit(withSelection(state, selection), false);
+        },
+        false,
+      );
+      body.append(controls);
+      entry.append(body);
+    }
+    return entry;
+  }
+
   function draw() {
     root.replaceChildren();
+    root.append(selectionEntry());
     const list = document.createElement('ol');
     list.className = 'chain';
     if (state.steps.length === 0) {
@@ -128,6 +185,7 @@ export function renderChain(
       remove.addEventListener('click', () =>
         commit(
           {
+            ...state,
             steps: state.steps.filter((s) => s.uid !== step.uid),
             selected: state.selected === step.uid ? state.steps[i - 1]?.uid ?? state.steps[i + 1]?.uid : state.selected,
           },
@@ -148,14 +206,33 @@ export function renderChain(
         );
         const maskControls = document.createElement('div');
         maskControls.className = 'mask-controls';
-        // Reads the step from the current state: the mask can also change from the image overlay.
-        renderMaskControls(
-          maskControls,
-          () => state.steps.find((s) => s.uid === step.uid)?.mask,
-          (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
-          wantsMask(filter),
-        );
-        body.append(controls, maskControls);
+        body.append(controls);
+        if (!wantsMask(filter)) {
+          const label = document.createElement('label');
+          label.className = 'use-selection';
+          const check = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!step.useSelection });
+          check.dataset.action = 'use-selection';
+          check.addEventListener('change', () => commit({ ...state, steps: update(step.uid, { useSelection: check.checked }) }, true));
+          label.append(check, ' Only in selection');
+          body.append(label);
+        }
+        if (step.useSelection) {
+          const edit = button('Edit selection', 'edit-selection', 'Change the area this step acts on');
+          edit.addEventListener('click', () => commit({ ...state, selected: SELECTION }, true));
+          maskControls.append(
+            Object.assign(document.createElement('p'), { className: 'hint', textContent: state.selection ? 'Acts only inside the selection.' : 'Nothing is selected yet: acts on the whole image.' }),
+            edit,
+          );
+        } else {
+          // Reads the step from the current state: the mask can also change from the image overlay.
+          renderMaskControls(
+            maskControls,
+            () => state.steps.find((s) => s.uid === step.uid)?.mask,
+            (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
+            wantsMask(filter),
+          );
+        }
+        body.append(maskControls);
         if (filter.id === 'patch' && actions.fill) {
           const fill = button('Fill with AI', 'fill', 'Fill the masked area with AI');
           fill.className = 'primary';
@@ -197,7 +274,7 @@ export function renderChain(
       if (!f) return;
       const step = newStep(f);
       // A patch is made from the original image, so it goes first (adjustments after it apply to the result).
-      commit({ steps: f.id === 'patch' ? [step, ...state.steps] : [...state.steps, step], selected: step.uid }, true);
+      commit({ ...state, steps: f.id === 'patch' ? [step, ...state.steps] : [...state.steps, step], selected: step.uid }, true);
     });
     root.append(add);
 
@@ -210,7 +287,7 @@ export function renderChain(
       const group = groups.find((g) => g.id === addGroup.value);
       if (!group) return;
       const added = group.steps().map((s) => ({ ...newStep(s.filter), params: { ...defaultParams(s.filter.params), ...s.params } }));
-      commit({ steps: [...state.steps, ...added], selected: added[0]?.uid ?? state.selected }, true);
+      commit({ ...state, steps: [...state.steps, ...added], selected: added[0]?.uid ?? state.selected }, true);
     });
     root.append(addGroup);
   }

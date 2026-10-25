@@ -33,6 +33,10 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .chain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .chain li { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .chain li.selected { border-color: var(--accent); }
+.selection-entry { border: 1px dashed var(--line); border-radius: 8px; background: var(--bg); margin-bottom: 8px; }
+.selection-entry.selected { border-style: solid; border-color: var(--accent); }
+.selection-summary { color: var(--muted); font-size: 12px; padding-right: 6px; }
+.use-selection { display: block; margin: 6px 0; font-size: 13px; }
 .chain li.disabled .step-title { opacity: 0.45; text-decoration: line-through; }
 .step-header { display: flex; align-items: center; gap: 4px; padding: 4px 6px; }
 .step-header button { border: 0; background: none; padding: 2px 6px; cursor: pointer; color: var(--muted); }
