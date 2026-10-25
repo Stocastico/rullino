@@ -29,7 +29,7 @@ export { createImage, MAX_IMAGE_SIDE, sampleImage, type LinearImage } from './im
 export { applyLutCpu, createLut, identityLut, lutFromFunction, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { applyGeometry } from './gpu/geometry';
 export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
-export { paintStroke, type BrushOptions } from './paint';
+export { fillShape, paintStroke, type BrushOptions, type FillOptions, type Shape } from './paint';
 export { magicWand, type WandOptions } from './wand';
 export { histogramSrgb8, type Histogram } from './histogram';
 export { applyGeometryCpu, flipGeometry, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, turnGeometry, validateGeometry, type Geometry, type GeometryFrame } from './geometry';

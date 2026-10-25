@@ -1,4 +1,4 @@
-import { paintStroke, type BrushOptions, type LinearMask, type Mask, type RadialMask, type RasterMask, type Vec2 } from '@rullino/core';
+import { fillShape, paintStroke, type BrushOptions, type Shape, type LinearMask, type Mask, type RadialMask, type RasterMask, type Vec2 } from '@rullino/core';
 
 // On-image handles for gradient masks, drawn in an SVG laid over the canvases. The SVG uses the
 // display image's pixel coordinates (viewBox = image size), so ellipses and the gradient's
@@ -30,7 +30,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
  * preview rendering (the drag ends with the window's pointerup).
  */
 export interface OverlayTools {
-  readonly tool: () => 'paint' | 'erase' | 'wand' | 'object';
+  readonly tool: () => 'paint' | 'erase' | 'wand' | 'object' | 'rect' | 'ellipse' | 'lasso';
   readonly brush: () => BrushOptions;
   /** Wand click at `uv` (removing with `subtract`); the caller updates the mask (asynchronously). */
   readonly wand: (uv: Vec2, subtract: boolean) => void;
@@ -132,11 +132,45 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
       last = to;
       onChange(mask);
     };
+    // Shape tools: drag out a rectangle / ellipse (its box) or a freehand outline; the shape is
+    // added on release (removed with Alt), a preview follows the pointer meanwhile.
+    const shapeTool = () => ['rect', 'ellipse', 'lasso'].includes(tools.tool());
+    let drawing: { tool: 'rect' | 'ellipse' | 'lasso'; points: Vec2[]; subtract: boolean; preview: SVGElement } | undefined;
+    const px = (p: Vec2) => `${p[0] * size[0]},${p[1] * size[1]}`;
+    const drawPreview = () => {
+      if (!drawing) return;
+      const [a, b] = [drawing.points[0]!, drawing.points.at(-1)!];
+      if (drawing.tool === 'lasso') set(drawing.preview, { points: drawing.points.map(px).join(' ') });
+      else if (drawing.tool === 'rect') set(drawing.preview, { x: Math.min(a[0], b[0]) * size[0], y: Math.min(a[1], b[1]) * size[1], width: Math.abs(b[0] - a[0]) * size[0], height: Math.abs(b[1] - a[1]) * size[1] });
+      else set(drawing.preview, { cx: ((a[0] + b[0]) / 2) * size[0], cy: ((a[1] + b[1]) / 2) * size[1], rx: (Math.abs(b[0] - a[0]) / 2) * size[0], ry: (Math.abs(b[1] - a[1]) / 2) * size[1] });
+    };
+    const finishShape = () => {
+      if (!drawing) return;
+      const { tool, points, subtract, preview } = drawing;
+      drawing = undefined;
+      preview.remove();
+      const [a, b] = [points[0]!, points.at(-1)!];
+      // a click, or a sliver, selects nothing
+      const shape: Shape | undefined =
+        tool === 'lasso' ? (points.length >= 3 ? { kind: 'polygon', points } : undefined) : Math.abs(b[0] - a[0]) * size[0] >= 1 && Math.abs(b[1] - a[1]) * size[1] >= 1 ? { kind: tool, from: a, to: b } : undefined;
+      if (!shape) return;
+      const m = mask as RasterMask;
+      mask = { ...m, raster: fillShape(m.raster, shape, { subtract }) };
+      onChange(mask);
+    };
     svg.onpointermove = (e) => {
       const [u, v] = toUv(e);
-      const wand = tools.tool() === 'wand' || tools.tool() === 'object';
+      const wand = tools.tool() === 'wand' || tools.tool() === 'object' || shapeTool();
       svg.classList.toggle('wand', wand);
       set(cursor, { cx: u * size[0], cy: v * size[1], r: wand ? 0 : tools.brush().radius * Math.max(...size) });
+      if (drawing) {
+        const last = drawing.points.at(-1)!;
+        // lasso: a point per couple of display pixels is plenty; box tools only need the end
+        if (drawing.tool !== 'lasso') drawing.points[1] = [u, v];
+        else if (Math.hypot((u - last[0]) * size[0], (v - last[1]) * size[1]) >= 2) drawing.points.push([u, v]);
+        drawPreview();
+        return;
+      }
       if (last) paint([u, v]);
     };
     svg.onpointerdown = (e) => {
@@ -151,11 +185,26 @@ export function createMaskOverlay(svg: SVGSVGElement, onChange: (mask: Mask) => 
       }
       capture(svg, e.pointerId);
       onDragStart();
-      last = undefined;
       mask = tools.fit(mask as RasterMask);
+      if (shapeTool()) {
+        const tool = tools.tool() as 'rect' | 'ellipse' | 'lasso';
+        const preview = el(tool === 'lasso' ? 'polyline' : tool === 'rect' ? 'rect' : 'ellipse', { class: 'shape-preview' });
+        svg.append(preview);
+        drawing = { tool, points: [toUv(e)], subtract: e.altKey, preview };
+        return;
+      }
+      last = undefined;
       paint(toUv(e));
     };
-    svg.onpointerup = svg.onpointercancel = () => (last = undefined);
+    svg.onpointerup = () => {
+      finishShape();
+      last = undefined;
+    };
+    svg.onpointercancel = () => {
+      drawing?.preview.remove();
+      drawing = undefined;
+      last = undefined;
+    };
     svg.onpointerleave = () => set(cursor, { r: 0 });
   }
 

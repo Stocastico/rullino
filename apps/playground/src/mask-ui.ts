@@ -24,7 +24,7 @@ export const emptyBrush = (): Mask => ({ kind: 'raster', raster: createRasterMas
 
 /** Tool settings, shared by every brush mask (tools, not part of the mask). */
 export const tools = {
-  tool: 'paint' as 'paint' | 'erase' | 'wand' | 'object',
+  tool: 'paint' as 'paint' | 'erase' | 'wand' | 'object' | 'rect' | 'ellipse' | 'lasso',
   /** Changes when a new object selection starts (the Object tool's points begin again). */
   objectSession: 0,
   radius: 0.04,
@@ -123,7 +123,7 @@ export function renderMaskControls(root: HTMLElement, get: () => Mask | undefine
       };
       const mode = document.createElement('div');
       mode.className = 'brush-mode';
-      for (const [tool, text] of [['paint', 'Paint'], ['erase', 'Erase'], ['wand', 'Wand'], ['object', 'Object']] as const) {
+      for (const [tool, text] of [['paint', 'Paint'], ['erase', 'Erase'], ['rect', 'Rectangle'], ['ellipse', 'Ellipse'], ['lasso', 'Lasso'], ['wand', 'Wand'], ['object', 'Object']] as const) {
         const b = button(text, `tool-${tool}`, () => {
           if (tool === 'object') tools.objectSession++;
           tools.tool = tool;
@@ -158,6 +158,9 @@ export function renderMaskControls(root: HTMLElement, get: () => Mask | undefine
           contiguousLabel,
           hint('Click to add similar colours, Alt+click to remove them.'),
         );
+      } else if (tools.tool === 'rect' || tools.tool === 'ellipse' || tools.tool === 'lasso') {
+        const what = { rect: 'a rectangle', ellipse: 'an ellipse', lasso: 'a freehand outline' }[tools.tool];
+        root.append(hint(`Drag on the image to select ${what}; Alt+drag removes it from the selection.`));
       } else {
         root.append(
           slider('Size', 'brush-size', tools.radius / 0.25, (v) => (tools.radius = Math.max(0.002, v * 0.25))),
