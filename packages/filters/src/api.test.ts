@@ -5,7 +5,7 @@ import * as api from './index';
 describe('@rullino/filters public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'adaptiveThreshold', 'applyLut', 'autoAdjust', 'bilateral', 'blackPoint', 'bloom', 'boxBlur',
+    'adaptiveThreshold', 'applyLut', 'ascii', 'autoAdjust', 'bilateral', 'blackPoint', 'bloom', 'boxBlur',
     'brightness', 'canny', 'channelMixer', 'chromaticAberration', 'clahe', 'colorGrading', 'colorMixer',
     'contrast', 'convolve', 'curves', 'dither', 'emboss', 'equalize', 'exposure', 'filters', 'gamma',
     'gaussianBlur', 'gradient', 'gradientMap', 'grain', 'grayscale', 'halftone', 'hue', 'inpaint', 'invert', 'kuwahara', 'laplacian', 'lensBlur',

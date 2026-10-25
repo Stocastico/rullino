@@ -1,6 +1,7 @@
 import type { Filter } from '@rullino/core';
 export { autoAdjust, type AutoAdjustment } from './auto';
 import { adaptiveThreshold } from './adaptiveThreshold';
+import { ascii } from './ascii';
 import { applyLut } from './applyLut';
 import { bilateral } from './bilateral';
 import { blackPoint } from './blackPoint';
@@ -53,6 +54,7 @@ import { whiteBalance } from './whiteBalance';
 
 export {
   adaptiveThreshold,
+  ascii,
   applyLut,
   bilateral,
   blackPoint,
@@ -129,6 +131,7 @@ export const filters: readonly Filter<any>[] = [
   threshold,
   otsu,
   adaptiveThreshold,
+  ascii,
   posterize,
   applyLut,
   vignette,
