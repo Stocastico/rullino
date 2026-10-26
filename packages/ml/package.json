@@ -1,6 +1,6 @@
 {
   "name": "@rullino/ml",
-  "version": "0.1.0-rc.0",
+  "version": "0.1.0-rc.1",
   "description": "Optional ML tools for rullino (select, remove, depth). ONNX Runtime is passed in by the caller.",
   "keywords": [
     "webgpu",

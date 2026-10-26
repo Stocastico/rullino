@@ -1,6 +1,6 @@
 {
   "name": "@rullino/core",
-  "version": "0.1.0-rc.0",
+  "version": "0.1.0-rc.1",
   "description": "Zero-dependency WebGPU image-processing core: filter schema, chains, masks, geometry, LUTs, export.",
   "keywords": [
     "webgpu",

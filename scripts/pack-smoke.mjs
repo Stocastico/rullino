@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 
@@ -39,6 +39,12 @@ try {
     check(listing.some((f) => f === 'package/dist/index.js') && listing.some((f) => f === 'package/dist/index.d.ts'), `${name}: dist/index.js / index.d.ts missing`);
     check(listing.includes('package/LICENSE'), `${name}: LICENSE missing from the tarball`);
     check(!listing.some((f) => /\.test\.|test-utils/.test(f)), `${name}: test files in the tarball`);
+    // What the release workflow runs on each tarball (with "./": without it npm reads "dir/x.tgz" as a GitHub repo).
+    try {
+      run('npm', ['publish', '--dry-run', `./${basename(tgz)}`, '--access', 'public', '--tag', 'next'], tarballs);
+    } catch (e) {
+      failures.push(`${name}: npm publish --dry-run of the tarball failed: ${e.message}`);
+    }
     const pkg = JSON.parse(run('tar', ['-xzOf', tgz, 'package/package.json'], work));
     check(JSON.stringify(pkg.exports).includes('./dist/index.js') && !JSON.stringify(pkg.exports).includes('/src/'), `${name}: exports do not point at dist: ${JSON.stringify(pkg.exports)}`);
     const ranges = JSON.stringify({ ...pkg.dependencies, ...pkg.peerDependencies });

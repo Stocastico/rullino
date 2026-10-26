@@ -67,7 +67,8 @@ jobs:
               echo "@rullino/$p@$VERSION is already on npm, skipping"
               continue
             fi
-            npm publish "tarballs/rullino-$p-$VERSION.tgz" --access public --provenance --tag "$NPM_TAG"
+            # "./": a path with a slash and no "./" is read as a GitHub shorthand (owner/repo) and npm tries to git-clone it
+            npm publish "./tarballs/rullino-$p-$VERSION.tgz" --access public --provenance --tag "$NPM_TAG"
           done
 
       - name: GitHub release
