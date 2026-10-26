@@ -4,11 +4,13 @@ import { defineFilter } from '@rullino/core';
 export const exposure = defineFilter({
   id: 'exposure',
   label: 'Exposure',
+  description: 'Makes the whole picture lighter or darker, like opening or closing the lens by whole stops of light.',
+  tryThis: 'Raise it until the sky starts to lose detail, then lower it a little.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',
   params: {
-    ev: { type: 'float', min: -5, max: 5, step: 0.05, default: 0, label: 'EV' },
+    ev: { type: 'float', min: -5, max: 5, step: 0.05, default: 0, label: 'EV', description: 'Stops of light: +1 doubles the brightness, −1 halves it.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

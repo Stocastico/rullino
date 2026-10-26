@@ -11,8 +11,9 @@ describe('filterReference', () => {
     const md = filterReference([
       fake({
         description: 'Does a thing.',
+        tryThis: 'Drag Amount to the right.',
         params: {
-          amount: { type: 'float', min: -1, max: 1, step: 0.05, default: 0.25, label: 'Amount' },
+          amount: { type: 'float', min: -1, max: 1, step: 0.05, default: 0.25, label: 'Amount', description: 'How much | of it.' },
           sigma: { type: 'float', min: 0.5, max: 8, step: 0.5, default: 2, unit: 'px', label: 'Sigma' },
           radius: { type: 'int', min: 1, max: 40, default: 4, unit: 'px', label: 'Radius' },
           invert: { type: 'bool', default: true, label: 'Invert' },
@@ -27,7 +28,8 @@ describe('filterReference', () => {
     ]);
     expect(md).toContain('### Thing (`thing`)');
     expect(md).toContain('Does a thing.');
-    expect(md).toContain('| `amount` | Amount | number | −1 … 1 (step 0.05) | 0.25 |');
+    expect(md).toContain('**Try this:** Drag Amount to the right.');
+    expect(md).toContain('| `amount` | Amount | number | −1 … 1 (step 0.05) | 0.25 |  | How much \\| of it. |');
     expect(md).toContain('| `sigma` | Sigma (px) | number | 0.5 … 8 (step 0.5), in pixels of the full-resolution image | 2 |');
     expect(md).toContain('| `radius` | Radius (px) | integer | 1 … 40, in pixels of the full-resolution image | 4 |');
     expect(md).toContain('| `invert` | Invert | on / off |  | on |');

@@ -48,13 +48,18 @@ function section(f: Filter<any>): string {
   const grouped = params.some(([, p]) => p.group);
   const lines = [`### ${f.label} (\`${f.id}\`)`, '', `${kind}.`, ''];
   if (f.description) lines.push(f.description, '');
+  if (f.tryThis) lines.push(`**Try this:** ${f.tryThis}`, '');
   if (params.length === 0) return `${lines.join('\n')}No parameters.\n`;
-  lines.push(`| Parameter | Label | Type | Range / options | Default |${grouped ? ' Group |' : ''}`, `|---|---|---|---|---|${grouped ? '---|' : ''}`);
+  const noted = params.some(([, p]) => p.description);
+  lines.push(
+    `| Parameter | Label | Type | Range / options | Default |${grouped ? ' Group |' : ''}${noted ? ' Notes |' : ''}`,
+    `|---|---|---|---|---|${grouped ? '---|' : ''}${noted ? '---|' : ''}`,
+  );
   for (const [key, p] of params) {
     const [type, range, def] = describe(p);
     const name = p.label ?? key;
     const label = 'unit' in p && p.unit === 'px' && !name.includes('px') ? `${name} (px)` : name;
-    lines.push(`| \`${key}\` | ${cell(label)} | ${type} | ${cell(range)} | ${cell(def)} |${grouped ? ` ${p.group ?? ''} |` : ''}`);
+    lines.push(`| \`${key}\` | ${cell(label)} | ${type} | ${cell(range)} | ${cell(def)} |${grouped ? ` ${p.group ?? ''} |` : ''}${noted ? ` ${cell(p.description ?? '')} |` : ''}`);
   }
   return `${lines.join('\n')}\n`;
 }

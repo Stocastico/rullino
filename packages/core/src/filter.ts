@@ -11,6 +11,8 @@ export interface PointwiseFilterDef<S extends ParamSchema = ParamSchema> {
   readonly id: string;
   readonly label: string;
   readonly description?: string;
+  /** One suggestion for exploring the filter ("push X, then look at Y"); shown next to its controls. */
+  readonly tryThis?: string;
   readonly category: FilterCategory;
   readonly kind: 'pointwise';
   /**
@@ -79,6 +81,8 @@ interface FilterBase<S extends ParamSchema> {
   readonly id: string;
   readonly label: string;
   readonly description?: string;
+  /** One suggestion for exploring the filter ("push X, then look at Y"); shown next to its controls. */
+  readonly tryThis?: string;
   readonly category: FilterCategory;
   readonly params: S;
   readonly tolerance: Tolerance;
