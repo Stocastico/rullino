@@ -131,7 +131,7 @@ export function createFilmStrip(root: HTMLElement, filters: readonly Filter<any>
         // The frame is rebuilt: keep the keyboard on the step that moved.
         queueMicrotask(() => (frameAt(to)?.querySelector('.step-title') as HTMLElement | null)?.focus());
       });
-      const solo = button('◐', 'solo', `Show the photo up to ${filter.label}`, 'frame-tool');
+      const solo = button('to here', 'solo', `Show the photo up to ${filter.label}`, 'frame-tool');
       solo.setAttribute('aria-pressed', String(soloUid === step.uid));
       solo.addEventListener('click', () => handlers.solo(soloUid === step.uid ? undefined : step.uid));
       const remove = button('✕', 'remove', `Remove ${filter.label}`, 'frame-tool');

@@ -198,7 +198,7 @@ kbd { font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var
 .frame:hover .frame-tools, .frame:focus-within .frame-tools, .frame.selected .frame-tools { opacity: 1; }
 @media (hover: none) { .frame-tools { opacity: 1; } }
 .frame-tool { border: 0; background: rgb(0 0 0 / 0.65); color: var(--text); width: 22px; height: 22px; padding: 0; border-radius: 4px; cursor: pointer; line-height: 1; }
-.frame-tool:hover, .frame-tool[aria-pressed=true] { color: var(--accent); }
+.frame-tool:hover { color: var(--accent); }
 .frame-original canvas { cursor: default; }
 .frame-selection, .frame-add { justify-content: center; width: 92px; }
 .frame-selection.selected { border-color: var(--accent); }
@@ -208,3 +208,5 @@ kbd { font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var
 .strip-empty[hidden] { display: none; }
 @media (max-width: 720px) { #workspace { --strip-h: 0px; } #strip { padding: 8px 12px; } }
 .frame.beyond canvas, .frame.beyond .step-title { opacity: 0.35; }
+.frame-tool[data-action=solo] { width: auto; padding: 0 6px; font-size: 11px; }
+.frame-tool[aria-pressed=true] { background: var(--accent); color: #161618; }
