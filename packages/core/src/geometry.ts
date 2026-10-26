@@ -27,7 +27,7 @@ export interface Geometry {
 
 export const IDENTITY_GEOMETRY: Geometry = { rotate: 0, flipH: false, flipV: false, straighten: 0, crop: { x: 0, y: 0, width: 1, height: 1 } };
 
-type Mat3 = [number, number, number, number, number, number, number, number, number];
+export type Mat3 = [number, number, number, number, number, number, number, number, number];
 
 const mul = (a: Mat3, b: Mat3): Mat3 => {
   const out = new Array<number>(9) as Mat3;

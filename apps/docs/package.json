@@ -1,0 +1,14 @@
+{
+  "name": "@rullino/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API reference generated with TypeDoc. Its own package because TypeDoc needs the TypeScript 5 compiler API, which the repo's TypeScript 7 does not have.",
+  "scripts": {
+    "docs": "typedoc"
+  },
+  "devDependencies": {
+    "typedoc": "^0.28.20",
+    "typescript": "~5.9.3"
+  }
+}

@@ -12,6 +12,8 @@ The weights are **not bundled**: `fetchModel` downloads a pinned revision from H
 
 > Pre-alpha (0.x): the API may change between minor versions.
 
+**[API reference](https://stocastico.github.io/rullino/docs/modules/_rullino_ml.html)** (generated from the sources)
+
 ## Install
 
 ONNX Runtime is **passed in, not imported**: the package has no runtime dependency, and you choose the build (WASM or WebGPU).

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "rullino",
+  "entryPoints": [
+    "../../packages/core",
+    "../../packages/filters",
+    "../../packages/presets",
+    "../../packages/ml"
+  ],
+  "entryPointStrategy": "packages",
+  "packageOptions": {
+    "entryPoints": [
+      "src/index.ts"
+    ],
+    "tsconfig": "tsconfig.build.json",
+    "skipErrorChecking": true,
+    "excludeExternals": true
+  },
+  "out": "../playground/dist/docs",
+  "readme": "../../README.md",
+  "githubPages": true,
+  "sourceLinkTemplate": "https://github.com/Stocastico/rullino/blob/main/{path}#L{line}",
+  "gitRevision": "main",
+  "skipErrorChecking": true,
+  "treatWarningsAsErrors": true
+}

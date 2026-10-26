@@ -45,6 +45,8 @@ jobs:
           if-no-files-found: ignore
       # Builds the packages (dist/) and the playground.
       - run: pnpm build
+      # The TypeDoc API reference: warnings (broken {@link}, exported types that point at unexported ones) fail it.
+      - run: pnpm build:docs
       # gzip size of every package and of the playground's main chunk against size-budget.json.
       - run: pnpm size
       # The packed packages as a user installs them: tarball contents, Node ESM, and a Vite bundle

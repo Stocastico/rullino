@@ -32,7 +32,7 @@ export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, va
 export { fillShape, paintStroke, type BrushOptions, type FillOptions, type Shape } from './paint';
 export { magicWand, type WandOptions } from './wand';
 export { histogramSrgb8, type Histogram } from './histogram';
-export { applyGeometryCpu, flipGeometry, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, turnGeometry, validateGeometry, type Geometry, type GeometryFrame } from './geometry';
+export { applyGeometryCpu, flipGeometry, geometryFrame, IDENTITY_GEOMETRY, isIdentityGeometry, turnGeometry, validateGeometry, type Geometry, type GeometryFrame, type Mat3 } from './geometry';
 export { refineMask, type RefineOptions } from './refine';
 export { linearToOklab, luminance, oklabToLinear, type Vec3 } from './oklab';
 export {
@@ -46,6 +46,7 @@ export {
   type FloatParam,
   type IntParam,
   type KernelParam,
+  type ImageParam,
   type Param,
   type ParamSchema,
   type ParamValue,
@@ -55,4 +56,4 @@ export { activeSteps, runChainCpu, type ChainOptions, type Step } from './pipeli
 export { Pipeline, type PipelineOptions } from './pipeline/pipeline';
 export { downscale } from './gpu/resize';
 export { downscaleCpu, fitWithin } from './resize';
-export { CHAIN_VERSION, parseChain, serializeChain, type ChainDocument, type MaskDocument, type ParseOptions, type SerializeOptions, type StepDocument } from './serialize';
+export { CHAIN_VERSION, parseChain, serializeChain, type ChainDocument, type MaskDocument, type ParseOptions, type SerializeOptions, type Json, type StepDocument } from './serialize';
