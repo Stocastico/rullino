@@ -154,25 +154,59 @@ The user marks regions by hand; the library turns marks into masks and applies o
 - Mask layer (gradient, brush, lasso) and masked steps; cut-out to alpha with magic wand and edge refinement; small-region inpainting (§4.6).
 - Chain via URL, undo/redo.
 
-### M5 — Release (in progress)
-- **M5.1** public API audit, metadata, notices — *done*.
-- **M5.2** `dist/` build, pack smoke test, size budget — *done*.
-- **M5.3** filter reference generated from the schemas, README per package — *done*.
-- **M5.4** playground on GitHub Pages (`stefanomasneri.com`), documentation review — *in progress*.
-- **M5.5** release workflow (tag, npm trusted publishing with provenance), changelog, drop `private`, `0.1.0` (first an `rc` on the `next` tag) — workflow, changelog and `0.1.0-rc.0` prepared; waiting for the Trusted Publisher setup on npm, then tag `v0.1.0-rc.0`.
+### M5 — Release — done
+- M5.1 API audit, M5.2 `dist/` + pack smoke + size budget, M5.3 generated filter reference, M5.4 playground on GitHub Pages, M5.5 release workflow: `0.1.0-rc.1` is on npm under `next`.
 
-### 0.2 (agreed, in this order)
-Creative effects from the shader world (Maxime Heckel's posts, Paper Shaders: Apache-2.0, algorithms only), all 2D image effects with CPU reference and parity:
-1. **Gradient map** (duotone / tritone: luminance through a colour ramp).
-2. **dither** and **halftone** extensions: blue / white noise next to Bayer and a 2-3 colour palette; ring and square dots, hex grid, "gooey" (smooth-min between neighbouring dots), CMYK "ink" type, moiré of two rotated grids.
-3. **Cell effects** on one pixelate-then-pattern skeleton: ASCII (built-in 5x7 glyph bitmaps, no dependency), LED panel with sub-pixels, receipt bars, Lego studs, crochet.
-4. **Outlines, hatching and tonal shadows** (Moebius style): Sobel on luminance and, with the ML depth map, on depth; crosshatch from luminance thresholds.
-5. **Fluted glass** (sine distortion, blur, dispersion) and a water / caustics distortion.
-6. **Anisotropic and Papari Kuwahara** (structure tensor, several passes): last, the most expensive.
-Out of scope: purely generative backgrounds (mesh gradient, warp, swirl, god rays; not filters on an image), mouse trails and animated depixelation (need time and state), volumetric light and raymarching (3D). Other 0.2 candidates: bicubic / Lanczos resize, non-local-means denoise, clarity / dehaze, blend modes, a `process()` facade, drop shadow, preset saving and `.cube` export, canvas blit helper, memory budget, Firefox / WebKit CI.
+## 6b. Reach and adoption (from 26 Oct 2026, 16 weeks)
+
+Goal: rullino becomes the MIT engine for photo edits that **preview on the GPU in the browser and render in Node with matching output**, with at least one production user we did not recruit. Breadth is not what is missing: **no new filters until the week-16 review**. The 0.2 creative-effects list below is frozen until then.
+
+Pitch: *describe a photo edit once as JSON; preview it live in the browser, render the final file on the server; output within a published per-filter tolerance; MIT, no runtime dependencies.* WebGPU, fusion and zero-deps are never the headline (fusion only after benchmarks show a win).
+
+Reality checks against the original proposal (measured or verified 26 Oct):
+- **The CPU path is a reference, not a product.** Node 22, 4000×3000: exposure + curves 10.0 s, Gaussian blur + sharpen 8.0 s, levels + vignette + grain 14.3 s. Both the browser fallback and the server renderer depend on it, so CPU speed is Phase 1 work, not an afterthought.
+- **"Same pixels" is not true and must not be claimed**: GPU intermediates are f16, some filters allow outliers (halftone 2% at 1e-2). The claim is "within the published tolerance of each filter", backed by a table generated from the schemas.
+- **Already done**: the repo is public; model licences are in `THIRD_PARTY_NOTICES.md` (all Apache-2.0 / MIT); a versioned edit JSON exists (`serializeChain`, chain + masks + geometry); share links in the URL hash exist.
+- **Konva and Fabric filters are synchronous** (`(imageData) => void`, Fabric `applyTo`); WebGPU is async. Adapters cannot be plain filters: they render asynchronously and swap the node's image source.
+- **Node has no decoder or JPEG / WebP encoder without dependencies** (`encodeImage` uses `OffscreenCanvas`). The Node renderer takes decoded RGBA in and writes PNG itself; JPEG / WebP and decoding go through an optional peer (`sharp`), outside the zero-dependency packages.
+
+### Phase 0 — release hygiene (week 1)
+- [ ] `0.1.0` on `latest` for all four packages; deprecate `0.0.0`. Done when the README quick-start runs in a clean project after `npm install @rullino/core @rullino/filters`.
+- [ ] Root README quick-start: one install line, ~10 lines, a before / after image; works in under 5 minutes.
+- [ ] Playground header: version, install line, GitHub link, link to the filter reference.
+- [ ] Parity badge + generated tolerance table (`docs/parity.md`, per filter: abs / rel / outliers).
+
+### Phase 1 — the product (weeks 2–6)
+1. **Edit document v2** (weeks 2–3): extend `ChainDocument` rather than start over — add export settings (format, size, bit depth, background), a JSON Schema file and a migration function from v1; `applyEdit(image, edit, { backend })`; looks (`@rullino/presets`) available as edit documents.
+2. **Fast CPU path** (weeks 2–4): fused pointwise chains in one pass over the buffer, separable convolutions without per-pixel allocations, then the worst offenders found by a CPU bench; every fast filter has a parity test against its reference (the reference stays the specification). Target to set after the first profile: 12 MP common chain < 1 s in Node.
+3. **One entry point with fallback** (weeks 3–4): `createContext()` picks WebGPU, else CPU in a Web Worker, and reports the backend; CPU previews at reduced resolution; `WebGpuUnavailableError` only when the caller demands the GPU. No WebGL2.
+4. **Node renderer** (weeks 4–5): Node entry (subpath of core or `@rullino/node`): RGBA in, `applyEdit` on CPU, PNG 8/16 out; `sharp` as optional peer for decode / JPEG / WebP. CI test: browser GPU vs Node output on a fixed image set within the table's tolerances. Example: one-file Express route.
+   - Spike first (1–2 days): WebGPU in Node through Dawn (`webgpu` package) — if it runs headless on CI, the server renders the *same shaders* and the CPU path is only the fallback.
+5. **Benchmarks** (weeks 5–6): 3 chains (exposure + curves + LUT; blur + unsharp; levels + vignette + grain) at 12 and 24 MP vs pixi-filters, Photon, wasm-vips: first preview, per-change latency, memory, gzip size. **Run on real hardware** (SwiftShader numbers are meaningless here); publish the losses too; drop the fusion claim if it shows no win.
+
+### Phase 2 — distribution (weeks 6–10)
+- [ ] `@rullino/konva` (Konva.Image source swapped after an async render) — first, it is where GPU speed shows most.
+- [ ] `@rullino/fabric` — after Konva, only if Konva gets interest; Fabric already has WebGL filters and two GPU contexts cannot share textures (one readback per render).
+- [ ] Each adapter: < 200 lines, README, StackBlitz demo.
+- [ ] Docs by job: preview + export, LUT looks in your editor, same edit on the server, remove an object on-device. Five one-file examples: Konva editor, Fabric editor, Next.js server render, Node batch, Worker fallback.
+- [ ] Migration notes from glfx and tui.image-editor (filter mapping).
+- [ ] Playground: **Copy as code** (edit JSON + snippet; was UX review step 6), backend + render time in plain words. The film strip and the examples gallery (UX review steps 4–5) wait: the playground is a developer demo, not an editor.
+
+### Phase 3 — launch and first users (weeks 10–16)
+- [ ] 3–5 design partners (teams on Konva / Fabric), one production integration live before launch.
+- [ ] Launch post (preview / render mismatch, honest benchmarks), Show HN around the job, Konva / Fabric discussions, r/webdev, r/javascript, JavaScript Weekly, Frontend Focus.
+- [ ] After launch: issues answered within 48 h for a month, good-first-issue labels, monthly release, a talk proposal on CPU/GPU parity testing.
+
+### Week-16 review
+Signals (targets are guesses, revise after the first partner calls): ≥ 1 production user not recruited, ≥ 3 design partners integrated, ≥ 10 outside issues / PRs, ≥ 15 public dependents; downloads as a trend against pixi-filters and Photon only. Decide: **grow** (WebGL2 tier if fallback speed is the top complaint, more adapters), **narrow** (Node-parity engine + adapters only) or **freeze** (reference implementation, no active development).
+
+Not doing until then: new filters, node-graph editor, full editor UI, WebGL2, marketing to photographers, ML expansion.
+
+### 0.2 creative effects (frozen until the week-16 review)
+Done: gradient map, dither / halftone extensions (except gooey and moiré), ASCII. Remaining, if the review says grow: other cell effects (LED, receipt, Lego, crochet), outlines / hatching (Moebius), fluted glass and caustics, anisotropic / Papari Kuwahara. Other candidates: bicubic / Lanczos resize, NLM denoise, clarity / dehaze, blend modes, drop shadow, `.cube` export, memory budget, Firefox / WebKit CI (Firefox / WebKit CI moves up if partners need it).
 
 ### Later
-- Tier-C filters (Hough, Harris, FFT, NLM, …), film simulations, possibly a WebGL2 backend if the user base asks for it.
+- Tier-C filters (Hough, Harris, FFT, NLM, …), film simulations, a WebGL2 backend if fallback users ask for it.
 
 ## 7. Open decisions
 
