@@ -27,6 +27,11 @@
     <main>
       <aside>
         <section>
+          <h2>Chain</h2>
+          <button id="auto" type="button" title="Suggest white balance and levels for this image">Auto</button>
+          <div id="chain"></div>
+        </section>
+        <section>
           <h2>Image</h2>
           <label>Sample <select id="sample"></select></label>
           <label class="file">Open file… <input id="file" type="file" accept="image/*" /></label>
@@ -37,17 +42,12 @@
           <div id="geometry" class="geometry"></div>
         </section>
         <section>
-          <h2>Histogram</h2>
+          <h2>Histogram of the result</h2>
           <canvas id="histogram" class="histogram" aria-label="Histogram of the result"></canvas>
         </section>
         <section>
           <h2>Looks</h2>
           <div id="looks" class="looks" role="list"></div>
-        </section>
-        <section>
-          <h2>Chain</h2>
-          <button id="auto" type="button" title="Suggest white balance and levels for this image">Auto</button>
-          <div id="chain"></div>
         </section>
         <section>
           <h2>Export</h2>

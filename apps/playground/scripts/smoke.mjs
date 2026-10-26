@@ -631,6 +631,13 @@ try {
   check(/Ramps & hues/.test(await status()), `last load should win, status: ${await status()}`);
   check(sizes.every((s) => s === '768x384'), `canvas sizes after back-to-back loads: ${sizes.join(', ')}`);
 
+  // A first visit (no ?sample, no link) opens on a chain that visibly does something.
+  await page.goto(url);
+  await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  check((await page.$$('#chain li[data-step]')).length > 1, 'a first visit should open on an example chain');
+  check((await differs()) > 0.05, `the first-visit chain should change the picture, ${((await differs()) * 100).toFixed(1)}% differs`);
+
   console.log(`smoke: ${ids.length} filters chained, status "${await status()}"`);
 } finally {
   await browser.close();
