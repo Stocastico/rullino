@@ -1,5 +1,9 @@
 # @rullino/core
 
+[![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
+
+**[Try it in the playground](https://stefanomasneri.com/rullino/)**
+
 The core of [rullino](https://github.com/Stocastico/rullino): GPU-first image processing for the web on **WebGPU**, written in TypeScript. Zero runtime dependencies.
 
 It holds what every filter builds on: the parameter schema and `defineFilter()`, the cached filter-chain `Pipeline`, masks, geometry (crop, perspective, straighten), 3D LUTs, colour maths, and export to PNG (8/16-bit), JPEG and WebP. The filters themselves are in [`@rullino/filters`](../filters/README.md).

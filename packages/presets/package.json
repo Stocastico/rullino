@@ -4,10 +4,17 @@
   "description": "Photo looks for rullino: LUT recipes plus vignette and grain.",
   "keywords": [
     "webgpu",
+    "wgsl",
     "image-processing",
-    "image",
-    "filters",
-    "typescript"
+    "image-filters",
+    "photo-editing",
+    "gpu",
+    "typescript",
+    "presets",
+    "film-look",
+    "lut",
+    "vignette",
+    "film-grain"
   ],
   "license": "MIT",
   "repository": {
@@ -15,7 +22,7 @@
     "url": "git+https://github.com/Stocastico/rullino.git",
     "directory": "packages/presets"
   },
-  "homepage": "https://github.com/Stocastico/rullino#readme",
+  "homepage": "https://stefanomasneri.com/rullino/",
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },

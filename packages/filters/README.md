@@ -1,5 +1,9 @@
 # @rullino/filters
 
+[![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
+
+**[Try it in the playground](https://stefanomasneri.com/rullino/)**
+
 The filters of [rullino](https://github.com/Stocastico/rullino): WebGPU compute shaders, each with a plain TypeScript CPU implementation that is the specification the GPU version is tested against. Built on [`@rullino/core`](../core/README.md).
 
 > Pre-alpha (0.x): the API may change between minor versions.
