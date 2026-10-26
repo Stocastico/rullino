@@ -15,7 +15,7 @@ rullino spans the arc from classic computer-vision operations (thresholds, convo
 > - **ML (optional, `@rullino/ml`)**: click-to-select objects (SlimSAM), object removal (MI-GAN) and depth for lens blur (Depth Anything V2 Small), with ONNX Runtime passed in by the caller.
 > - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links.
 >
-> Not published to npm yet. Input is 8-bit sRGB (what the browser decodes); not done yet: Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
+> Published on npm as `0.1.0-rc.1` under the `next` tag (`npm install @rullino/core@next @rullino/filters@next`); `latest` follows with `0.1.0`. Input is 8-bit sRGB (what the browser decodes); not done yet: Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
 
 ## Why
 

@@ -1,5 +1,9 @@
 # @rullino/ml
 
+[![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
+
+**[Try it in the playground](https://stefanomasneri.com/rullino/)**
+
 Optional machine-learning tools for [rullino](https://github.com/Stocastico/rullino), running small ONNX models in the browser:
 
 | Tool | Model | Size |

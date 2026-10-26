@@ -1,5 +1,9 @@
 # @rullino/presets
 
+[![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
+
+**[Try it in the playground](https://stefanomasneri.com/rullino/)**
+
 Photo looks for [rullino](https://github.com/Stocastico/rullino): each look is a recipe of ordinary filters (a colour grade baked once into a 3D LUT, plus vignette and grain), so there are no third-party LUT licences and a look is just a list of chain steps you can edit.
 
 > Pre-alpha (0.x): the API may change between minor versions.

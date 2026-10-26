@@ -4,10 +4,21 @@
   "description": "WebGPU image filters with CPU reference implementations: adjustments, convolutions, edges, morphology, stylize, lens blur.",
   "keywords": [
     "webgpu",
+    "wgsl",
     "image-processing",
-    "image",
-    "filters",
-    "typescript"
+    "image-filters",
+    "photo-editing",
+    "gpu",
+    "typescript",
+    "convolution",
+    "canny",
+    "clahe",
+    "halftone",
+    "dither",
+    "lens-blur",
+    "kuwahara",
+    "bloom",
+    "edge-detection"
   ],
   "license": "MIT",
   "repository": {
@@ -15,7 +26,7 @@
     "url": "git+https://github.com/Stocastico/rullino.git",
     "directory": "packages/filters"
   },
-  "homepage": "https://github.com/Stocastico/rullino#readme",
+  "homepage": "https://stefanomasneri.com/rullino/",
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },

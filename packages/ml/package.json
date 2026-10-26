@@ -5,13 +5,14 @@
   "keywords": [
     "webgpu",
     "image-processing",
-    "image",
-    "filters",
     "typescript",
     "onnx",
+    "onnxruntime",
     "segmentation",
     "inpainting",
-    "depth"
+    "depth-estimation",
+    "object-removal",
+    "sam"
   ],
   "license": "MIT",
   "repository": {
@@ -19,7 +20,7 @@
     "url": "git+https://github.com/Stocastico/rullino.git",
     "directory": "packages/ml"
   },
-  "homepage": "https://github.com/Stocastico/rullino#readme",
+  "homepage": "https://stefanomasneri.com/rullino/",
   "bugs": {
     "url": "https://github.com/Stocastico/rullino/issues"
   },
