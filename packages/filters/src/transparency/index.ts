@@ -7,12 +7,13 @@ import { defineFilter } from '@rullino/core';
 export const transparency = defineFilter({
   id: 'transparency',
   label: 'Transparency',
+  tryThis: 'Add a mask (try a gradient) and watch the checkerboard appear where it applies.',
   description: 'Makes the image (or, with a mask, part of it) transparent. Export as PNG to keep the alpha.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',
   params: {
-    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount' },
+    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount', description: 'How transparent the result is: 0 leaves it opaque, 1 makes it fully see-through.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

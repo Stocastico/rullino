@@ -20,177 +20,241 @@ Makes the whole picture lighter or darker, like opening or closing the lens by w
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 |
+Spreads tones apart (more contrast) or squeezes them together (less), around mid grey.
+
+**Try this:** Add some, then look at the histogram: the tones spread towards both ends.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 | Negative flattens the picture, positive makes darks darker and lights lighter. |
 
 ### Brightness (`brightness`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 |
+Makes the picture lighter or darker while keeping the colours as they are (unlike Exposure, it works on perceived lightness).
+
+**Try this:** Push it up and compare with Exposure: brightness leaves hue and colourfulness alone.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 | Negative darkens, positive lightens; 0 changes nothing. |
 
 ### Black point (`blackPoint`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | −0.2 … 0.2 (step 0.005) | 0 |
+Sets how dark the darkest tones are: raising the black point deepens shadows, lowering it lifts them into a faded look.
+
+**Try this:** Lower it slightly for a matte, filmic shadow, or raise it to make blacks richer.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | −0.2 … 0.2 (step 0.005) | 0 | Positive values crush the shadows towards black; negative values lift them. |
 
 ### Shadows / highlights (`shadowsHighlights`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `shadows` | Shadows | number | −1 … 1 (step 0.01) | 0 |
-| `highlights` | Highlights | number | −1 … 1 (step 0.01) | 0 |
+Recovers detail in dark and bright areas by lightening shadows or darkening highlights.
+
+**Try this:** Lift the shadows of a backlit portrait, then pull the highlights down a little to recover the sky.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `shadows` | Shadows | number | −1 … 1 (step 0.01) | 0 | Positive lightens dark areas, negative deepens them. |
+| `highlights` | Highlights | number | −1 … 1 (step 0.01) | 0 | Negative darkens bright areas, positive brightens them. |
 
 ### Curves (`curves`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `rgb` | RGB | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) |
-| `red` | Red | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) |
-| `green` | Green | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) |
-| `blue` | Blue | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) |
+Redraws the tone response with a curve: drag points to lift or lower any range of tones, overall or per colour channel.
+
+**Try this:** Pull the middle of the RGB curve up for a brighter mood, or drag the ends in for a faded look.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `rgb` | RGB | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) | The curve for all channels together: brightness and contrast. |
+| `red` | Red | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) | Applied to red only, after the RGB curve. |
+| `green` | Green | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) | Applied to green only, after the RGB curve. |
+| `blue` | Blue | tone curve | 2 to 16 points in [0, 1] | (0, 0) (1, 1) | Applied to blue only, after the RGB curve. |
 
 ### Levels (`levels`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `inBlack` | Input black | number | 0 … 1 (step 0.005) | 0 |
-| `inWhite` | Input white | number | 0 … 1 (step 0.005) | 1 |
-| `gamma` | Gamma (midtones) | number | 0.1 … 10 (step 0.01) | 1 |
-| `outBlack` | Output black | number | 0 … 1 (step 0.005) | 0 |
-| `outWhite` | Output white | number | 0 … 1 (step 0.005) | 1 |
+Maps a range of input tones to a range of output tones: set the black and white points, then adjust the midtones.
+
+**Try this:** Move Input black and Input white towards the edges of the histogram, then use the midtone gamma to set the mood.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `inBlack` | Input black | number | 0 … 1 (step 0.005) | 0 | Input tones at or below this become black. |
+| `inWhite` | Input white | number | 0 … 1 (step 0.005) | 1 | Input tones at or above this become white. |
+| `gamma` | Gamma (midtones) | number | 0.1 … 10 (step 0.01) | 1 | Above 1 lightens the midtones, below 1 darkens them. |
+| `outBlack` | Output black | number | 0 … 1 (step 0.005) | 0 | Black is raised to this level: a higher value gives a faded look. |
+| `outWhite` | Output white | number | 0 … 1 (step 0.005) | 1 | White is lowered to this level. |
 
 ### Equalise histogram (`equalize`)
 
 Multipass (3 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 |
+Spreads the tones evenly across the brightness range, which stretches contrast on flat images.
+
+**Try this:** Try it on a dull, hazy photo, then lower Amount until it stops looking harsh.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 | Blend between the original (0) and the fully equalised picture (1). |
 
 ### CLAHE (local contrast) (`clahe`)
 
 Multipass (3 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `tiles` | Tiles per side | integer | 1 … 16 | 8 |
-| `clipLimit` | Clip limit | number | 1 … 20 (step 0.1) | 3 |
-| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 |
+Boosts local contrast by balancing the histogram tile by tile, bringing out detail in flat or hazy areas.
+
+**Try this:** Raise the clip limit until textures pop, then pull Amount back until it looks natural.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `tiles` | Tiles per side | integer | 1 … 16 | 8 | How many tiles the image is cut into on each side. More tiles means more local, and a stronger effect on small areas. |
+| `clipLimit` | Clip limit | number | 1 … 20 (step 0.1) | 3 | How much contrast a tile may gain. Low values are gentle; high values bring out detail but also noise. |
+| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 | Blend between the original (0) and the full effect (1). |
 
 ### Gamma (`gamma`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `gamma` | Gamma | number | 0.2 … 5 (step 0.01) | 1 |
+Brightens or darkens the midtones without moving pure black or pure white.
+
+**Try this:** Drag it below 1 to darken the middle and above 1 to lighten it, and watch the ends stay put.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `gamma` | Gamma | number | 0.2 … 5 (step 0.01) | 1 | Above 1 lightens the midtones, below 1 darkens them; 1 changes nothing. |
 
 ### Saturation (`saturation`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 |
+Makes colours stronger or weaker, all by the same amount.
+
+**Try this:** Take it to the minimum for a grey picture, then bring it back to just under natural.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 | -1 removes all colour, +1 doubles the colourfulness; 0 changes nothing. |
 
 ### Vibrance (`vibrance`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 |
+Boosts muted colours more than ones that are already strong.
+
+**Try this:** Compare with Saturation on a muted photo: vibrance lifts the dull colours while strong ones barely change.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | −1 … 1 (step 0.01) | 0 | Positive boosts the dull colours most, negative mutes them; 0 changes nothing. |
 
 ### Hue (`hue`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `degrees` | Rotation (°) | number | −180 … 180 (step 1) | 0 |
+Rotates all colours around the colour wheel, so reds turn to greens, blues to oranges, and so on.
+
+**Try this:** Rotate by 180° for complementary colours, or by a few degrees to fix a colour cast.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `degrees` | Rotation (°) | number | −180 … 180 (step 1) | 0 | How far to rotate the hues; ±180° is the opposite colour. |
 
 ### Colour mixer (`colorMixer`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default | Group |
-|---|---|---|---|---|---|
-| `redHue` | Red (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `redSat` | Red | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `redLum` | Red | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `orangeHue` | Orange (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `orangeSat` | Orange | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `orangeLum` | Orange | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `yellowHue` | Yellow (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `yellowSat` | Yellow | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `yellowLum` | Yellow | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `greenHue` | Green (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `greenSat` | Green | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `greenLum` | Green | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `aquaHue` | Aqua (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `aquaSat` | Aqua | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `aquaLum` | Aqua | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `blueHue` | Blue (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `blueSat` | Blue | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `blueLum` | Blue | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `purpleHue` | Purple (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `purpleSat` | Purple | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `purpleLum` | Purple | number | −1 … 1 (step 0.01) | 0 | Luminance |
-| `magentaHue` | Magenta (°) | number | −30 … 30 (step 1) | 0 | Hue |
-| `magentaSat` | Magenta | number | −1 … 1 (step 0.01) | 0 | Saturation |
-| `magentaLum` | Magenta | number | −1 … 1 (step 0.01) | 0 | Luminance |
+Adjusts hue, saturation and lightness separately for eight colour ranges, so you can change the sky without touching the skin.
+
+**Try this:** Darken Blue and raise its saturation for a deeper sky, then shift Orange slightly to warm the skin.
+
+| Parameter | Label | Type | Range / options | Default | Group | Notes |
+|---|---|---|---|---|---|---|
+| `redHue` | Red (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of red tones. |
+| `redSat` | Red | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful red tones are. |
+| `redLum` | Red | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark red tones are. |
+| `orangeHue` | Orange (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of orange tones. |
+| `orangeSat` | Orange | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful orange tones are. |
+| `orangeLum` | Orange | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark orange tones are. |
+| `yellowHue` | Yellow (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of yellow tones. |
+| `yellowSat` | Yellow | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful yellow tones are. |
+| `yellowLum` | Yellow | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark yellow tones are. |
+| `greenHue` | Green (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of green tones. |
+| `greenSat` | Green | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful green tones are. |
+| `greenLum` | Green | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark green tones are. |
+| `aquaHue` | Aqua (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of aqua tones. |
+| `aquaSat` | Aqua | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful aqua tones are. |
+| `aquaLum` | Aqua | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark aqua tones are. |
+| `blueHue` | Blue (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of blue tones. |
+| `blueSat` | Blue | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful blue tones are. |
+| `blueLum` | Blue | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark blue tones are. |
+| `purpleHue` | Purple (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of purple tones. |
+| `purpleSat` | Purple | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful purple tones are. |
+| `purpleLum` | Purple | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark purple tones are. |
+| `magentaHue` | Magenta (°) | number | −30 … 30 (step 1) | 0 | Hue | Rotates the hue of magenta tones. |
+| `magentaSat` | Magenta | number | −1 … 1 (step 0.01) | 0 | Saturation | How colourful magenta tones are. |
+| `magentaLum` | Magenta | number | −1 … 1 (step 0.01) | 0 | Luminance | How light or dark magenta tones are. |
 
 ### Colour grading (`colorGrading`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default | Group |
-|---|---|---|---|---|---|
-| `shadows` | Colour | colour | sRGB colour | #337399 | Shadows |
-| `shadowsStrength` | Strength | number | 0 … 1 (step 0.01) | 0 | Shadows |
-| `midtones` | Colour | colour | sRGB colour | #bf9973 | Midtones |
-| `midtonesStrength` | Strength | number | 0 … 1 (step 0.01) | 0 | Midtones |
-| `highlights` | Colour | colour | sRGB colour | #ffb359 | Highlights |
-| `highlightsStrength` | Strength | number | 0 … 1 (step 0.01) | 0 | Highlights |
-| `balance` | Balance | number | −1 … 1 (step 0.01) | 0 |  |
+Tints shadows, midtones and highlights separately, the way split toning and three-way colour wheels do.
+
+**Try this:** Give the shadows a teal tint and the highlights an orange one at low strength.
+
+| Parameter | Label | Type | Range / options | Default | Group | Notes |
+|---|---|---|---|---|---|---|
+| `shadows` | Colour | colour | sRGB colour | #337399 | Shadows | The colour added to the dark tones. |
+| `shadowsStrength` | Strength | number | 0 … 1 (step 0.01) | 0 | Shadows | How strongly the shadows are tinted; 0 turns it off. |
+| `midtones` | Colour | colour | sRGB colour | #bf9973 | Midtones | The colour added to the middle tones. |
+| `midtonesStrength` | Strength | number | 0 … 1 (step 0.01) | 0 | Midtones | How strongly the midtones are tinted; 0 turns it off. |
+| `highlights` | Colour | colour | sRGB colour | #ffb359 | Highlights | The colour added to the bright tones. |
+| `highlightsStrength` | Strength | number | 0 … 1 (step 0.01) | 0 | Highlights | How strongly the highlights are tinted; 0 turns it off. |
+| `balance` | Balance | number | −1 … 1 (step 0.01) | 0 |  | Moves the boundary between shadows and highlights: negative widens the shadows, positive widens the highlights. |
 
 ### Channel mixer (`channelMixer`)
 
 Pointwise, premultiplied alpha.
 
-| Parameter | Label | Type | Range / options | Default | Group |
-|---|---|---|---|---|---|
-| `rr` | From red | number | −2 … 2 (step 0.01) | 1 | Red output |
-| `rg` | From green | number | −2 … 2 (step 0.01) | 0 | Red output |
-| `rb` | From blue | number | −2 … 2 (step 0.01) | 0 | Red output |
-| `gr` | From red | number | −2 … 2 (step 0.01) | 0 | Green output |
-| `gg` | From green | number | −2 … 2 (step 0.01) | 1 | Green output |
-| `gb` | From blue | number | −2 … 2 (step 0.01) | 0 | Green output |
-| `br` | From red | number | −2 … 2 (step 0.01) | 0 | Blue output |
-| `bg` | From green | number | −2 … 2 (step 0.01) | 0 | Blue output |
-| `bb` | From blue | number | −2 … 2 (step 0.01) | 1 | Blue output |
+Builds each output colour channel from a weighted mix of the input channels, on linear light.
+
+**Try this:** Feed some red into the blue output for a surreal colour swap, or set the red output to 0.3 / 0.6 / 0.1 for a classic black-and-white look.
+
+| Parameter | Label | Type | Range / options | Default | Group | Notes |
+|---|---|---|---|---|---|---|
+| `rr` | From red | number | −2 … 2 (step 0.01) | 1 | Red output | How much of the input red goes into the red output. |
+| `rg` | From green | number | −2 … 2 (step 0.01) | 0 | Red output | How much of the input green goes into the red output. |
+| `rb` | From blue | number | −2 … 2 (step 0.01) | 0 | Red output | How much of the input blue goes into the red output. |
+| `gr` | From red | number | −2 … 2 (step 0.01) | 0 | Green output | How much of the input red goes into the green output. |
+| `gg` | From green | number | −2 … 2 (step 0.01) | 1 | Green output | How much of the input green goes into the green output. |
+| `gb` | From blue | number | −2 … 2 (step 0.01) | 0 | Green output | How much of the input blue goes into the green output. |
+| `br` | From red | number | −2 … 2 (step 0.01) | 0 | Blue output | How much of the input red goes into the blue output. |
+| `bg` | From green | number | −2 … 2 (step 0.01) | 0 | Blue output | How much of the input green goes into the blue output. |
+| `bb` | From blue | number | −2 … 2 (step 0.01) | 1 | Blue output | How much of the input blue goes into the blue output. |
 
 ### White balance (`whiteBalance`)
 
 Pointwise, premultiplied alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `temperature` | Temperature | number | −1 … 1 (step 0.01) | 0 |
-| `tint` | Tint | number | −1 … 1 (step 0.01) | 0 |
+Corrects the colour of the light so that neutral things look neutral: cooler or warmer, greener or more magenta.
+
+**Try this:** Drag Temperature until something that should be white or grey looks neutral.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `temperature` | Temperature | number | −1 … 1 (step 0.01) | 0 | Negative makes the picture cooler (bluer), positive warmer (more orange). |
+| `tint` | Tint | number | −1 … 1 (step 0.01) | 0 | Negative adds green, positive adds magenta. |
 
 ### Transparency (`transparency`)
 
@@ -198,9 +262,11 @@ Pointwise, premultiplied alpha.
 
 Makes the image (or, with a mask, part of it) transparent. Export as PNG to keep the alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 |
+**Try this:** Add a mask (try a gradient) and watch the checkerboard appear where it applies.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 | How transparent the result is: 0 leaves it opaque, 1 makes it fully see-through. |
 
 ## Look (4)
 

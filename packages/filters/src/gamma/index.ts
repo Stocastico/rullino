@@ -6,11 +6,13 @@ const pow = (x: number, e: number) => Math.sign(x) * Math.abs(x) ** e;
 export const gamma = defineFilter({
   id: 'gamma',
   label: 'Gamma',
+  description: 'Brightens or darkens the midtones without moving pure black or pure white.',
+  tryThis: 'Drag it below 1 to darken the middle and above 1 to lighten it, and watch the ends stay put.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    gamma: { type: 'float', min: 0.2, max: 5, step: 0.01, default: 1, label: 'Gamma' },
+    gamma: { type: 'float', min: 0.2, max: 5, step: 0.01, default: 1, label: 'Gamma', description: 'Above 1 lightens the midtones, below 1 darkens them; 1 changes nothing.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

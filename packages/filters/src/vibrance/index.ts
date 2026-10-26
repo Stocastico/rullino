@@ -11,11 +11,13 @@ const FULL_CHROMA = 0.25;
 export const vibrance = defineFilter({
   id: 'vibrance',
   label: 'Vibrance',
+  description: 'Boosts muted colours more than ones that are already strong.',
+  tryThis: 'Compare with Saturation on a muted photo: vibrance lifts the dull colours while strong ones barely change.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount' },
+    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount', description: 'Positive boosts the dull colours most, negative mutes them; 0 changes nothing.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

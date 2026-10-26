@@ -19,12 +19,14 @@ function gains(temperature: number, tint: number): [number, number, number] {
 export const whiteBalance = defineFilter({
   id: 'whiteBalance',
   label: 'White balance',
+  description: 'Corrects the colour of the light so that neutral things look neutral: cooler or warmer, greener or more magenta.',
+  tryThis: 'Drag Temperature until something that should be white or grey looks neutral.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',
   params: {
-    temperature: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Temperature' },
-    tint: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Tint' },
+    temperature: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Temperature', description: 'Negative makes the picture cooler (bluer), positive warmer (more orange).' },
+    tint: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Tint', description: 'Negative adds green, positive adds magenta.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

@@ -15,12 +15,14 @@ const tone = (L: number, s: number, h: number) => {
 export const shadowsHighlights = defineFilter({
   id: 'shadowsHighlights',
   label: 'Shadows / highlights',
+  description: 'Recovers detail in dark and bright areas by lightening shadows or darkening highlights.',
+  tryThis: 'Lift the shadows of a backlit portrait, then pull the highlights down a little to recover the sky.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    shadows: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Shadows' },
-    highlights: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Highlights' },
+    shadows: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Shadows', description: 'Positive lightens dark areas, negative deepens them.' },
+    highlights: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Highlights', description: 'Negative darkens bright areas, positive brightens them.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

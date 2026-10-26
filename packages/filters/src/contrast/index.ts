@@ -8,11 +8,13 @@ import { MID_GREY_L, OKLAB_TOLERANCE } from '../shared';
 export const contrast = defineFilter({
   id: 'contrast',
   label: 'Contrast',
+  description: 'Spreads tones apart (more contrast) or squeezes them together (less), around mid grey.',
+  tryThis: 'Add some, then look at the histogram: the tones spread towards both ends.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount' },
+    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount', description: 'Negative flattens the picture, positive makes darks darker and lights lighter.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {
