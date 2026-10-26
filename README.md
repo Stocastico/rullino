@@ -4,7 +4,7 @@
 
 GPU-first image processing for the web, built on **WebGPU** and written in **TypeScript**.
 
-rullino spans the arc from classic computer-vision operations (thresholds, convolutions, Canny edges, morphology, median, bilateral, CLAHE) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain), with a few optional AI tools. A companion **playground** lets you load a photo, chain filters and tweak their parameters live: **[try it](https://stocastico.github.io/rullino/)**. Photos are processed on your machine and never uploaded.
+rullino spans the arc from classic computer-vision operations (thresholds, convolutions, Canny edges, morphology, median, bilateral, CLAHE) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain), with a few optional AI tools. A companion **playground** lets you load a photo, chain filters and tweak their parameters live: **[try it](https://stocastico.github.io/rullino/)** · **[API reference](https://stocastico.github.io/rullino/docs/)**. Photos are processed on your machine and never uploaded.
 
 [![The rullino playground: a photo with a look applied, before / after split, histogram and look gallery](./docs/playground.jpg)](https://stocastico.github.io/rullino/)
 

@@ -20,7 +20,8 @@
     "bench": "vitest run --project bench && cat packages/filters/bench/results.txt",
     "test:pack": "node scripts/pack-smoke.mjs",
     "size": "node scripts/size-budget.mjs",
-    "test:e2e:base": "pnpm --filter @rullino/playground smoke:base"
+    "test:e2e:base": "pnpm --filter @rullino/playground smoke:base",
+    "build:docs": "pnpm --filter @rullino/docs docs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

@@ -40,7 +40,7 @@ const wrap = (d: number) => d - 360 * Math.floor((d + 180) / 360);
 
 /**
  * HSL-style colour mixer in OKLCh: per hue band, shift the hue, scale the chroma and the lightness.
- * Greys (chroma below {@link GREY_CHROMA}) are left alone, fading in so nothing jumps.
+ * Greys (chroma below `GREY_CHROMA`) are left alone, fading in so nothing jumps.
  */
 export const colorMixer = defineFilter({
   id: 'colorMixer',

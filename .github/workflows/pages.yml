@@ -36,6 +36,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The playground reads the packages' sources, so only the site needs building.
       - run: pnpm --filter @rullino/playground build
+      # The API reference goes next to the playground (dist/docs); it must come after the Vite build, which empties dist/.
+      - run: pnpm build:docs
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

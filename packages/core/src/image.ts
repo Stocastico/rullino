@@ -21,7 +21,7 @@ export const MAX_IMAGE_SIDE = 2048;
 
 /**
  * Bilinear sample at normalised coordinates (u, v) in [0, 1] across the image, between pixel
- * centres, edges clamped. Returns the premultiplied RGBA values. The CPU twin of {@link imageSamplerWgsl}.
+ * centres, edges clamped. Returns the premultiplied RGBA values. The CPU twin of `imageSamplerWgsl`.
  */
 export function sampleImage(img: LinearImage, u: number, v: number): [number, number, number, number] {
   const px = Math.min(img.width - 1, Math.max(0, u * img.width - 0.5));

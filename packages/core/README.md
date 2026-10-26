@@ -6,6 +6,8 @@ It holds what every filter builds on: the parameter schema and `defineFilter()`,
 
 > Pre-alpha (0.x): the API may change between minor versions. Only the package root is public; `@rullino/core/internal` is plumbing without any stability promise.
 
+**[API reference](https://stocastico.github.io/rullino/docs/modules/_rullino_core.html)** (generated from the sources)
+
 ## Install
 
 ```sh
@@ -91,7 +93,7 @@ fn apply(c: vec4f, p: Params) -> vec4f {
 });
 ```
 
-Neighbourhood filters use `kind: 'multipass'` (a fixed list of passes); see the [filters' sources](../filters/src) for blurs, edges and reductions.
+Neighbourhood filters use `kind: 'multipass'` (a fixed list of passes); see the [filters' sources](https://github.com/Stocastico/rullino/tree/main/packages/filters/src) for blurs, edges and reductions.
 
 ## Export
 

@@ -11,7 +11,7 @@ import { resolveParams, type ParamSchema } from './params';
 
 export const CHAIN_VERSION = 1;
 
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 export type MaskDocument =
   | Exclude<Mask, { kind: 'raster' }>
