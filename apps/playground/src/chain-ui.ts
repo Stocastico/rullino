@@ -199,6 +199,7 @@ export function renderChain(
         const body = document.createElement('div');
         body.className = 'step-body';
         if (filter.description) body.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: filter.description }));
+        if (filter.tryThis) body.append(Object.assign(document.createElement('p'), { className: 'try-this', textContent: `Try this: ${filter.tryThis}` }));
         const controls = document.createElement('div');
         controls.className = 'controls';
         renderControls(controls, filter.params, step.params as never, (params) =>

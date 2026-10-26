@@ -230,7 +230,10 @@ export function renderControls<S extends ParamSchema>(
         break;
       }
     }
-    if (p.description) row.title = p.description;
+    if (p.description) {
+      row.title = p.description;
+      row.append(el('p', { className: 'param-help' }, p.description));
+    }
     if (p.group) row.dataset.group = p.group;
     root.append(row);
   }

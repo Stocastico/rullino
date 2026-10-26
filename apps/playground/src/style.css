@@ -52,7 +52,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .control-float output, .control-int output { grid-column: 2; grid-row: 1; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .control-float input, .control-int input { grid-column: 1 / span 2; }
 .control-enum label { justify-content: space-between; }
-.control-color { display: flex; justify-content: space-between; align-items: center; }
+.control-color { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; }
 .control-color input { width: 3em; height: 1.8em; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
 .reset { align-self: flex-start; cursor: pointer; }
 /* Anchored to the top (and sticky), so a long sidebar does not push the image down. */
@@ -165,3 +165,6 @@ button.primary { border-color: var(--accent); color: var(--accent); }
 .look-card:hover { border-color: var(--accent); }
 
 .shape-preview { fill: color-mix(in srgb, var(--accent) 25%, transparent); stroke: var(--accent); stroke-width: calc(2 * var(--px, 1)); stroke-dasharray: calc(6 * var(--px, 1)); pointer-events: none; }
+
+.param-help { grid-column: 1 / -1; flex-basis: 100%; margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.try-this { margin: 0; padding-left: 8px; border-left: 2px solid var(--accent); color: var(--muted); font-size: 12px; line-height: 1.4; }

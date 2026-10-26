@@ -144,6 +144,9 @@ describe('renderControls', () => {
     amount.dispatchEvent(new Event('dblclick'));
     expect([changes.at(-1)!.amount, amount.value]).toEqual([0, '0']);
     expect(amount.closest<HTMLElement>('.control')!.title).toBe('How much.');
+    // The description is also shown, as text under the control, not only on hover.
+    expect(amount.closest<HTMLElement>('.control')!.querySelector('.param-help')!.textContent).toBe('How much.');
+    expect(root.querySelectorAll('.param-help').length).toBe(1);
   });
 
   it('ignores invalid kernel cells', () => {

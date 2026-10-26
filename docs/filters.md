@@ -8,9 +8,13 @@
 
 Pointwise, premultiplied alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `ev` | EV | number | −5 … 5 (step 0.05) | 0 |
+Makes the whole picture lighter or darker, like opening or closing the lens by whole stops of light.
+
+**Try this:** Raise it until the sky starts to lose detail, then lower it a little.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `ev` | EV | number | −5 … 5 (step 0.05) | 0 | Stops of light: +1 doubles the brightness, −1 halves it. |
 
 ### Contrast (`contrast`)
 

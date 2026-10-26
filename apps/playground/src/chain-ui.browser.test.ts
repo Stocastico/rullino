@@ -132,7 +132,7 @@ describe('renderChain', () => {
   });
 
   it('mask-aware filters start with a brush mask that cannot be removed; descriptions show as hints', () => {
-    const needsMask = { ...filters[0]!, id: 'needs', kind: 'multipass', usesMask: true, description: 'Paints over things.', passes: [] } as never;
+    const needsMask = { ...filters[0]!, id: 'needs', kind: 'multipass', usesMask: true, description: 'Paints over things.', tryThis: 'Paint a small area first.', passes: [] } as never;
     const root = document.createElement('div');
     document.body.append(root);
     const states: ChainState[] = [];
@@ -142,6 +142,7 @@ describe('renderChain', () => {
     sel.dispatchEvent(new Event('change'));
     expect(states.at(-1)!.steps[0]!.mask?.kind).toBe('raster');
     expect(root.querySelector('.hint')!.textContent).toBe('Paints over things.');
+    expect(root.querySelector('.try-this')!.textContent).toBe('Try this: Paint a small area first.');
     expect([...root.querySelector<HTMLSelectElement>('[data-action=mask-kind]')!.options].map((o) => o.value)).not.toContain('none');
     // The mask panel reads the current state: a change made elsewhere shows after set().
     chain.set({ ...states.at(-1)!, steps: states.at(-1)!.steps.map((s) => ({ ...s, mask: { kind: 'linear', from: [0, 0], to: [1, 1] } })) }, true);
