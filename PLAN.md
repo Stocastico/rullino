@@ -190,7 +190,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 - [ ] Each adapter: < 200 lines, README, StackBlitz demo.
 - [ ] Docs by job: preview + export, LUT looks in your editor, same edit on the server, remove an object on-device. Five one-file examples: Konva editor, Fabric editor, Next.js server render, Node batch, Worker fallback.
 - [ ] Migration notes from glfx and tui.image-editor (filter mapping).
-- [ ] Playground: **Copy as code** (edit JSON + snippet; was UX review step 6), backend + render time in plain words. The film strip and the examples gallery (UX review steps 4–5) wait: the playground is a developer demo, not an editor.
+- [ ] Playground: **Copy as code** (edit JSON + snippet; was UX review step 6), backend + render time in plain words. The film strip (UX review step 4) is done; the examples gallery (step 5) waits: the playground is a developer demo, not an editor.
 
 ### Phase 3 — launch and first users (weeks 10–16)
 - [ ] 3–5 design partners (teams on Konva / Fabric), one production integration live before launch.
