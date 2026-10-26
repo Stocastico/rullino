@@ -11,6 +11,7 @@ Follow CLAUDE.md (Rules, Decisions, Traps); this is the order of work that has p
 - Which space? Perceptual tools (levels, posterize, halftone, dither, curves) work in **sRGB-encoded** units of the straight colour; physical ones (exposure, blur, bloom, means) in **linear premultiplied** light; hue / chroma tools in **OKLab / OKLCh**. Write the reason in the doc comment.
 - Kind: `pointwise` (pure `fn apply(c: vec4f, p: Params) -> vec4f`, fuses with neighbours) unless the filter needs neighbours, position or reductions → `multipass` (static pass list, `fn run(xy: vec2i, p: Params) -> vec4f`, `load_<input>(xy)`, `size()`).
 - Params: every one has a `label`; lengths in pixels are `unit: 'px'`; enums use non-integer-like keys; colours are `type: 'color'` (sRGB triple); long schemas get a `group` (tabs in the UI).
+- Texts: the filter needs a `description`, a `tryThis` and a `description` on every param (the registry test enforces it). Check each claim against the code (direction of a slider, units, defaults) before committing; first drafts got a sign wrong twice.
 - Avoid hard decisions (thresholds, argmin) where a smooth blend does the job: they cost parity outliers. If unavoidable, mirror the GPU's f16 intermediates in the CPU reference (`q16`).
 
 ## 2. Tests first (red)

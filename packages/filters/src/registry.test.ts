@@ -20,10 +20,8 @@ describe('filter registry', () => {
     for (const p of Object.values(f.params as ParamSchema)) expect(p.label, `${f.id} param label`).toBeTruthy();
   });
 
-  // The playground explains filters from their schemas. Categories are added here as their texts are
-  // written; once every category is listed, this becomes a rule for all filters.
-  const DESCRIBED = ['adjust', 'classic'];
-  it.each(filters.filter((f) => DESCRIBED.includes(f.category)).map((f) => [f.id, f] as const))(
+  // The playground and the generated reference explain filters from their schemas.
+  it.each(filters.map((f) => [f.id, f] as const))(
     '%s: has a description, a try-this and a description on every param',
     (_, f) => {
       expect(f.description, `${f.id} description`).toBeTruthy();

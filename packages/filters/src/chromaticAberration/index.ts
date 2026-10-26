@@ -19,10 +19,12 @@ function sample(img: LinearImage, x: number, y: number, c: number): number {
 export const chromaticAberration = defineFilter({
   id: 'chromaticAberration',
   label: 'Chromatic aberration',
+  description: 'Splits the colour channels toward the corners, like the colour fringes of a cheap lens.',
+  tryThis: 'Keep it small for a subtle lens feel, or go to the maximum for a glitchy look.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    amount: { type: 'float', min: -20, max: 20, step: 0.1, default: 4, unit: 'px', label: 'Shift at the corners (px)' },
+    amount: { type: 'float', min: -20, max: 20, step: 0.1, default: 4, unit: 'px', label: 'Shift at the corners (px)', description: 'How far red and blue move apart at the corners, in pixels; zero in the centre. Negative reverses the direction.' },
   },
   passes: [
     {

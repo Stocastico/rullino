@@ -36,12 +36,14 @@ const response = (y: number) => 0.2 + 0.8 * Math.min(1, Math.max(0, 4 * y * (1 -
 export const grain = defineFilter({
   id: 'grain',
   label: 'Grain',
+  description: 'Adds film-like grain, strongest in the midtones and gentler in deep shadows and bright highlights.',
+  tryThis: 'Raise the size a little, then pull the amount back until you only feel it.',
   category: 'look',
   kind: 'multipass',
   params: {
-    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.3, label: 'Amount' },
-    size: { type: 'float', min: 1, max: 8, step: 0.1, default: 1.5, unit: 'px', label: 'Size' },
-    seed: { type: 'int', min: 0, max: 999, default: 0, label: 'Seed' },
+    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.3, label: 'Amount', description: 'How strong the grain is.' },
+    size: { type: 'float', min: 1, max: 8, step: 0.1, default: 1.5, unit: 'px', label: 'Size', description: 'Size of the grain in pixels.' },
+    seed: { type: 'int', min: 0, max: 999, default: 0, label: 'Seed', description: 'Changes the grain pattern without changing its look.' },
   },
   passes: [
     {

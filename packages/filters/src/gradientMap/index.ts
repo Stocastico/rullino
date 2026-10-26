@@ -12,16 +12,18 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 export const gradientMap = defineFilter({
   id: 'gradientMap',
   label: 'Gradient map',
+  description: 'Recolours the picture by brightness: darks get one colour, lights another, optionally with a third in between (duotone and tritone).',
+  tryThis: 'Pick a deep blue for shadows and a warm yellow for highlights, then turn on the midtone colour.',
   category: 'look',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    shadows: { type: 'color', default: [0.08, 0.04, 0.25], label: 'Shadows' },
-    highlights: { type: 'color', default: [1, 0.85, 0.55], label: 'Highlights' },
-    tritone: { type: 'bool', default: false, label: 'Midtone colour' },
-    midtones: { type: 'color', default: [0.8, 0.25, 0.35], label: 'Midtones' },
-    midpoint: { type: 'float', min: 0.05, max: 0.95, step: 0.01, default: 0.5, label: 'Midpoint' },
-    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount' },
+    shadows: { type: 'color', default: [0.08, 0.04, 0.25], label: 'Shadows', description: 'Colour for the darkest tones.' },
+    highlights: { type: 'color', default: [1, 0.85, 0.55], label: 'Highlights', description: 'Colour for the brightest tones.' },
+    tritone: { type: 'bool', default: false, label: 'Midtone colour', description: 'Add a third colour between the other two.' },
+    midtones: { type: 'color', default: [0.8, 0.25, 0.35], label: 'Midtones', description: 'Colour for the middle tones; used only when the midtone colour is on.' },
+    midpoint: { type: 'float', min: 0.05, max: 0.95, step: 0.01, default: 0.5, label: 'Midpoint', description: 'Which brightness gets the midtone colour; used only when the midtone colour is on.' },
+    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount', description: 'Blend between the original (0) and the full recolouring (1).' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

@@ -13,11 +13,13 @@ const MIN_BLUR = 1e-3;
 export const sketch = defineFilter({
   id: 'sketch',
   label: 'Sketch',
+  description: 'Turns the picture into a pencil-like drawing by comparing each pixel with a blurred copy of the picture.',
+  tryThis: 'Make the line width larger for bold strokes, then raise the darkness for a deeper drawing.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    sigma: { type: 'float', min: 0.5, max: 20, step: 0.1, default: 3, unit: 'px', label: 'Line width σ (px)' },
-    darkness: { type: 'float', min: 0.5, max: 4, step: 0.01, default: 1.5, label: 'Darkness' },
+    sigma: { type: 'float', min: 0.5, max: 20, step: 0.1, default: 3, unit: 'px', label: 'Line width σ (px)', description: 'Thickness of the lines in pixels.' },
+    darkness: { type: 'float', min: 0.5, max: 4, step: 0.01, default: 1.5, label: 'Darkness', description: 'How dark the lines get; higher looks more like heavy pencil.' },
   },
   passes: [
     {

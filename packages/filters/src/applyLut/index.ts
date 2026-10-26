@@ -8,11 +8,13 @@ import { applyLutCpu, createImage, defineFilter, identityLut, linearToSrgb, srgb
 export const applyLut = defineFilter({
   id: 'applyLut',
   label: 'LUT',
+  description: 'Applies a colour look stored in a 3D LUT file (.cube or Hald CLUT), the format colour graders and presets use.',
+  tryThis: 'Load a .cube file, then use Intensity to mix it with the original.',
   category: 'look',
   kind: 'multipass',
   params: {
-    look: { type: 'lut', default: identityLut(2), label: 'LUT file' },
-    intensity: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Intensity' },
+    look: { type: 'lut', default: identityLut(2), label: 'LUT file', description: 'The LUT file to apply (.cube or a Hald CLUT image).' },
+    intensity: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Intensity', description: 'Blend between the original (0) and the full look (1).' },
   },
   passes: [
     {
