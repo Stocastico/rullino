@@ -67,7 +67,7 @@ try {
   });
   await removal.goto(`${url}?sample=tiger-cubs`);
   await removal.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 60000 });
-  await removal.selectOption('#chain select[data-action=add]', 'patch');
+  await removal.evaluate((id) => window.rullino.add(id), 'patch');
   await removal.click('#chain [data-action=tool-object]');
   const box2 = await removal.locator('#after').boundingBox();
   await removal.mouse.click(box2.x + box2.width * 0.78, box2.y + box2.height * 0.62);
@@ -106,7 +106,7 @@ try {
   });
   await lens.goto(`${url}?sample=still-life`);
   await lens.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 60000 });
-  await lens.selectOption('#chain select[data-action=add]', 'lensBlur');
+  await lens.evaluate((id) => window.rullino.add(id), 'lensBlur');
   await lens.click('#chain [data-action=depth]');
   await lens.waitForFunction(() => /Depth estimated|failed/.test(document.getElementById('announce').textContent), null, { timeout: 300000 });
   const depthSaid = await lens.textContent('#announce');

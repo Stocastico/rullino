@@ -3,9 +3,10 @@ import { renderControls } from './controls';
 import { emptyBrush, renderMaskControls } from './mask-ui';
 import { CATEGORY_LABELS } from './effect-search';
 
-// The filter chain editor: a list of steps (enable, reorder, remove), an "add filter" menu, and
-// the generated controls of the selected step. Structural edits rebuild the list; param edits
-// only update state, so a slider drag in progress is never interrupted.
+// The state of the filter chain and the inspector of its selected step (description, generated
+// controls, mask). The steps themselves are shown by the film strip; edits reach it through
+// `subscribe`. Structural edits redraw the inspector; param edits only update state, so a slider
+// drag in progress is never interrupted.
 
 export interface StepState {
   readonly uid: string;
@@ -46,8 +47,16 @@ export interface ChainActions {
 export interface ChainUi {
   /** Replaces the state after an edit made elsewhere (e.g. on the image); redraws only if asked. */
   set(state: ChainState, redraw: boolean): void;
-  /** Appends a step for the filter (a patch goes first) and selects it, as the Add filter menu does. */
+  /** Appends a step for the filter (a patch goes first) and selects it. */
   add(filter: Filter<any>): void;
+  /** Selects a step by uid, or SELECTION. */
+  select(uid: string): void;
+  toggle(uid: string, enabled: boolean): void;
+  remove(uid: string): void;
+  /** Moves the step at `from` so that it ends up at index `to`. */
+  move(from: number, to: number): void;
+  /** Called with the new state after every change, from here or from `set`. */
+  subscribe(listener: (state: ChainState) => void): void;
 }
 
 /** The step with `mask` set, or removed when undefined. */
@@ -75,14 +84,6 @@ export const newStep = (f: Filter<any>): StepState => ({
   ...(wantsMask(f) ? { mask: emptyBrush() } : {}),
 });
 
-/** A named group of steps added in one go (a look). */
-export interface StepGroup {
-  readonly id: string;
-  readonly label: string;
-  steps(): readonly { readonly filter: Filter<any>; readonly params?: Readonly<Record<string, unknown>> }[];
-}
-
-
 function button(label: string, action: string, title: string): HTMLButtonElement {
   const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label, title });
   b.dataset.action = action;
@@ -95,207 +96,128 @@ export function renderChain(
   filters: readonly Filter<any>[],
   initial: ChainState,
   onChange: (state: ChainState) => void,
-  groups: readonly StepGroup[] = [],
   actions: ChainActions = {},
 ): ChainUi {
   let state = initial;
   const byId = new Map(filters.map((f) => [f.id, f]));
+  const listeners: ((state: ChainState) => void)[] = [];
 
   const commit = (next: ChainState, rebuild: boolean) => {
     state = next;
     if (rebuild) draw();
+    listeners.forEach((l) => l(state));
     onChange(state);
   };
   const update = (uid: string, patch: Partial<StepState>) =>
     state.steps.map((s) => (s.uid === uid ? { ...s, ...patch } : s));
-  const move = (i: number, by: number) => {
-    const steps = [...state.steps];
-    const j = i + by;
-    if (j < 0 || j >= steps.length) return;
-    [steps[i], steps[j]] = [steps[j]!, steps[i]!];
-    commit({ ...state, steps }, true);
-  };
-
-  /** The "Selection" entry above the steps: one shared area that steps can opt into. */
-  function selectionEntry(): HTMLElement {
-    const entry = document.createElement('div');
-    entry.className = 'selection-entry';
-    entry.dataset.selection = '';
-    entry.classList.toggle('selected', state.selected === SELECTION);
-    const header = document.createElement('div');
-    header.className = 'step-header';
-    const title = button('Selection', 'select', 'Choose the area filters act on');
-    title.className = 'step-title';
-    title.addEventListener('click', () => commit({ ...state, selected: SELECTION }, true));
-    const summary = Object.assign(document.createElement('span'), { className: 'selection-summary', textContent: state.selection ? 'set' : 'whole image' });
-    header.append(title, summary);
-    entry.append(header);
-    if (state.selected === SELECTION) {
-      const body = document.createElement('div');
-      body.className = 'step-body';
-      body.append(
-        Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Select an area once, then tick "Only in selection" on any filter.' }),
-      );
-      const controls = document.createElement('div');
-      controls.className = 'mask-controls';
-      renderMaskControls(
-        controls,
-        () => state.selection,
-        (selection) => {
-          summary.textContent = selection ? 'set' : 'whole image';
-          commit(withSelection(state, selection), false);
-        },
-        false,
-      );
-      body.append(controls);
-      entry.append(body);
-    }
-    return entry;
-  }
-
-  function draw() {
-    root.replaceChildren();
-    root.append(selectionEntry());
-    const list = document.createElement('ol');
-    list.className = 'chain';
-    if (state.steps.length === 0) {
-      root.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Add a filter to start a chain.' }));
-    }
-    state.steps.forEach((step, i) => {
-      const filter = byId.get(step.filterId)!;
-      const item = document.createElement('li');
-      item.dataset.step = step.uid;
-      item.classList.toggle('selected', step.uid === state.selected);
-      item.classList.toggle('disabled', !step.enabled);
-
-      const header = document.createElement('div');
-      header.className = 'step-header';
-      const toggle = Object.assign(document.createElement('input'), { type: 'checkbox', checked: step.enabled, title: 'Enabled' });
-      toggle.dataset.action = 'toggle';
-      toggle.setAttribute('aria-label', `Enable ${filter.label}`);
-      toggle.addEventListener('change', () => commit({ ...state, steps: update(step.uid, { enabled: toggle.checked }) }, true));
-      const title = button(filter.label, 'select', `Edit ${filter.label}`);
-      title.className = 'step-title';
-      title.addEventListener('click', () => commit({ ...state, selected: step.uid }, true));
-      const up = button('↑', 'up', 'Move up');
-      up.disabled = i === 0;
-      up.addEventListener('click', () => move(i, -1));
-      const down = button('↓', 'down', 'Move down');
-      down.disabled = i === state.steps.length - 1;
-      down.addEventListener('click', () => move(i, 1));
-      const remove = button('✕', 'remove', 'Remove');
-      remove.addEventListener('click', () =>
-        commit(
-          {
-            ...state,
-            steps: state.steps.filter((s) => s.uid !== step.uid),
-            selected: state.selected === step.uid ? state.steps[i - 1]?.uid ?? state.steps[i + 1]?.uid : state.selected,
-          },
-          true,
-        ),
-      );
-      header.append(toggle, title, up, down, remove);
-      item.append(header);
-
-      if (step.uid === state.selected) {
-        const body = document.createElement('div');
-        body.className = 'step-body';
-        if (filter.description) body.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: filter.description }));
-        if (filter.tryThis) body.append(Object.assign(document.createElement('p'), { className: 'try-this', textContent: `Try this: ${filter.tryThis}` }));
-        const controls = document.createElement('div');
-        controls.className = 'controls';
-        renderControls(controls, filter.params, step.params as never, (params) =>
-          commit({ ...state, steps: update(step.uid, { params }) }, false),
-        );
-        const maskControls = document.createElement('div');
-        maskControls.className = 'mask-controls';
-        body.append(controls);
-        if (!wantsMask(filter)) {
-          const label = document.createElement('label');
-          label.className = 'use-selection';
-          const check = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!step.useSelection });
-          check.dataset.action = 'use-selection';
-          check.addEventListener('change', () => commit({ ...state, steps: update(step.uid, { useSelection: check.checked }) }, true));
-          label.append(check, ' Only in selection');
-          body.append(label);
-        }
-        if (step.useSelection) {
-          const edit = button('Edit selection', 'edit-selection', 'Change the area this step acts on');
-          edit.addEventListener('click', () => commit({ ...state, selected: SELECTION }, true));
-          maskControls.append(
-            Object.assign(document.createElement('p'), { className: 'hint', textContent: state.selection ? 'Acts only inside the selection.' : 'Nothing is selected yet: acts on the whole image.' }),
-            edit,
-          );
-        } else {
-          // Reads the step from the current state: the mask can also change from the image overlay.
-          renderMaskControls(
-            maskControls,
-            () => state.steps.find((s) => s.uid === step.uid)?.mask,
-            (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
-            wantsMask(filter),
-          );
-        }
-        body.append(maskControls);
-        if (filter.id === 'patch' && actions.fill) {
-          const fill = button('Fill with AI', 'fill', 'Fill the masked area with AI');
-          fill.className = 'primary';
-          fill.addEventListener('click', () => {
-            fill.disabled = true;
-            void actions.fill!(step.uid).finally(() => (fill.disabled = false));
-          });
-          body.append(fill);
-        }
-        if (filter.id === 'lensBlur' && actions.estimateDepth) {
-          const estimate = button('Estimate depth', 'depth', 'Estimate the depth map with AI');
-          estimate.className = 'primary';
-          estimate.addEventListener('click', () => {
-            estimate.disabled = true;
-            void actions.estimateDepth!(step.uid).finally(() => (estimate.disabled = false));
-          });
-          const pick = button('Pick focus', 'pick-focus', 'Click the image to focus there');
-          pick.disabled = step.params.depth === (filter.params as ParamSchema).depth?.default;
-          pick.addEventListener('click', () => actions.pickFocus?.(step.uid));
-          body.append(estimate, pick);
-        }
-        item.append(body);
-      }
-      list.append(item);
-    });
-    root.append(list);
-
-    const add = document.createElement('select');
-    add.dataset.action = 'add';
-    add.setAttribute('aria-label', 'Add filter');
-    add.append(new Option('+ Add filter…', ''));
-    for (const [category, label] of Object.entries(CATEGORY_LABELS)) {
-      const group = Object.assign(document.createElement('optgroup'), { label });
-      for (const f of filters.filter((f) => f.category === category)) group.append(new Option(f.label, f.id));
-      if (group.children.length) add.append(group);
-    }
-    add.addEventListener('change', () => {
-      const f = byId.get(add.value);
-      if (f) addFilter(f);
-    });
-    root.append(add);
-
-    if (groups.length === 0) return;
-    const addGroup = document.createElement('select');
-    addGroup.dataset.action = 'add-look';
-    addGroup.setAttribute('aria-label', 'Add look');
-    addGroup.append(new Option('+ Add look…', ''), ...groups.map((g) => new Option(g.label, g.id)));
-    addGroup.addEventListener('change', () => {
-      const group = groups.find((g) => g.id === addGroup.value);
-      if (!group) return;
-      const added = group.steps().map((s) => ({ ...newStep(s.filter), params: { ...defaultParams(s.filter.params), ...s.params } }));
-      commit({ ...state, steps: [...state.steps, ...added], selected: added[0]?.uid ?? state.selected }, true);
-    });
-    root.append(addGroup);
-  }
 
   function addFilter(f: Filter<any>): void {
     const step = newStep(f);
     // A patch is made from the original image, so it goes first (adjustments after it apply to the result).
     commit({ ...state, steps: f.id === 'patch' ? [step, ...state.steps] : [...state.steps, step], selected: step.uid }, true);
+  }
+  function remove(uid: string): void {
+    const i = state.steps.findIndex((s) => s.uid === uid);
+    if (i < 0) return;
+    commit({ ...state, steps: state.steps.filter((s) => s.uid !== uid), selected: state.selected === uid ? state.steps[i - 1]?.uid ?? state.steps[i + 1]?.uid : state.selected }, true);
+  }
+  function move(from: number, to: number): void {
+    const steps = [...state.steps];
+    if (from === to || from < 0 || to < 0 || from >= steps.length || to >= steps.length) return;
+    steps.splice(to, 0, steps.splice(from, 1)[0]!);
+    commit({ ...state, steps }, true);
+  }
+
+  /** The inspector of the selection: one shared area that steps can opt into. */
+  function selectionInspector(): HTMLElement {
+    const body = document.createElement('div');
+    body.className = 'step-body';
+    body.dataset.selection = '';
+    body.append(
+      Object.assign(document.createElement('h3'), { className: 'inspector-title', textContent: 'Selection' }),
+      Object.assign(document.createElement('p'), { className: 'hint', textContent: 'Select an area once, then tick "Only in selection" on any effect.' }),
+    );
+    const controls = document.createElement('div');
+    controls.className = 'mask-controls';
+    renderMaskControls(controls, () => state.selection, (selection) => commit(withSelection(state, selection), false), false);
+    body.append(controls);
+    return body;
+  }
+
+  function stepInspector(step: StepState): HTMLElement {
+    const filter = byId.get(step.filterId)!;
+    const body = document.createElement('div');
+    body.className = 'step-body';
+    body.dataset.step = step.uid;
+    const title = document.createElement('h3');
+    title.className = 'inspector-title';
+    title.textContent = filter.label;
+    title.append(Object.assign(document.createElement('small'), { textContent: CATEGORY_LABELS[filter.category] ?? filter.category }));
+    body.append(title);
+    if (filter.description) body.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: filter.description }));
+    if (filter.tryThis) body.append(Object.assign(document.createElement('p'), { className: 'try-this', textContent: `Try this: ${filter.tryThis}` }));
+    const controls = document.createElement('div');
+    controls.className = 'controls';
+    renderControls(controls, filter.params, step.params as never, (params) => commit({ ...state, steps: update(step.uid, { params }) }, false));
+    const maskControls = document.createElement('div');
+    maskControls.className = 'mask-controls';
+    body.append(controls);
+    if (!wantsMask(filter)) {
+      const label = document.createElement('label');
+      label.className = 'use-selection';
+      const check = Object.assign(document.createElement('input'), { type: 'checkbox', checked: !!step.useSelection });
+      check.dataset.action = 'use-selection';
+      check.addEventListener('change', () => commit({ ...state, steps: update(step.uid, { useSelection: check.checked }) }, true));
+      label.append(check, ' Only in selection');
+      body.append(label);
+    }
+    if (step.useSelection) {
+      const edit = button('Edit selection', 'edit-selection', 'Change the area this step acts on');
+      edit.addEventListener('click', () => commit({ ...state, selected: SELECTION }, true));
+      maskControls.append(
+        Object.assign(document.createElement('p'), { className: 'hint', textContent: state.selection ? 'Acts only inside the selection.' : 'Nothing is selected yet: acts on the whole image.' }),
+        edit,
+      );
+    } else {
+      // Reads the step from the current state: the mask can also change from the image overlay.
+      renderMaskControls(
+        maskControls,
+        () => state.steps.find((s) => s.uid === step.uid)?.mask,
+        (mask) => commit({ ...state, steps: state.steps.map((s) => (s.uid === step.uid ? withMask(s, mask) : s)) }, false),
+        wantsMask(filter),
+      );
+    }
+    body.append(maskControls);
+    if (filter.id === 'patch' && actions.fill) {
+      const fill = button('Fill with AI', 'fill', 'Fill the masked area with AI');
+      fill.className = 'primary';
+      fill.addEventListener('click', () => {
+        fill.disabled = true;
+        void actions.fill!(step.uid).finally(() => (fill.disabled = false));
+      });
+      body.append(fill);
+    }
+    if (filter.id === 'lensBlur' && actions.estimateDepth) {
+      const estimate = button('Estimate depth', 'depth', 'Estimate the depth map with AI');
+      estimate.className = 'primary';
+      estimate.addEventListener('click', () => {
+        estimate.disabled = true;
+        void actions.estimateDepth!(step.uid).finally(() => (estimate.disabled = false));
+      });
+      const pick = button('Pick focus', 'pick-focus', 'Click the image to focus there');
+      pick.disabled = step.params.depth === (filter.params as ParamSchema).depth?.default;
+      pick.addEventListener('click', () => actions.pickFocus?.(step.uid));
+      body.append(estimate, pick);
+    }
+    return body;
+  }
+
+  function draw() {
+    root.replaceChildren();
+    const step = state.steps.find((s) => s.uid === state.selected);
+    if (state.selected === SELECTION) root.append(selectionInspector());
+    else if (step) root.append(stepInspector(step));
+    else root.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: state.steps.length ? 'Select a frame in the strip under the photo to edit it.' : 'Press Browse effects (Ctrl+K) to add the first effect.' }));
   }
 
   draw();
@@ -303,7 +225,16 @@ export function renderChain(
     set(next, redraw) {
       state = next;
       if (redraw) draw();
+      listeners.forEach((l) => l(state));
     },
     add: addFilter,
+    select: (uid) => commit({ ...state, selected: uid }, true),
+    toggle: (uid, enabled) => commit({ ...state, steps: update(uid, { enabled }) }, false),
+    remove,
+    move,
+    subscribe: (listener) => {
+      listeners.push(listener);
+      listener(state);
+    },
   };
 }

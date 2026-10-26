@@ -37,6 +37,7 @@ import { autoAdjust, filters } from '@rullino/filters';
 import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
 import { lookLut, looks, lookSteps } from '@rullino/presets';
 import { createEffectBrowser } from './effect-browser';
+import { createFilmStrip } from './film-strip';
 import { effectiveMask, newStep, renderChain, SELECTION, withMask, withSelection, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
 import { renderGeometryControls, type Aspect, type EditMode } from './geometry-ui';
@@ -123,11 +124,16 @@ let chain: ChainState = (() => {
   return { steps: [first], selected: first.uid };
 })();
 
-const toSteps = (s: ChainState): Step[] =>
-  s.steps.map((st) => {
+/** The steps as the pipeline runs them. With `upTo`, the steps after that one are switched off (the strip's "show up to here"). */
+const toSteps = (s: ChainState, upTo?: string): Step[] => {
+  const cut = upTo ? s.steps.findIndex((st) => st.uid === upTo) : -1;
+  return s.steps.map((st, i) => {
     const mask = effectiveMask(s, st);
-    return { filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled, ...(mask ? { mask } : {}) };
+    return { filter: byId.get(st.filterId)!, params: st.params, enabled: st.enabled && (cut < 0 || i <= cut), ...(mask ? { mask } : {}) };
   });
+};
+/** View only: the photo is shown up to this step. Not part of the chain, history or share links. */
+let soloUid: string | undefined;
 
 /** Size of the after canvas for the current image; applied when a frame is ready, not on load. */
 let displaySize: [number, number] = [0, 0];
@@ -396,10 +402,10 @@ async function render() {
     const preview = dragging;
     const t0 = performance.now();
     try {
-      const steps = toSteps(chain);
+      const steps = toSteps(chain, soloUid);
       await busyWhile(renderer.render(steps, preview));
       const n = activeSteps(steps).length;
-      ui.status.textContent = `${renderer.name} · ${imageInfo} · ${n} step${n === 1 ? '' : 's'}${preview ? ' · preview' : ''} · ${(performance.now() - t0).toFixed(1)} ms`;
+      ui.status.textContent = `${renderer.name} · ${imageInfo} · ${n} step${n === 1 ? '' : 's'}${soloUid ? ' · up to one step' : ''}${preview ? ' · preview' : ''} · ${(performance.now() - t0).toFixed(1)} ms`;
     } catch (e) {
       announce(`Render failed: ${(e as Error).message}`);
       console.error(e);
@@ -407,6 +413,7 @@ async function render() {
   } while (dirty);
   busy = false;
   ui.status.dataset.frame = String(++frames); // lets the e2e smoke test wait for a finished frame
+  if (!dragging) refreshStrip();
 }
 
 // Loads run one at a time (overlapping loads would destroy each other's textures), and a load
@@ -755,9 +762,46 @@ const chainUi = renderChain(
     showOverlay();
     void render();
   },
-  looks.map((l) => ({ id: l.id, label: l.label, steps: () => lookSteps(l) })),
   { fill: fillPatch, estimateDepth, pickFocus },
 );
+
+// The chain as a film strip under the photo; every edit goes through chainUi, which tells the strip.
+const strip = createFilmStrip($<HTMLDivElement>('strip'), filters, {
+  select: (uid) => chainUi.select(uid),
+  toggle: (uid, enabled) => chainUi.toggle(uid, enabled),
+  remove: (uid) => {
+    if (uid === soloUid) setSolo(undefined);
+    chainUi.remove(uid);
+  },
+  move: (from, to) => chainUi.move(from, to),
+  add: () => effectBrowser.open(),
+  solo: (uid) => setSolo(uid),
+});
+chainUi.subscribe((state) => strip.set(state));
+function setSolo(uid: string | undefined): void {
+  soloUid = uid;
+  strip.setSolo(uid);
+  void render();
+}
+
+const STRIP_SIDE = 160;
+let stripQueued = false;
+/** Redraws the strip's frames: the picture after each step, through the same thumbnail pipeline as the looks. */
+function refreshStrip(): void {
+  if (stripQueued) return;
+  stripQueued = true;
+  loads = loads.then(async () => {
+    stripQueued = false;
+    if (!loaded) return;
+    try {
+      const steps = toSteps(chain);
+      const images = await renderer.thumbnails([[], ...steps.map((_, i) => steps.slice(0, i + 1))], STRIP_SIDE);
+      strip.setThumbnails(images[0], new Map(chain.steps.map((st, i) => [st.uid, images[i + 1]!])));
+    } catch (e) {
+      console.error(e);
+    }
+  });
+}
 ui.chain.addEventListener('pointerdown', (e) => {
   if ((e.target as HTMLElement).matches('input[type=range]')) dragging = true;
 });
@@ -885,6 +929,7 @@ function refreshThumbnails(): void {
   if (thumbnailsQueued) return;
   thumbnailsQueued = true;
   effectBrowser.invalidate();
+  refreshStrip();
   loads = loads.then(async () => {
     thumbnailsQueued = false;
     if (!loaded) return;
@@ -1095,8 +1140,13 @@ async function recoverFromDeviceLoss(info: GPUDeviceLostInfo): Promise<void> {
   await loads;
   void render();
 }
-// For the e2e smoke test: simulate a device loss.
-(window as unknown as { rullino: object }).rullino = { loseDevice: () => gpuContext?.device.destroy() };
+// For the e2e smoke test: simulate a device loss, and add effects without going through the dialog
+// (the dialog has its own checks).
+(window as unknown as { rullino: object }).rullino = {
+  loseDevice: () => gpuContext?.device.destroy(),
+  add: (id: string) => chainUi.add(byId.get(id)!),
+  filterIds: () => filters.map((f) => f.id),
+};
 
 await startRenderer();
 const shared = await readShareLink();
