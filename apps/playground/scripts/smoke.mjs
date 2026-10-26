@@ -639,8 +639,8 @@ try {
   check((await differs()) > 0.05, `the first-visit chain should change the picture, ${((await differs()) * 100).toFixed(1)}% differs`);
 
   // The effect browser: Ctrl+K, search, thumbnails drawn on the photo, Enter adds the first match.
-  const titles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
-  const stepsBefore = (await titles()).length;
+  const browserTitles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
+  const browserStepsBefore = (await browserTitles()).length;
   await page.keyboard.press('Control+k');
   await page.waitForSelector('dialog.effect-browser[open]', { timeout: 5000 });
   await page.fill('dialog.effect-browser input[type=search]', 'halftone');
@@ -655,9 +655,9 @@ try {
   });
   check(thumb.ready && thumb.w > 0 && thumb.spread > 100, `the halftone thumbnail should be drawn (ready ${thumb.ready}, width ${thumb.w}, contrast ${thumb.spread})`);
   await page.keyboard.press('Enter');
-  await page.waitForFunction((n) => document.querySelectorAll('#chain li[data-step]').length === n + 1, stepsBefore, { timeout: 10000 }).catch(() => {});
-  const after2 = await titles();
-  check(after2.length === stepsBefore + 1 && after2.at(-1) === 'Halftone', `Enter should add Halftone, steps were ${after2.join(', ')}`);
+  await page.waitForFunction((n) => document.querySelectorAll('#chain li[data-step]').length === n + 1, browserStepsBefore, { timeout: 10000 }).catch(() => {});
+  const after2 = await browserTitles();
+  check(after2.length === browserStepsBefore + 1 && after2.at(-1) === 'Halftone', `Enter should add Halftone, steps were ${after2.join(', ')}`);
   check(!(await page.$eval('dialog.effect-browser', (d) => d.open)), 'adding an effect should close the browser');
 
   console.log(`smoke: ${ids.length} filters chained, status "${await status()}"`);
