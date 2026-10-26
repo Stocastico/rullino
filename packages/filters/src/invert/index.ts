@@ -9,6 +9,8 @@ const inv = (x: number) => srgbToLinear(1 - Math.min(1, Math.max(0, linearToSrgb
 export const invert = defineFilter({
   id: 'invert',
   label: 'Invert',
+  description: 'Swaps every colour for its opposite, like a photographic negative.',
+  tryThis: 'Apply it twice and the original comes back.',
   category: 'classic',
   kind: 'pointwise',
   alpha: 'straight',

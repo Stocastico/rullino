@@ -319,131 +319,191 @@ Pointwise, straight alpha.
 
 Pointwise, premultiplied alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `method` | Method | choice | `luminance` Luminance (Rec. 709), `average` Average, `max` Max | `luminance` |
-| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 |
+Removes colour, keeping only brightness.
+
+**Try this:** Compare Luminance, Average and Max on a picture with a strong red or blue.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `method` | Method | choice | `luminance` Luminance (Rec. 709), `average` Average, `max` Max | `luminance` | How brightness is computed. Luminance weighs colours like the eye does, Average takes the mean, Max takes the brightest channel. |
+| `amount` | Amount | number | 0 … 1 (step 0.01) | 1 | Blend between the original colour (0) and full grayscale (1). |
 
 ### Invert (`invert`)
 
 Pointwise, straight alpha.
+
+Swaps every colour for its opposite, like a photographic negative.
+
+**Try this:** Apply it twice and the original comes back.
 No parameters.
 
 ### Threshold (`threshold`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `level` | Level | number | 0 … 1 (step 0.01) | 0.5 |
-| `invert` | Invert | on / off |  | off |
+Turns the picture into pure black and white: pixels brighter than the level become white.
+
+**Try this:** Slide the level and watch the picture become a stencil.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `level` | Level | number | 0 … 1 (step 0.01) | 0.5 | The brightness cut-off. Higher values leave less white. |
+| `invert` | Invert | on / off |  | off | Swap black and white. |
 
 ### Otsu threshold (`otsu`)
 
 Multipass (3 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `invert` | Invert | on / off |  | off |
+Turns the picture into black and white, choosing the best cut-off automatically from the histogram.
+
+**Try this:** Try it on a clear subject against a plain background.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `invert` | Invert | on / off |  | off | Swap black and white. |
 
 ### Adaptive threshold (`adaptiveThreshold`)
 
 Multipass (4 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `sigma` | Neighbourhood σ (px) | number | 0.5 … 50 (step 0.1), in pixels of the full-resolution image | 8 |
-| `offset` | Offset C | number | −0.5 … 0.5 (step 0.005) | 0.02 |
-| `invert` | Invert | on / off |  | off |
+Turns the picture into black and white by comparing each pixel with the average of its surroundings, so it copes with uneven lighting.
+
+**Try this:** Try it on a photographed page with a shadow across it, where a plain Threshold fails.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `sigma` | Neighbourhood σ (px) | number | 0.5 … 50 (step 0.1), in pixels of the full-resolution image | 8 | How far around each pixel the local average reaches. Larger values suit bigger shapes. |
+| `offset` | Offset C | number | −0.5 … 0.5 (step 0.005) | 0.02 | A pixel turns white when it is brighter than its local average minus this value. Raise it for more white; lower it to remove speckles. |
+| `invert` | Invert | on / off |  | off | Swap black and white. |
 
 ### Posterize (`posterize`)
 
 Pointwise, straight alpha.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `levels` | Levels | integer | 2 … 32 | 4 |
+Reduces each colour channel to a few levels, giving flat poster-like areas.
+
+**Try this:** Go down to 3 or 4 levels for graphic blocks of colour.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `levels` | Levels | integer | 2 … 32 | 4 | How many levels each channel keeps. 2 is the most extreme. |
 
 ### Gaussian blur (`gaussianBlur`)
 
 Multipass (2 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `sigma` | Sigma (px) | number | 0 … 50 (step 0.1), in pixels of the full-resolution image | 2 |
+Blurs with a bell-shaped weighting, the most natural-looking blur.
+
+**Try this:** Add a mask to blur only part of the picture, such as the background.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `sigma` | Sigma (px) | number | 0 … 50 (step 0.1), in pixels of the full-resolution image | 2 | The spread of the blur in pixels; 0 changes nothing. |
 
 ### Box blur (`boxBlur`)
 
 Multipass (2 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `radius` | Radius (px) | integer | 0 … 50, in pixels of the full-resolution image | 3 |
+Blurs by averaging every pixel in a square around each pixel.
+
+**Try this:** Compare it with Gaussian blur at a large radius: the box leaves a more even, slightly blocky blur.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `radius` | Radius (px) | integer | 0 … 50, in pixels of the full-resolution image | 3 | Half the side of the square, in pixels; 0 changes nothing. |
 
 ### Sharpen (`sharpen`)
 
 Multipass (1 pass).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | 0 … 3 (step 0.01) | 0.5 |
+Makes edges crisper by emphasising the difference between each pixel and its four neighbours.
+
+**Try this:** Zoom to 100% and raise it until edges stand out, then back off before halos appear.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | 0 … 3 (step 0.01) | 0.5 | Strength of the sharpening; 0 changes nothing. |
 
 ### Unsharp mask (`unsharpMask`)
 
 Multipass (3 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `amount` | Amount | number | 0 … 5 (step 0.01) | 1 |
-| `sigma` | Radius σ (px) | number | 0.3 … 50 (step 0.1), in pixels of the full-resolution image | 2 |
+Sharpens by subtracting a blurred copy, the classic photographic method; the radius sets which detail is boosted.
+
+**Try this:** Use a small radius for fine detail and a large one for a broad local-contrast boost.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `amount` | Amount | number | 0 … 5 (step 0.01) | 1 | How strongly the detail is boosted; 0 changes nothing. |
+| `sigma` | Radius σ (px) | number | 0.3 … 50 (step 0.1), in pixels of the full-resolution image | 2 | Size of the blur that is subtracted, in pixels. Small boosts fine texture, large boosts broader contrast. |
 
 ### Custom kernel (`convolve`)
 
 Multipass (1 pass).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `kernel` | Kernel | 5×5 matrix | 25 values | 25 values |
-| `normalize` | Normalise by sum | on / off |  | on |
-| `bias` | Bias | number | −1 … 1 (step 0.01) | 0 |
+Applies your own 5×5 kernel: each output pixel is a weighted sum of its neighbours. A 3×3 kernel goes in the centre.
+
+**Try this:** Put 1 in the centre and 0 elsewhere for no change, then try 5 in the centre with -1 on the four cells next to it for a sharpen.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `kernel` | Kernel | 5×5 matrix | 25 values | 25 values | The weights. The centre cell is the pixel itself. |
+| `normalize` | Normalise by sum | on / off |  | on | Divide by the sum of the weights, so a blur keeps the overall brightness. |
+| `bias` | Bias | number | −1 … 1 (step 0.01) | 0 | Added to the result, useful for kernels whose weights add up to zero (edge detectors). |
 
 ### Canny edges (`canny`)
 
 Multipass (7 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `sigma` | Smoothing σ (px) | number | 0 … 10 (step 0.1), in pixels of the full-resolution image | 1.4 |
-| `low` | Low threshold | number | 0 … 1 (step 0.005) | 0.05 |
-| `high` | High threshold | number | 0 … 1 (step 0.005) | 0.15 |
-| `iterations` | Hysteresis iterations | integer | 0 … 256 | 64 |
+Finds thin, connected edges: smooths the picture, measures the gradient, thins it to one pixel, then keeps strong edges and the weak ones attached to them.
+
+**Try this:** Lower the high threshold until the outline of the main subject appears, then raise the low threshold to cut the noise.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `sigma` | Smoothing σ (px) | number | 0 … 10 (step 0.1), in pixels of the full-resolution image | 1.4 | Blur applied first, in pixels. More smoothing ignores fine texture. |
+| `low` | Low threshold | number | 0 … 1 (step 0.005) | 0.05 | Gradients below this are never edges; between low and high they count only when connected to a strong edge. |
+| `high` | High threshold | number | 0 … 1 (step 0.005) | 0.15 | Gradients above this are always edges. |
+| `iterations` | Hysteresis iterations | integer | 0 … 256 | 64 | How many rounds are used to follow weak edges. Enough rounds give the full result; more only costs time. |
 
 ### Morphology (`morphology`)
 
 Multipass (3 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `operation` | Operation | choice | `erode` Erode, `dilate` Dilate, `open` Open, `close` Close, `gradient` Gradient, `tophat` Top-hat, `blackhat` Black-hat | `dilate` |
-| `shape` | Structuring element | choice | `square` Square, `disk` Disk, `cross` Cross | `disk` |
-| `radius` | Radius (px) | integer | 1 … 15, in pixels of the full-resolution image | 2 |
+Grows or shrinks bright shapes, or opens and closes gaps, with a small shape moved over the picture.
+
+**Try this:** Erode removes small bright specks; Dilate widens bright shapes; Close fills small dark holes.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `operation` | Operation | choice | `erode` Erode, `dilate` Dilate, `open` Open, `close` Close, `gradient` Gradient, `tophat` Top-hat, `blackhat` Black-hat | `dilate` | Erode shrinks bright areas, Dilate grows them. Open and Close combine the two to remove specks or fill holes. Gradient outlines shapes; Top-hat and Black-hat keep small bright or dark details. |
+| `shape` | Structuring element | choice | `square` Square, `disk` Disk, `cross` Cross | `disk` | The shape moved over the picture: a square, a round disk or a cross. |
+| `radius` | Radius (px) | integer | 1 … 15, in pixels of the full-resolution image | 2 | Size of that shape in pixels. |
 
 ### Median (`median`)
 
 Multipass (1 pass).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `radius` | Radius (px) | integer | 1 … 3, in pixels of the full-resolution image | 1 |
+Replaces each pixel by the median of its neighbours, which removes speckle noise while keeping edges.
+
+**Try this:** Use radius 1 on a noisy shot, and radius 3 for a painterly, flattened look.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `radius` | Radius (px) | integer | 1 … 3, in pixels of the full-resolution image | 1 | Size of the neighbourhood in pixels. |
 
 ### Bilateral (`bilateral`)
 
 Multipass (2 passes).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `sigmaSpace` | Spatial sigma (px) | number | 0.5 … 20 (step 0.1), in pixels of the full-resolution image | 3 |
-| `sigmaRange` | Colour sigma (ΔE) | number | 0.01 … 0.5 (step 0.005) | 0.08 |
+Smooths flat areas while keeping edges sharp, by averaging only with neighbours of a similar colour.
+
+**Try this:** Raise the spatial sigma on a portrait for smooth skin, and keep the colour sigma low so edges stay crisp.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `sigmaSpace` | Spatial sigma (px) | number | 0.5 … 20 (step 0.1), in pixels of the full-resolution image | 3 | How far the smoothing reaches, in pixels. |
+| `sigmaRange` | Colour sigma (ΔE) | number | 0.01 … 0.5 (step 0.005) | 0.08 | How different in colour a neighbour may be and still be averaged in. Low keeps edges; high approaches a plain blur. |
 
 ### Remove (inpaint) (`inpaint`)
 
@@ -451,10 +511,12 @@ Multipass (8 passes), needs a mask.
 
 Paint a mask over what to remove; it is rebuilt from the surrounding pixels. For wider areas, raise the reach to at least half their width.
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `sigma` | Reach (px) | number | 1 … 100 (step 0.5), in pixels of the full-resolution image | 12 |
-| `iterations` | Smoothing iterations | integer | 0 … 400 | 30 |
+**Try this:** Paint a thin scratch or a wire, and watch it disappear; use a larger reach for wider areas.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `sigma` | Reach (px) | number | 1 … 100 (step 0.5), in pixels of the full-resolution image | 12 | How far into the surroundings the fill reaches, in pixels. Use at least half the width of the area you remove. |
+| `iterations` | Smoothing iterations | integer | 0 … 400 | 30 | Smoothing rounds applied to the fill. More is smoother but slower. |
 
 ### Remove object (`patch`)
 
@@ -462,29 +524,39 @@ Multipass (1 pass).
 
 Select what to remove with the brush, wand or Object tool, then press Fill with AI (the first use downloads a 28 MB model).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `patch` | Image | image | an image set by the app, not serialisable | none |
+**Try this:** Paint over a small object first, then press Fill with AI.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `patch` | Image | image | an image set by the app, not serialisable | none | The fill made by the Fill with AI button; there is nothing to set by hand. |
 
 ### Gradient (`gradient`)
 
 Multipass (1 pass).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `method` | Operator | choice | `sobel` Sobel, `scharr` Scharr, `prewitt` Prewitt | `sobel` |
-| `output` | Output | choice | `magnitude` Magnitude, `horizontal` Horizontal, `vertical` Vertical | `magnitude` |
-| `strength` | Strength | number | 0 … 10 (step 0.01) | 1 |
+Shows how fast brightness changes at each pixel: edges light up, flat areas go dark.
+
+**Try this:** Switch Output to Horizontal, then Vertical, to see which edges each direction picks up.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `method` | Operator | choice | `sobel` Sobel, `scharr` Scharr, `prewitt` Prewitt | `sobel` | The kernel used. Sobel is the usual choice, Scharr is more accurate for diagonals, Prewitt is the simplest. |
+| `output` | Output | choice | `magnitude` Magnitude, `horizontal` Horizontal, `vertical` Vertical | `magnitude` | Magnitude shows edge strength in any direction; Horizontal and Vertical show signed change on mid grey. |
+| `strength` | Strength | number | 0 … 10 (step 0.01) | 1 | Scales the result; raise it to see faint edges. |
 
 ### Laplacian (`laplacian`)
 
 Multipass (1 pass).
 
-| Parameter | Label | Type | Range / options | Default |
-|---|---|---|---|---|
-| `connectivity` | Neighbours | choice | `four` 4 neighbours, `eight` 8 neighbours | `four` |
-| `output` | Output | choice | `signed` Signed, `magnitude` Magnitude | `signed` |
-| `strength` | Strength | number | 0 … 10 (step 0.01) | 1 |
+Measures how much each pixel differs from its neighbours, which highlights edges and fine detail.
+
+**Try this:** Use Magnitude to see edges as bright lines, or Signed to see which side of an edge is brighter.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `connectivity` | Neighbours | choice | `four` 4 neighbours, `eight` 8 neighbours | `four` | Which neighbours are compared: the 4 direct ones, or all 8 around the pixel. |
+| `output` | Output | choice | `signed` Signed, `magnitude` Magnitude | `signed` | Signed keeps the direction of change on mid grey; Magnitude shows its size only. |
+| `strength` | Strength | number | 0 … 10 (step 0.01) | 1 | Scales the result; raise it to see faint detail. |
 
 ## Stylize (10)
 

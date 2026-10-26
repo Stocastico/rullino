@@ -11,12 +11,14 @@ const IDENTITY = Array.from({ length: 25 }, (_, i) => (i === 12 ? 1 : 0));
 export const convolve = defineFilter({
   id: 'convolve',
   label: 'Custom kernel',
+  description: 'Applies your own 5×5 kernel: each output pixel is a weighted sum of its neighbours. A 3×3 kernel goes in the centre.',
+  tryThis: 'Put 1 in the centre and 0 elsewhere for no change, then try 5 in the centre with -1 on the four cells next to it for a sharpen.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    kernel: { type: 'kernel', size: 5, default: IDENTITY, label: 'Kernel' },
-    normalize: { type: 'bool', default: true, label: 'Normalise by sum' },
-    bias: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Bias' },
+    kernel: { type: 'kernel', size: 5, default: IDENTITY, label: 'Kernel', description: 'The weights. The centre cell is the pixel itself.' },
+    normalize: { type: 'bool', default: true, label: 'Normalise by sum', description: 'Divide by the sum of the weights, so a blur keeps the overall brightness.' },
+    bias: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Bias', description: 'Added to the result, useful for kernels whose weights add up to zero (edge detectors).' },
   },
   passes: [
     {

@@ -9,12 +9,14 @@ import { convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
 export const adaptiveThreshold = defineFilter({
   id: 'adaptiveThreshold',
   label: 'Adaptive threshold',
+  description: 'Turns the picture into black and white by comparing each pixel with the average of its surroundings, so it copes with uneven lighting.',
+  tryThis: 'Try it on a photographed page with a shadow across it, where a plain Threshold fails.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    sigma: { type: 'float', min: 0.5, max: 50, step: 0.1, default: 8, unit: 'px', label: 'Neighbourhood σ (px)' },
-    offset: { type: 'float', min: -0.5, max: 0.5, step: 0.005, default: 0.02, label: 'Offset C' },
-    invert: { type: 'bool', default: false, label: 'Invert' },
+    sigma: { type: 'float', min: 0.5, max: 50, step: 0.1, default: 8, unit: 'px', label: 'Neighbourhood σ (px)', description: 'How far around each pixel the local average reaches. Larger values suit bigger shapes.' },
+    offset: { type: 'float', min: -0.5, max: 0.5, step: 0.005, default: 0.02, label: 'Offset C', description: 'A pixel turns white when it is brighter than its local average minus this value. Raise it for more white; lower it to remove speckles.' },
+    invert: { type: 'bool', default: false, label: 'Invert', description: 'Swap black and white.' },
   },
   passes: [
     {

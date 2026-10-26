@@ -9,6 +9,8 @@ const mix = (x: number, y: number, t: number) => x + (y - x) * t;
 export const grayscale = defineFilter({
   id: 'grayscale',
   label: 'Grayscale',
+  description: 'Removes colour, keeping only brightness.',
+  tryThis: 'Compare Luminance, Average and Max on a picture with a strong red or blue.',
   category: 'classic',
   kind: 'pointwise',
   alpha: 'premultiplied',
@@ -18,8 +20,9 @@ export const grayscale = defineFilter({
       options: { luminance: 'Luminance (Rec. 709)', average: 'Average', max: 'Max' },
       default: 'luminance',
       label: 'Method',
+      description: 'How brightness is computed. Luminance weighs colours like the eye does, Average takes the mean, Max takes the brightest channel.',
     },
-    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount' },
+    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount', description: 'Blend between the original colour (0) and full grayscale (1).' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

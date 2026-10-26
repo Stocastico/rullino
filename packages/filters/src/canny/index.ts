@@ -23,13 +23,15 @@ const DIRS: [number, number][] = [[1, 0], [1, 1], [0, 1], [1, -1]];
 export const canny = defineFilter({
   id: 'canny',
   label: 'Canny edges',
+  description: 'Finds thin, connected edges: smooths the picture, measures the gradient, thins it to one pixel, then keeps strong edges and the weak ones attached to them.',
+  tryThis: 'Lower the high threshold until the outline of the main subject appears, then raise the low threshold to cut the noise.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    sigma: { type: 'float', min: 0, max: 10, step: 0.1, default: 1.4, unit: 'px', label: 'Smoothing σ (px)' },
-    low: { type: 'float', min: 0, max: 1, step: 0.005, default: 0.05, label: 'Low threshold' },
-    high: { type: 'float', min: 0, max: 1, step: 0.005, default: 0.15, label: 'High threshold' },
-    iterations: { type: 'int', min: 0, max: 256, default: 64, label: 'Hysteresis iterations' },
+    sigma: { type: 'float', min: 0, max: 10, step: 0.1, default: 1.4, unit: 'px', label: 'Smoothing σ (px)', description: 'Blur applied first, in pixels. More smoothing ignores fine texture.' },
+    low: { type: 'float', min: 0, max: 1, step: 0.005, default: 0.05, label: 'Low threshold', description: 'Gradients below this are never edges; between low and high they count only when connected to a strong edge.' },
+    high: { type: 'float', min: 0, max: 1, step: 0.005, default: 0.15, label: 'High threshold', description: 'Gradients above this are always edges.' },
+    iterations: { type: 'int', min: 0, max: 256, default: 64, label: 'Hysteresis iterations', description: 'How many rounds are used to follow weak edges. Enough rounds give the full result; more only costs time.' },
   },
   passes: [
     {

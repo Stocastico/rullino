@@ -11,12 +11,14 @@ import { greyLike, lumAt, LUM_AT_WGSL } from '../edges';
 export const laplacian = defineFilter({
   id: 'laplacian',
   label: 'Laplacian',
+  description: 'Measures how much each pixel differs from its neighbours, which highlights edges and fine detail.',
+  tryThis: 'Use Magnitude to see edges as bright lines, or Signed to see which side of an edge is brighter.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    connectivity: { type: 'enum', options: { four: '4 neighbours', eight: '8 neighbours' }, default: 'four', label: 'Neighbours' },
-    output: { type: 'enum', options: { signed: 'Signed', magnitude: 'Magnitude' }, default: 'signed', label: 'Output' },
-    strength: { type: 'float', min: 0, max: 10, step: 0.01, default: 1, label: 'Strength' },
+    connectivity: { type: 'enum', options: { four: '4 neighbours', eight: '8 neighbours' }, default: 'four', label: 'Neighbours', description: 'Which neighbours are compared: the 4 direct ones, or all 8 around the pixel.' },
+    output: { type: 'enum', options: { signed: 'Signed', magnitude: 'Magnitude' }, default: 'signed', label: 'Output', description: 'Signed keeps the direction of change on mid grey; Magnitude shows its size only.' },
+    strength: { type: 'float', min: 0, max: 10, step: 0.01, default: 1, label: 'Strength', description: 'Scales the result; raise it to see faint detail.' },
   },
   passes: [
     {

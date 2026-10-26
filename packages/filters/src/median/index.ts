@@ -21,10 +21,12 @@ const MED9 = [[1, 2], [4, 5], [7, 8], [0, 1], [3, 4], [6, 7], [1, 2], [4, 5], [7
 export const median = defineFilter({
   id: 'median',
   label: 'Median',
+  description: 'Replaces each pixel by the median of its neighbours, which removes speckle noise while keeping edges.',
+  tryThis: 'Use radius 1 on a noisy shot, and radius 3 for a painterly, flattened look.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    radius: { type: 'int', min: 1, max: MAX_RADIUS, default: 1, unit: 'px', label: 'Radius (px)' },
+    radius: { type: 'int', min: 1, max: MAX_RADIUS, default: 1, unit: 'px', label: 'Radius (px)', description: 'Size of the neighbourhood in pixels.' },
   },
   passes: [
     {

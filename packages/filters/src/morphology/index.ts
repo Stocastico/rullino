@@ -60,12 +60,14 @@ const morphWgsl = (src: string, useMax: string) => /* wgsl */ `
 export const morphology = defineFilter({
   id: 'morphology',
   label: 'Morphology',
+  description: 'Grows or shrinks bright shapes, or opens and closes gaps, with a small shape moved over the picture.',
+  tryThis: 'Erode removes small bright specks; Dilate widens bright shapes; Close fills small dark holes.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    operation: { type: 'enum', options: OPERATIONS, default: 'dilate', label: 'Operation' },
-    shape: { type: 'enum', options: SHAPES, default: 'disk', label: 'Structuring element' },
-    radius: { type: 'int', min: 1, max: 15, default: 2, unit: 'px', label: 'Radius (px)' },
+    operation: { type: 'enum', options: OPERATIONS, default: 'dilate', label: 'Operation', description: 'Erode shrinks bright areas, Dilate grows them. Open and Close combine the two to remove specks or fill holes. Gradient outlines shapes; Top-hat and Black-hat keep small bright or dark details.' },
+    shape: { type: 'enum', options: SHAPES, default: 'disk', label: 'Structuring element', description: 'The shape moved over the picture: a square, a round disk or a cross.' },
+    radius: { type: 'int', min: 1, max: 15, default: 2, unit: 'px', label: 'Radius (px)', description: 'Size of that shape in pixels.' },
   },
   passes: [
     // First operation: dilate for dilate / close / gradient / black-hat, erode otherwise.

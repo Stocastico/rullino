@@ -7,12 +7,14 @@ import { defineFilter, linearToSrgb, luminance } from '@rullino/core';
 export const threshold = defineFilter({
   id: 'threshold',
   label: 'Threshold',
+  description: 'Turns the picture into pure black and white: pixels brighter than the level become white.',
+  tryThis: 'Slide the level and watch the picture become a stencil.',
   category: 'classic',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    level: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.5, label: 'Level' },
-    invert: { type: 'bool', default: false, label: 'Invert' },
+    level: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.5, label: 'Level', description: 'The brightness cut-off. Higher values leave less white.' },
+    invert: { type: 'bool', default: false, label: 'Invert', description: 'Swap black and white.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {
