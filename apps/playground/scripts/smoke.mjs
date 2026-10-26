@@ -155,7 +155,7 @@ try {
   const [utop, ubottom] = await rowDiff();
   check(utop < 1 && ubottom > 10, `"Only in selection": top row differs by ${utop.toFixed(1)}, bottom by ${ubottom.toFixed(1)}`);
   // A second step shares the same selection.
-  await after(() => page.selectOption('#chain select[data-action=add]', 'invert'));
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'invert'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
   const [ntop, nbottom] = await rowDiff();
   check(ntop < 1 && nbottom > 10, `two steps in the same selection: top row differs by ${ntop.toFixed(1)}, bottom by ${nbottom.toFixed(1)}`);
@@ -284,7 +284,7 @@ try {
 
   // Inpainting: the new step comes with an empty brush mask (no "No mask" option); painting over
   // a chart patch replaces it with its surroundings while far patches stay as they were.
-  await after(() => page.selectOption('#chain select[data-action=add]', 'inpaint'));
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'inpaint'));
   check(!(await page.$$eval('#chain select[data-action=mask-kind] option', (o) => o.map((x) => x.value))).includes('none'), 'inpaint should not offer "No mask"');
   const afterPx = (fx, fy) => page.$eval('#after', (c, [fx, fy]) => [...c.getContext('2d').getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data], [fx, fy]);
   const [centreBefore, farBefore] = [await afterPx(0.09, 0.12), await afterPx(0.75, 0.85)];
@@ -320,7 +320,7 @@ try {
 
   // A .cube file loaded into a LUT step changes the image (an inverting LUT).
   const afterPixels = () => page.$eval('#after', (c) => Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data));
-  await after(() => page.selectOption('#chain select[data-action=add]', 'applyLut'));
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'applyLut'));
   const beforeLut = await afterPixels();
   const cube = ['LUT_3D_SIZE 2', ...[0, 1].flatMap((b) => [0, 1].flatMap((g) => [0, 1].map((r) => `${1 - r} ${1 - g} ${1 - b}`)))].join('\n');
   await after(() => page.setInputFiles('#chain input[type=file][name=look]', { name: 'invert.cube', mimeType: 'text/plain', buffer: Buffer.from(cube) }));
@@ -331,7 +331,7 @@ try {
 
   // Adding a look appends its steps (LUT, vignette, grain for Noir) and turns the image black and white.
   const stepsBefore = await page.$$eval('#strip li[data-step]', (l) => l.length);
-  await after(() => page.selectOption('#chain select[data-action=add-look]', 'noir'));
+  await after(() => page.click('.look-card[data-look=noir]'));
   check((await page.$$eval('#strip li[data-step]', (l) => l.length)) === stepsBefore + 3, 'the Noir look should add 3 steps');
   const colourful = await page.$eval('#after', (c) => {
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -571,8 +571,8 @@ try {
     new MutationObserver(() => (window.sawBusy ||= document.getElementById('stage').classList.contains('busy'))).observe(document.getElementById('stage'), { attributes: true });
   });
   // Every filter in one chain renders without errors.
-  const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
-  for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
+  const ids = await page.evaluate(() => window.rullino.filterIds());
+  for (const id of ids) await after(() => page.evaluate((id) => window.rullino.add(id), id));
   // Transparency at full strength (its default) would hide everything after it; the checks below
   // need to see a drawn image.
   await after(() => page.click('#strip button[data-action=select][aria-label="Edit Transparency"]'));
@@ -609,7 +609,7 @@ try {
   await page.selectOption('#sample', 'ramps');
   await page.waitForTimeout(500);
   await page.selectOption('#sample', 'chart');
-  await page.selectOption('#chain select[data-action=add]', 'canny');
+  await page.evaluate((id) => window.rullino.add(id), 'canny');
   // Initial exposure + the LUT step + every filter + the canny just added.
   const expected = new RegExp(`Colour chart .* ${ids.length + 3} steps`);
   await page.waitForFunction((re) => new RegExp(re).test(document.getElementById('status').textContent), expected.source, { timeout: 20000 }).catch(() => {});

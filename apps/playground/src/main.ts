@@ -1140,8 +1140,13 @@ async function recoverFromDeviceLoss(info: GPUDeviceLostInfo): Promise<void> {
   await loads;
   void render();
 }
-// For the e2e smoke test: simulate a device loss.
-(window as unknown as { rullino: object }).rullino = { loseDevice: () => gpuContext?.device.destroy() };
+// For the e2e smoke test: simulate a device loss, and add effects without going through the dialog
+// (the dialog has its own checks).
+(window as unknown as { rullino: object }).rullino = {
+  loseDevice: () => gpuContext?.device.destroy(),
+  add: (id: string) => chainUi.add(byId.get(id)!),
+  filterIds: () => filters.map((f) => f.id),
+};
 
 await startRenderer();
 const shared = await readShareLink();
