@@ -9,9 +9,9 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml). T
 3. `git tag vX.Y.Z[-rc.N] && git push origin vX.Y.Z[-rc.N]`. The workflow checks the tag, runs the tests, publishes with provenance (`next` for a pre-release, `latest` otherwise) and creates the GitHub release from the section below.
 4. Never `npm publish` from a package directory (`prepublishOnly` refuses): the dist exports exist only in the packed tarball.
 
-## [0.1.0-rc.0]
+## [0.1.0-rc.1]
 
-First release candidate.
+First release candidate. (`0.1.0-rc.0` was tagged but never published: the release workflow's publish step read the tarball path as a GitHub repository. Nothing was released under that version.)
 
 ### Added
 - **core**: schema-driven filter parameters and `defineFilter()` (pointwise and multipass kinds, each with a WGSL shader and a TypeScript CPU reference), cached incremental filter-chain `Pipeline` with pointwise fusion, masks (linear, radial, brush, magic wand, guided-filter refinement), geometry (orientation, perspective, straighten, crop), 3D LUTs (`.cube`, Hald), colour maths in linear light and OKLab, export to PNG (8 / 16-bit), JPEG and WebP, chain serialisation, GPU errors reported to a callback (`createGpuContext({ onError })`, `ctx.limits`, `ctx.lost`).
