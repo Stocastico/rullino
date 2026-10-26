@@ -47,6 +47,7 @@ export const colorMixer = defineFilter({
   label: 'Colour mixer',
   description: 'Adjusts hue, saturation and lightness separately for eight colour ranges, so you can change the sky without touching the skin.',
   tryThis: 'Darken Blue and raise its saturation for a deeper sky, then shift Orange slightly to warm the skin.',
+  preview: { blueSat: 0.8, blueLum: -0.3, orangeHue: 20 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

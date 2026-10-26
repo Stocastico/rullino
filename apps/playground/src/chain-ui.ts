@@ -1,6 +1,7 @@
 import { defaultParams, type Filter, type Mask, type ParamSchema } from '@rullino/core';
 import { renderControls } from './controls';
 import { emptyBrush, renderMaskControls } from './mask-ui';
+import { CATEGORY_LABELS } from './effect-search';
 
 // The filter chain editor: a list of steps (enable, reorder, remove), an "add filter" menu, and
 // the generated controls of the selected step. Structural edits rebuild the list; param edits
@@ -45,6 +46,8 @@ export interface ChainActions {
 export interface ChainUi {
   /** Replaces the state after an edit made elsewhere (e.g. on the image); redraws only if asked. */
   set(state: ChainState, redraw: boolean): void;
+  /** Appends a step for the filter (a patch goes first) and selects it, as the Add filter menu does. */
+  add(filter: Filter<any>): void;
 }
 
 /** The step with `mask` set, or removed when undefined. */
@@ -79,7 +82,6 @@ export interface StepGroup {
   steps(): readonly { readonly filter: Filter<any>; readonly params?: Readonly<Record<string, unknown>> }[];
 }
 
-const CATEGORY_LABELS: Record<string, string> = { adjust: 'Adjust', look: 'Look', classic: 'Classic', stylize: 'Stylize' };
 
 function button(label: string, action: string, title: string): HTMLButtonElement {
   const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label, title });
@@ -272,10 +274,7 @@ export function renderChain(
     }
     add.addEventListener('change', () => {
       const f = byId.get(add.value);
-      if (!f) return;
-      const step = newStep(f);
-      // A patch is made from the original image, so it goes first (adjustments after it apply to the result).
-      commit({ ...state, steps: f.id === 'patch' ? [step, ...state.steps] : [...state.steps, step], selected: step.uid }, true);
+      if (f) addFilter(f);
     });
     root.append(add);
 
@@ -293,11 +292,18 @@ export function renderChain(
     root.append(addGroup);
   }
 
+  function addFilter(f: Filter<any>): void {
+    const step = newStep(f);
+    // A patch is made from the original image, so it goes first (adjustments after it apply to the result).
+    commit({ ...state, steps: f.id === 'patch' ? [step, ...state.steps] : [...state.steps, step], selected: step.uid }, true);
+  }
+
   draw();
   return {
     set(next, redraw) {
       state = next;
       if (redraw) draw();
     },
+    add: addFilter,
   };
 }

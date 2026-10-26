@@ -21,6 +21,7 @@ export const whiteBalance = defineFilter({
   label: 'White balance',
   description: 'Corrects the colour of the light so that neutral things look neutral: cooler or warmer, greener or more magenta.',
   tryThis: 'Drag Temperature until something that should be white or grey looks neutral.',
+  preview: { temperature: 0.5 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',

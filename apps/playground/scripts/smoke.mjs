@@ -638,6 +638,28 @@ try {
   check((await page.$$('#chain li[data-step]')).length > 1, 'a first visit should open on an example chain');
   check((await differs()) > 0.05, `the first-visit chain should change the picture, ${((await differs()) * 100).toFixed(1)}% differs`);
 
+  // The effect browser: Ctrl+K, search, thumbnails drawn on the photo, Enter adds the first match.
+  const titles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
+  const stepsBefore = (await titles()).length;
+  await page.keyboard.press('Control+k');
+  await page.waitForSelector('dialog.effect-browser[open]', { timeout: 5000 });
+  await page.fill('dialog.effect-browser input[type=search]', 'halftone');
+  const shown = await page.$$eval('dialog.effect-browser .effect-card:not([hidden])', (c) => c.map((x) => x.dataset.filter));
+  check(shown[0] === 'halftone', `searching "halftone" should list it first, got ${shown.join(', ')}`);
+  await page.waitForSelector('dialog.effect-browser .effect-card[data-filter=halftone] canvas[data-ready]', { timeout: 90000 }).catch(() => {});
+  const thumb = await page.$eval('dialog.effect-browser .effect-card[data-filter=halftone] canvas', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let min = 255, max = 0;
+    for (let i = 0; i < d.length; i += 4) { min = Math.min(min, d[i]); max = Math.max(max, d[i]); }
+    return { w: c.width, ready: 'ready' in c.dataset, spread: max - min };
+  });
+  check(thumb.ready && thumb.w > 0 && thumb.spread > 100, `the halftone thumbnail should be drawn (ready ${thumb.ready}, width ${thumb.w}, contrast ${thumb.spread})`);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((n) => document.querySelectorAll('#chain li[data-step]').length === n + 1, stepsBefore, { timeout: 10000 }).catch(() => {});
+  const after2 = await titles();
+  check(after2.length === stepsBefore + 1 && after2.at(-1) === 'Halftone', `Enter should add Halftone, steps were ${after2.join(', ')}`);
+  check(!(await page.$eval('dialog.effect-browser', (d) => d.open)), 'adding an effect should close the browser');
+
   console.log(`smoke: ${ids.length} filters chained, status "${await status()}"`);
 } finally {
   await browser.close();

@@ -13,6 +13,7 @@ export const convolve = defineFilter({
   label: 'Custom kernel',
   description: 'Applies your own 5×5 kernel: each output pixel is a weighted sum of its neighbours. A 3×3 kernel goes in the centre.',
   tryThis: 'Put 1 in the centre and 0 elsewhere for no change, then try 5 in the centre with -1 on the four cells next to it for a sharpen.',
+  preview: { kernel: [0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, -1, 5, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0] },
   category: 'classic',
   kind: 'multipass',
   params: {

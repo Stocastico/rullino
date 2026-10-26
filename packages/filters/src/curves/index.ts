@@ -12,6 +12,7 @@ export const curves = defineFilter({
   label: 'Curves',
   description: 'Redraws the tone response with a curve: drag points to lift or lower any range of tones, overall or per colour channel.',
   tryThis: 'Pull the middle of the RGB curve up for a brighter mood, or drag the ends in for a faded look.',
+  preview: { rgb: [[0, 0], [0.25, 0.15], [0.75, 0.85], [1, 1]] },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

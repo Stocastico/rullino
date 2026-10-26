@@ -13,6 +13,7 @@ export const vibrance = defineFilter({
   label: 'Vibrance',
   description: 'Boosts muted colours more than ones that are already strong.',
   tryThis: 'Compare with Saturation on a muted photo: vibrance lifts the dull colours while strong ones barely change.',
+  preview: { amount: 0.8 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

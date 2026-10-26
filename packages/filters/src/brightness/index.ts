@@ -11,6 +11,7 @@ export const brightness = defineFilter({
   label: 'Brightness',
   description: 'Makes the picture lighter or darker while keeping the colours as they are (unlike Exposure, it works on perceived lightness).',
   tryThis: 'Push it up and compare with Exposure: brightness leaves hue and colourfulness alone.',
+  preview: { amount: 0.5 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

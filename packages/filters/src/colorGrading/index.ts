@@ -30,6 +30,7 @@ export const colorGrading = defineFilter({
   label: 'Colour grading',
   description: 'Tints shadows, midtones and highlights separately, the way split toning and three-way colour wheels do.',
   tryThis: 'Give the shadows a teal tint and the highlights an orange one at low strength.',
+  preview: { shadowsStrength: 0.6, highlightsStrength: 0.6 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
