@@ -90,7 +90,13 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
 }
 @media (max-width: 720px) {
   main { grid-template-columns: 1fr; }
-  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  /* The photo comes first on a phone, then the controls. */
+  figure { order: -1; padding: 12px; }
+  #stage { position: static; }
+  #stage canvas { max-height: 60vh; }
+  aside { border-right: 0; border-top: 1px solid var(--line); }
+  header { flex-wrap: wrap; gap: 8px 12px; }
+  #status { flex-basis: 100%; font-size: 12px; order: 3; }
 }
 .control-kernel { display: flex; flex-direction: column; gap: 6px; }
 .kernel { display: grid; gap: 3px; }

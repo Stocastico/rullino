@@ -1093,4 +1093,15 @@ if (shared) {
   // The linked state is where history starts, not an undoable edit of the default chain.
   history.replace(shared.snapshot);
   applySnapshot(shared.snapshot);
+} else if (!requested) {
+  // A first visit opens on a chain that visibly does something (an identity chain looks broken);
+  // an explicit `?sample=` keeps the plain one, which the e2e checks rely on.
+  const welcome = looks.find((l) => l.id === 'golden');
+  if (welcome) {
+    const steps = lookSteps(welcome).map((s) => ({ ...newStep(s.filter), params: { ...defaultParams(s.filter.params), ...s.params } }));
+    chain = { ...chain, steps, selected: steps[0]?.uid ?? chain.selected };
+    chainUi.set(chain, true);
+    history.replace({ chain, geometry });
+    void render();
+  }
 }
