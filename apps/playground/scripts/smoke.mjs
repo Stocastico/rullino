@@ -165,9 +165,9 @@ try {
   await after(() => page.click('#strip [data-selection] [data-action=select]'));
   await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'none'));
   // The selection is part of the undo history.
-  check((await page.textContent('#chain [data-selection] .selection-summary')) === 'whole image', 'clearing the selection should say "whole image"');
+  check((await page.textContent('#strip [data-selection] small')) === 'whole image', 'clearing the selection should say "whole image"');
   await after(() => page.keyboard.press('Control+z'));
-  check((await page.textContent('#chain [data-selection] .selection-summary')) === 'set', 'undo should bring the selection back');
+  check((await page.textContent('#strip [data-selection] small')) === 'set', 'undo should bring the selection back');
   await after(() => page.keyboard.press('Control+Shift+z'));
   await after(() => page.click('#strip li[data-step] .step-title'));
   const [wtop, wbottom] = await rowDiff();
