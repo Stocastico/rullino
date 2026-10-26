@@ -168,3 +168,20 @@ button.primary { border-color: var(--accent); color: var(--accent); }
 
 .param-help { grid-column: 1 / -1; flex-basis: 100%; margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .try-this { margin: 0; padding-left: 8px; border-left: 2px solid var(--accent); color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+kbd { font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
+.effect-browser { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 64px); padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); }
+.effect-browser::backdrop { background: rgb(0 0 0 / 0.6); }
+.effect-browser[open] { display: flex; flex-direction: column; gap: 12px; }
+.effect-browser input[type='search'] { font: inherit; font-size: 16px; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.effect-browser input[type='search']:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.effect-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; overflow-y: auto; min-height: 0; }
+.effect-card { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 8px; cursor: pointer; }
+.effect-card[hidden] { display: none; }
+.effect-card:hover, .effect-card:focus-visible { border-color: var(--accent); outline: none; }
+.effect-card canvas { flex: none; width: 84px; height: 62px; object-fit: cover; border-radius: 4px; background: rgb(255 255 255 / 0.05); }
+.effect-card:not(:has(canvas)) { padding-left: 12px; }
+.effect-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.effect-text small { color: var(--muted); }
+.effect-text span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.effect-empty { margin: 0; color: var(--muted); }

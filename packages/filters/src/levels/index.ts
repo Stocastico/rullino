@@ -23,6 +23,7 @@ export const levels = defineFilter({
   label: 'Levels',
   description: 'Maps a range of input tones to a range of output tones: set the black and white points, then adjust the midtones.',
   tryThis: 'Move Input black and Input white towards the edges of the histogram, then use the midtone gamma to set the mood.',
+  preview: { inBlack: 0.15, inWhite: 0.85, gamma: 1.3 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

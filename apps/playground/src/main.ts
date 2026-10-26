@@ -36,6 +36,7 @@ import {
 import { autoAdjust, filters } from '@rullino/filters';
 import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
 import { lookLut, looks, lookSteps } from '@rullino/presets';
+import { createEffectBrowser } from './effect-browser';
 import { effectiveMask, newStep, renderChain, SELECTION, withMask, withSelection, type ChainState } from './chain-ui';
 import { createCropOverlay, fitAspect } from './crop-overlay';
 import { renderGeometryControls, type Aspect, type EditMode } from './geometry-ui';
@@ -864,11 +865,26 @@ const lookCards = looks.map((look) => {
   return { look, canvas };
 });
 
+// Effect browser (Ctrl+K): every effect on a thumbnail of the framed original, at its preview values.
+const effectBrowser = createEffectBrowser({
+  filters,
+  thumbnails: (batch) => {
+    const result = loads.then(async () =>
+      loaded ? renderer.thumbnails(batch.map((f) => [{ filter: f, params: { ...defaultParams(f.params), ...f.preview }, enabled: true }]), THUMB_SIDE) : batch.map(() => undefined),
+    );
+    loads = result.then(() => undefined, () => undefined);
+    return result;
+  },
+  onPick: (f) => chainUi.add(f),
+});
+document.getElementById('browse')!.addEventListener('click', () => effectBrowser.open());
+
 let thumbnailsQueued = false;
 /** Redraws the gallery after the current load / reframe (queued like them, so textures are valid). */
 function refreshThumbnails(): void {
   if (thumbnailsQueued) return;
   thumbnailsQueued = true;
+  effectBrowser.invalidate();
   loads = loads.then(async () => {
     thumbnailsQueued = false;
     if (!loaded) return;

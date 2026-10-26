@@ -11,6 +11,7 @@ export const blackPoint = defineFilter({
   label: 'Black point',
   description: 'Sets how dark the darkest tones are: raising the black point deepens shadows, lowering it lifts them into a faded look.',
   tryThis: 'Lower it slightly for a matte, filmic shadow, or raise it to make blacks richer.',
+  preview: { amount: 0.12 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

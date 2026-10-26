@@ -7,6 +7,7 @@ export const saturation = defineFilter({
   label: 'Saturation',
   description: 'Makes colours stronger or weaker, all by the same amount.',
   tryThis: 'Take it to the minimum for a grey picture, then bring it back to just under natural.',
+  preview: { amount: 0.7 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

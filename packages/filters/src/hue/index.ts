@@ -7,6 +7,7 @@ export const hue = defineFilter({
   label: 'Hue',
   description: 'Rotates all colours around the colour wheel, so reds turn to greens, blues to oranges, and so on.',
   tryThis: 'Rotate by 180° for complementary colours, or by a few degrees to fix a colour cast.',
+  preview: { degrees: 120 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

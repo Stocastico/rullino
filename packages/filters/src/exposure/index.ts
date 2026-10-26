@@ -6,6 +6,7 @@ export const exposure = defineFilter({
   label: 'Exposure',
   description: 'Makes the whole picture lighter or darker, like opening or closing the lens by whole stops of light.',
   tryThis: 'Raise it until the sky starts to lose detail, then lower it a little.',
+  preview: { ev: 1 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',

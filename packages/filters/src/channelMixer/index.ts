@@ -11,6 +11,7 @@ export const channelMixer = defineFilter({
   label: 'Channel mixer',
   description: 'Builds each output colour channel from a weighted mix of the input channels, on linear light.',
   tryThis: 'Feed some red into the blue output for a surreal colour swap, or set the red output to 0.3 / 0.6 / 0.1 for a classic black-and-white look.',
+  preview: { rr: 0, rb: 1, br: 1, bb: 0 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',

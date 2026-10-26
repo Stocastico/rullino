@@ -8,6 +8,7 @@ export const gamma = defineFilter({
   label: 'Gamma',
   description: 'Brightens or darkens the midtones without moving pure black or pure white.',
   tryThis: 'Drag it below 1 to darken the middle and above 1 to lighten it, and watch the ends stay put.',
+  preview: { gamma: 2 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

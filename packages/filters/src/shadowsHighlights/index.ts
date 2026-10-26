@@ -17,6 +17,7 @@ export const shadowsHighlights = defineFilter({
   label: 'Shadows / highlights',
   description: 'Recovers detail in dark and bright areas by lightening shadows or darkening highlights.',
   tryThis: 'Lift the shadows of a backlit portrait, then pull the highlights down a little to recover the sky.',
+  preview: { shadows: 0.7, highlights: -0.5 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

@@ -10,6 +10,7 @@ export const contrast = defineFilter({
   label: 'Contrast',
   description: 'Spreads tones apart (more contrast) or squeezes them together (less), around mid grey.',
   tryThis: 'Add some, then look at the histogram: the tones spread towards both ends.',
+  preview: { amount: 0.6 },
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
