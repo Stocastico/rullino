@@ -91,6 +91,16 @@ export function createFilmStrip(root: HTMLElement, filters: readonly Filter<any>
   };
   const clearMarks = () => list.querySelectorAll('.drop-before, .drop-after').forEach((n) => n.classList.remove('drop-before', 'drop-after'));
 
+  /** Marks the pressed "up to here" button, and dims the frames after it. */
+  function markSolo(): void {
+    let beyond = false;
+    list.querySelectorAll<HTMLElement>('li[data-step]').forEach((f) => {
+      f.querySelector('[data-action=solo]')!.setAttribute('aria-pressed', String(f.dataset.step === soloUid));
+      f.classList.toggle('beyond', beyond);
+      if (f.dataset.step === soloUid) beyond = true;
+    });
+  }
+
   function draw(): void {
     list.replaceChildren();
     state.steps.forEach((step, i) => {
@@ -160,6 +170,7 @@ export function createFilmStrip(root: HTMLElement, filters: readonly Filter<any>
       });
       list.append(frame);
     });
+    markSolo();
     empty.hidden = state.steps.length > 0;
     if (!empty.isConnected) root.append(empty);
     selectionFrame.classList.toggle('selected', state.selected === SELECTION);
@@ -182,7 +193,7 @@ export function createFilmStrip(root: HTMLElement, filters: readonly Filter<any>
     },
     setSolo(uid) {
       soloUid = uid;
-      list.querySelectorAll<HTMLElement>('li[data-step]').forEach((f) => f.querySelector('[data-action=solo]')!.setAttribute('aria-pressed', String(f.dataset.step === uid)));
+      markSolo();
     },
   };
 }

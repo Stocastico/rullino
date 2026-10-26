@@ -207,3 +207,4 @@ kbd { font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var
 .strip-empty { align-self: center; margin: 0; color: var(--muted); max-width: 22em; }
 .strip-empty[hidden] { display: none; }
 @media (max-width: 720px) { #workspace { --strip-h: 0px; } #strip { padding: 8px 12px; } }
+.frame.beyond canvas, .frame.beyond .step-title { opacity: 0.35; }

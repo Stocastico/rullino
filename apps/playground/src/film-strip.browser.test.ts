@@ -77,6 +77,11 @@ describe('film strip', () => {
     strip.setSolo('b');
     expect(frames()[1]!.querySelector('[data-action=solo]')!.getAttribute('aria-pressed')).toBe('true');
     expect(frames()[0]!.querySelector('[data-action=solo]')!.getAttribute('aria-pressed')).toBe('false');
+    // The frames after it are dimmed: they are not in the picture.
+    expect(frames().map((f) => f.classList.contains('beyond'))).toEqual([false, false, true]);
+    strip.setSolo(undefined);
+    expect(frames().some((f) => f.classList.contains('beyond'))).toBe(false);
+    strip.setSolo('b');
     frames()[1]!.querySelector<HTMLElement>('[data-action=solo]')!.click();
     expect(calls.at(-1)).toEqual(['solo', undefined]);
   });

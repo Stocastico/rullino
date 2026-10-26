@@ -638,6 +638,21 @@ try {
   check((await page.$$('#strip li[data-step]')).length > 1, 'a first visit should open on an example chain');
   check((await differs()) > 0.05, `the first-visit chain should change the picture, ${((await differs()) * 100).toFixed(1)}% differs`);
 
+  // The film strip: a frame per step with the picture after it; "up to here" shows the photo cut at that step.
+  await page.waitForFunction(() => document.querySelectorAll('#strip li[data-step] canvas[data-ready]').length === 3 && document.querySelector('#strip [data-original] canvas[data-ready]'), null, { timeout: 60000 }).catch(() => {});
+  const frameInfo = await page.$$eval('#strip li[data-step] canvas', (cs) => cs.map((c) => 'ready' in c.dataset));
+  check(frameInfo.length === 3 && frameInfo.every(Boolean), `every frame of the strip should show its picture, got ${frameInfo.join(', ')}`);
+  const afterSum = () => page.$eval('#after', (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let t = 0; for (let i = 0; i < d.length; i += 37) t += d[i]; return t; });
+  const frameBefore = Number(await page.getAttribute('#status', 'data-frame'));
+  const full = await afterSum();
+  await page.click('#strip li[data-step]:first-of-type [data-action=solo]');
+  await page.waitForFunction((n) => Number(document.getElementById('status').dataset.frame) > n && /up to one step/.test(document.getElementById('status').textContent), frameBefore, { timeout: 30000 }).catch(() => {});
+  check(/up to one step/.test(await status()), `"up to here" should say so in the status, got: ${await status()}`);
+  check(Math.abs((await afterSum()) - full) > 1000, 'showing the photo up to the first step should change the picture (no vignette, no grain)');
+  await page.click('#strip li[data-step]:first-of-type [data-action=solo]');
+  await page.waitForFunction(() => !/up to one step/.test(document.getElementById('status').textContent), null, { timeout: 30000 }).catch(() => {});
+  check(!/up to one step/.test(await status()), 'pressing it again should show the whole chain');
+
   // The effect browser: Ctrl+K, search, thumbnails drawn on the photo, Enter adds the first match.
   const browserTitles = () => page.$$eval('#strip li[data-step] .step-title', (b) => b.map((x) => x.textContent));
   const browserStepsBefore = (await browserTitles()).length;
