@@ -4,7 +4,7 @@ The filters of [rullino](https://github.com/Stocastico/rullino): WebGPU compute 
 
 > Pre-alpha (0.x): the API may change between minor versions.
 
-**[API reference](https://stocastico.github.io/rullino/docs/modules/_rullino_filters.html)** (generated from the sources)
+**[API reference](https://stefanomasneri.com/rullino/docs/modules/_rullino_filters.html)** (generated from the sources)
 
 ## Install
 

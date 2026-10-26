@@ -4,7 +4,7 @@ Photo looks for [rullino](https://github.com/Stocastico/rullino): each look is a
 
 > Pre-alpha (0.x): the API may change between minor versions.
 
-**[API reference](https://stocastico.github.io/rullino/docs/modules/_rullino_presets.html)** (generated from the sources)
+**[API reference](https://stefanomasneri.com/rullino/docs/modules/_rullino_presets.html)** (generated from the sources)
 
 ```sh
 npm install @rullino/core @rullino/filters @rullino/presets
