@@ -34,14 +34,15 @@ function bilinear(src: LinearImage, x: number, y: number, c: number): number {
 export const lensBlur = defineFilter({
   id: 'lensBlur',
   label: 'Lens blur (depth)',
+  tryThis: 'Estimate the depth first, then move Focus to choose what stays sharp.',
   description: 'Blurs by distance from the focus depth. Press Estimate depth (the first use downloads a 27 MB model), then move the focus.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    depth: { type: 'image', default: createImage(1, 1), label: 'Depth map' },
-    focus: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.5, label: 'Focus depth' },
-    range: { type: 'float', min: 0, max: 0.5, step: 0.01, default: 0.1, label: 'Sharp range' },
-    radius: { type: 'float', min: 0, max: 40, step: 0.5, default: 12, unit: 'px', label: 'Blur radius (px)' },
+    depth: { type: 'image', default: createImage(1, 1), label: 'Depth map', description: 'The depth map made by Estimate depth; there is nothing to set by hand.' },
+    focus: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.5, label: 'Focus depth', description: 'Which depth stays sharp: 1 is the nearest part of the picture, 0 the farthest.' },
+    range: { type: 'float', min: 0, max: 0.5, step: 0.01, default: 0.1, label: 'Sharp range', description: 'How much depth around the focus also stays sharp.' },
+    radius: { type: 'float', min: 0, max: 40, step: 0.5, default: 12, unit: 'px', label: 'Blur radius (px)', description: 'The largest blur, in pixels, for areas far from the focus.' },
   },
   passes: [
     {

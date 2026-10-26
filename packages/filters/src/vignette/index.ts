@@ -18,13 +18,15 @@ function distance(x: number, y: number, w: number, h: number, roundness: number)
 export const vignette = defineFilter({
   id: 'vignette',
   label: 'Vignette',
+  description: 'Darkens or lightens the edges of the picture to draw the eye to the centre.',
+  tryThis: 'Make the amount slightly negative and the feather wide for a natural lens falloff.',
   category: 'look',
   kind: 'multipass',
   params: {
-    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: -0.4, label: 'Amount' },
-    midpoint: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.4, label: 'Midpoint' },
-    feather: { type: 'float', min: 0.05, max: 1, step: 0.01, default: 0.5, label: 'Feather' },
-    roundness: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Roundness' },
+    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: -0.4, label: 'Amount', description: 'Negative darkens the edges, positive lightens them.' },
+    midpoint: { type: 'float', min: 0, max: 1, step: 0.01, default: 0.4, label: 'Midpoint', description: 'How far from the centre the effect starts (the corners are 1).' },
+    feather: { type: 'float', min: 0.05, max: 1, step: 0.01, default: 0.5, label: 'Feather', description: 'How gradually the effect fades in; larger is softer.' },
+    roundness: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Roundness', description: '0 follows the shape of the picture; 1 makes the vignette a circle.' },
   },
   passes: [
     {

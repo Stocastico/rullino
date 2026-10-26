@@ -21,11 +21,13 @@ const QUADRANTS = [
 export const kuwahara = defineFilter({
   id: 'kuwahara',
   label: 'Kuwahara (painterly)',
+  description: 'Smooths the picture into flat patches while keeping edges sharp, which looks like a painting.',
+  tryThis: 'Raise the radius until fine texture turns into brush strokes.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    radius: { type: 'int', min: 1, max: 10, default: 4, unit: 'px', label: 'Radius (px)' },
-    sharpness: { type: 'float', min: 1, max: 16, step: 0.5, default: 8, label: 'Sharpness' },
+    radius: { type: 'int', min: 1, max: 10, default: 4, unit: 'px', label: 'Radius (px)', description: 'Size of the brush patches in pixels.' },
+    sharpness: { type: 'float', min: 1, max: 16, step: 0.5, default: 8, label: 'Sharpness', description: 'How strongly each pixel follows the smoothest nearby patch; higher keeps edges crisper.' },
   },
   passes: [
     {

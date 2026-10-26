@@ -43,19 +43,22 @@ export const r2 = (x: number, y: number) => ((Math.imul(x, 3242174889) + Math.im
 export const dither = defineFilter({
   id: 'dither',
   label: 'Dither',
+  description: 'Reduces the picture to a few tones and uses a pattern of dots to fake the in-between ones, as in old newspapers and retro screens.',
+  tryThis: 'Set Levels to 2 and compare Bayer 8×8 with White noise, then chain a Gradient map for a palette.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    levels: { type: 'int', min: 2, max: 16, default: 2, label: 'Levels' },
+    levels: { type: 'int', min: 2, max: 16, default: 2, label: 'Levels', description: 'How many tones are kept per channel. 2 is pure black and white.' },
     matrix: {
       type: 'enum',
       options: { bayer2: 'Bayer 2×2', bayer4: 'Bayer 4×4', bayer8: 'Bayer 8×8', white: 'White noise', gradient: 'R2 (evenly spread)' },
       default: 'bayer4',
       label: 'Pattern',
+      description: 'The pattern that decides where each dot goes: ordered Bayer grids, random white noise, or the evenly spread R2 pattern.',
     },
-    seed: { type: 'int', min: 0, max: 999, default: 0, label: 'Noise seed' },
-    mode: { type: 'enum', options: { mono: 'Mono', color: 'Colour' }, default: 'mono', label: 'Colours' },
-    scale: { type: 'int', min: 1, max: 16, default: 1, unit: 'px', label: 'Cell size (px)' },
+    seed: { type: 'int', min: 0, max: 999, default: 0, label: 'Noise seed', description: 'Changes the random pattern; only used by White noise.' },
+    mode: { type: 'enum', options: { mono: 'Mono', color: 'Colour' }, default: 'mono', label: 'Colours', description: 'Mono dithers the brightness only; Colour dithers each colour channel.' },
+    scale: { type: 'int', min: 1, max: 16, default: 1, unit: 'px', label: 'Cell size (px)', description: 'Size of each pattern cell in pixels; larger gives a chunkier look.' },
   },
   passes: [
     {

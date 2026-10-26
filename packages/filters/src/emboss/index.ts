@@ -17,13 +17,15 @@ function lum(img: LinearImage, x: number, y: number): number {
 export const emboss = defineFilter({
   id: 'emboss',
   label: 'Emboss',
+  description: 'Turns edges into a relief, as if the picture were stamped into metal and lit from one side.',
+  tryThis: 'Rotate the light angle and watch the raised and sunken edges swap sides.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    angle: { type: 'float', min: 0, max: 360, step: 1, default: 135, label: 'Light angle (°)' },
-    strength: { type: 'float', min: 0, max: 4, step: 0.01, default: 1, label: 'Strength' },
-    distance: { type: 'int', min: 1, max: 10, default: 1, unit: 'px', label: 'Distance (px)' },
-    mode: { type: 'enum', options: { grey: 'Grey', color: 'Colour' }, default: 'grey', label: 'Surface' },
+    angle: { type: 'float', min: 0, max: 360, step: 1, default: 135, label: 'Light angle (°)', description: 'Direction of the light, counter-clockwise from the right. Edges facing the light rise.' },
+    strength: { type: 'float', min: 0, max: 4, step: 0.01, default: 1, label: 'Strength', description: 'How deep the relief looks.' },
+    distance: { type: 'int', min: 1, max: 10, default: 1, unit: 'px', label: 'Distance (px)', description: 'How far apart the compared pixels are, in pixels. Larger gives a thicker relief.' },
+    mode: { type: 'enum', options: { grey: 'Grey', color: 'Colour' }, default: 'grey', label: 'Surface', description: 'Grey shows the relief on mid grey; Colour adds it to the picture\'s colours.' },
   },
   passes: [
     {

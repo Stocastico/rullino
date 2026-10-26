@@ -23,10 +23,12 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 export const pixelate = defineFilter({
   id: 'pixelate',
   label: 'Pixelate',
+  description: 'Replaces the picture with big square pixels, each the average of the area under it.',
+  tryThis: 'Pixelate a small masked area to hide a face or a licence plate.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    size: { type: 'int', min: 1, max: 128, default: 12, unit: 'px', label: 'Cell size (px)' },
+    size: { type: 'int', min: 1, max: 128, default: 12, unit: 'px', label: 'Cell size (px)', description: 'Width of each square in pixels.' },
   },
   passes: [pass('h', 'input', 'x'), pass('v', 'h', 'y')],
   cpu: (src, { size }) => {

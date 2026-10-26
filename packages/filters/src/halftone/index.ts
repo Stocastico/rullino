@@ -66,14 +66,16 @@ function encoded(img: LinearImage, x: number, y: number, c: number): number {
 export const halftone = defineFilter({
   id: 'halftone',
   label: 'Halftone',
+  description: 'Prints the picture as dots whose size follows the tone, like a newspaper or a screen print.',
+  tryThis: 'Switch the inks to CMY and make the dots bigger to see the colour screens.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    size: { type: 'float', min: 2, max: 64, step: 0.5, default: 8, unit: 'px', label: 'Dot spacing (px)' },
-    angle: { type: 'float', min: 0, max: 90, step: 1, default: 45, label: 'Angle (°)' },
-    mode: { type: 'enum', options: { mono: 'Mono', cmy: 'CMY' }, default: 'mono', label: 'Inks' },
-    shape: { type: 'enum', options: { circle: 'Round', square: 'Square', ring: 'Ring' }, default: 'circle', label: 'Dot shape' },
-    grid: { type: 'enum', options: { square: 'Square grid', hex: 'Hex grid' }, default: 'square', label: 'Grid' },
+    size: { type: 'float', min: 2, max: 64, step: 0.5, default: 8, unit: 'px', label: 'Dot spacing (px)', description: 'Distance between dots in pixels.' },
+    angle: { type: 'float', min: 0, max: 90, step: 1, default: 45, label: 'Angle (°)', description: 'Rotation of the dot grid; 45° is the classic print angle.' },
+    mode: { type: 'enum', options: { mono: 'Mono', cmy: 'CMY' }, default: 'mono', label: 'Inks', description: 'Mono prints black dots from the brightness; CMY prints three colour screens at different angles.' },
+    shape: { type: 'enum', options: { circle: 'Round', square: 'Square', ring: 'Ring' }, default: 'circle', label: 'Dot shape', description: 'Round, square or ring-shaped dots.' },
+    grid: { type: 'enum', options: { square: 'Square grid', hex: 'Hex grid' }, default: 'square', label: 'Grid', description: 'Dots in a square grid or a honeycomb (hex) grid.' },
   },
   passes: [
     {

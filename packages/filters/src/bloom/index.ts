@@ -17,12 +17,14 @@ const smoothstep = (e0: number, e1: number, x: number) => {
 export const bloom = defineFilter({
   id: 'bloom',
   label: 'Bloom',
+  description: 'Adds a soft glow around the bright parts of the picture, as if light were bleeding in the lens.',
+  tryThis: 'Lower the threshold until only the lights glow, then widen the radius for a dreamy look.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    threshold: { type: 'float', min: 0, max: 2, step: 0.01, default: 0.7, label: 'Threshold' },
-    sigma: { type: 'float', min: 0.5, max: 60, step: 0.5, default: 12, unit: 'px', label: 'Radius σ (px)' },
-    intensity: { type: 'float', min: 0, max: 2, step: 0.01, default: 0.6, label: 'Intensity' },
+    threshold: { type: 'float', min: 0, max: 2, step: 0.01, default: 0.7, label: 'Threshold', description: 'Only light brighter than this glows (in linear light, so 1 is white).' },
+    sigma: { type: 'float', min: 0.5, max: 60, step: 0.5, default: 12, unit: 'px', label: 'Radius σ (px)', description: 'How far the glow spreads, in pixels.' },
+    intensity: { type: 'float', min: 0, max: 2, step: 0.01, default: 0.6, label: 'Intensity', description: 'How strong the glow is when added back.' },
   },
   passes: [
     {

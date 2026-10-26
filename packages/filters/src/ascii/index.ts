@@ -40,14 +40,16 @@ function encodedAt(src: { width: number; height: number; data: Float32Array }, x
 export const ascii = defineFilter({
   id: 'ascii',
   label: 'ASCII art',
+  description: 'Redraws the picture as small text-like glyphs, from empty cells in the darks to solid ones in the lights.',
+  tryThis: 'Raise the cell size to 16 or more to see the individual glyphs.',
   category: 'stylize',
   kind: 'multipass',
   params: {
-    cell: { type: 'int', min: 4, max: 32, default: 8, unit: 'px', label: 'Cell size (px)' },
-    color: { type: 'enum', options: { fixed: 'Ink colour', source: 'Image colours' }, default: 'fixed', label: 'Glyph colour' },
-    ink: { type: 'color', default: [0.85, 1, 0.85], label: 'Ink' },
-    paper: { type: 'color', default: [0.04, 0.07, 0.05], label: 'Paper' },
-    invert: { type: 'bool', default: false, label: 'Dark = dense' },
+    cell: { type: 'int', min: 4, max: 32, default: 8, unit: 'px', label: 'Cell size (px)', description: 'Width of each glyph cell in pixels.' },
+    color: { type: 'enum', options: { fixed: 'Ink colour', source: 'Image colours' }, default: 'fixed', label: 'Glyph colour', description: 'Use one ink colour on one paper colour, or take each glyph\'s colour from the picture.' },
+    ink: { type: 'color', default: [0.85, 1, 0.85], label: 'Ink', description: 'Colour of the glyphs when using the ink colour.' },
+    paper: { type: 'color', default: [0.04, 0.07, 0.05], label: 'Paper', description: 'Colour of the background.' },
+    invert: { type: 'bool', default: false, label: 'Dark = dense', description: 'Off: bright areas get the dense glyphs. On: dark areas get them instead, which suits dark ink on light paper.' },
   },
   passes: [
     {
