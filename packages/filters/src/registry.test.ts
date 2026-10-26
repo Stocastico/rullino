@@ -22,7 +22,7 @@ describe('filter registry', () => {
 
   // The playground explains filters from their schemas. Categories are added here as their texts are
   // written; once every category is listed, this becomes a rule for all filters.
-  const DESCRIBED = ['adjust'];
+  const DESCRIBED = ['adjust', 'classic'];
   it.each(filters.filter((f) => DESCRIBED.includes(f.category)).map((f) => [f.id, f] as const))(
     '%s: has a description, a try-this and a description on every param',
     (_, f) => {

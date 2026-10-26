@@ -15,12 +15,14 @@ const OPERATOR_IDS = Object.keys(OPERATORS) as (keyof typeof OPERATORS)[];
 export const gradient = defineFilter({
   id: 'gradient',
   label: 'Gradient',
+  description: 'Shows how fast brightness changes at each pixel: edges light up, flat areas go dark.',
+  tryThis: 'Switch Output to Horizontal, then Vertical, to see which edges each direction picks up.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    method: { type: 'enum', options: { sobel: 'Sobel', scharr: 'Scharr', prewitt: 'Prewitt' }, default: 'sobel', label: 'Operator' },
-    output: { type: 'enum', options: { magnitude: 'Magnitude', horizontal: 'Horizontal', vertical: 'Vertical' }, default: 'magnitude', label: 'Output' },
-    strength: { type: 'float', min: 0, max: 10, step: 0.01, default: 1, label: 'Strength' },
+    method: { type: 'enum', options: { sobel: 'Sobel', scharr: 'Scharr', prewitt: 'Prewitt' }, default: 'sobel', label: 'Operator', description: 'The kernel used. Sobel is the usual choice, Scharr is more accurate for diagonals, Prewitt is the simplest.' },
+    output: { type: 'enum', options: { magnitude: 'Magnitude', horizontal: 'Horizontal', vertical: 'Vertical' }, default: 'magnitude', label: 'Output', description: 'Magnitude shows edge strength in any direction; Horizontal and Vertical show signed change on mid grey.' },
+    strength: { type: 'float', min: 0, max: 10, step: 0.01, default: 1, label: 'Strength', description: 'Scales the result; raise it to see faint edges.' },
   },
   passes: [
     {

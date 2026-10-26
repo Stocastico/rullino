@@ -10,11 +10,12 @@ const EMPTY = createImage(1, 1);
 export const patch = defineFilter({
   id: 'patch',
   label: 'Remove object',
+  tryThis: 'Paint over a small object first, then press Fill with AI.',
   description: 'Select what to remove with the brush, wand or Object tool, then press Fill with AI (the first use downloads a 28 MB model).',
   category: 'classic',
   kind: 'multipass',
   params: {
-    patch: { type: 'image', default: EMPTY, label: 'Image' },
+    patch: { type: 'image', default: EMPTY, label: 'Image', description: 'The fill made by the Fill with AI button; there is nothing to set by hand.' },
   },
   passes: [
     {

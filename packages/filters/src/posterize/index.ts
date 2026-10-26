@@ -10,11 +10,13 @@ const quantise = (x: number, n: number) => {
 export const posterize = defineFilter({
   id: 'posterize',
   label: 'Posterize',
+  description: 'Reduces each colour channel to a few levels, giving flat poster-like areas.',
+  tryThis: 'Go down to 3 or 4 levels for graphic blocks of colour.',
   category: 'classic',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    levels: { type: 'int', min: 2, max: 32, default: 4, label: 'Levels' },
+    levels: { type: 'int', min: 2, max: 32, default: 4, label: 'Levels', description: 'How many levels each channel keeps. 2 is the most extreme.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

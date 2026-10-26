@@ -8,11 +8,13 @@ import { gaussianCpu, gaussianPass } from '../convolution';
 export const unsharpMask = defineFilter({
   id: 'unsharpMask',
   label: 'Unsharp mask',
+  description: 'Sharpens by subtracting a blurred copy, the classic photographic method; the radius sets which detail is boosted.',
+  tryThis: 'Use a small radius for fine detail and a large one for a broad local-contrast boost.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    amount: { type: 'float', min: 0, max: 5, step: 0.01, default: 1, label: 'Amount' },
-    sigma: { type: 'float', min: 0.3, max: 50, step: 0.1, default: 2, unit: 'px', label: 'Radius σ (px)' },
+    amount: { type: 'float', min: 0, max: 5, step: 0.01, default: 1, label: 'Amount', description: 'How strongly the detail is boosted; 0 changes nothing.' },
+    sigma: { type: 'float', min: 0.3, max: 50, step: 0.1, default: 2, unit: 'px', label: 'Radius σ (px)', description: 'Size of the blur that is subtracted, in pixels. Small boosts fine texture, large boosts broader contrast.' },
   },
   passes: [
     gaussianPass('h', 'input', 'x'),

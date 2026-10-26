@@ -44,10 +44,12 @@ export function otsuThreshold(hist: readonly number[]): number {
 export const otsu = defineFilter({
   id: 'otsu',
   label: 'Otsu threshold',
+  description: 'Turns the picture into black and white, choosing the best cut-off automatically from the histogram.',
+  tryThis: 'Try it on a clear subject against a plain background.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    invert: { type: 'bool', default: false, label: 'Invert' },
+    invert: { type: 'bool', default: false, label: 'Invert', description: 'Swap black and white.' },
   },
   buffers: { hist: 256, level: 1 },
   passes: [

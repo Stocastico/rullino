@@ -25,11 +25,13 @@ function labImage(src: LinearImage): LinearImage {
 export const bilateral = defineFilter({
   id: 'bilateral',
   label: 'Bilateral',
+  description: 'Smooths flat areas while keeping edges sharp, by averaging only with neighbours of a similar colour.',
+  tryThis: 'Raise the spatial sigma on a portrait for smooth skin, and keep the colour sigma low so edges stay crisp.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    sigmaSpace: { type: 'float', min: 0.5, max: 20, step: 0.1, default: 3, unit: 'px', label: 'Spatial sigma (px)' },
-    sigmaRange: { type: 'float', min: 0.01, max: 0.5, step: 0.005, default: 0.08, label: 'Colour sigma (ΔE)' },
+    sigmaSpace: { type: 'float', min: 0.5, max: 20, step: 0.1, default: 3, unit: 'px', label: 'Spatial sigma (px)', description: 'How far the smoothing reaches, in pixels.' },
+    sigmaRange: { type: 'float', min: 0.01, max: 0.5, step: 0.005, default: 0.08, label: 'Colour sigma (ΔE)', description: 'How different in colour a neighbour may be and still be averaged in. Low keeps edges; high approaches a plain blur.' },
   },
   passes: [
     {

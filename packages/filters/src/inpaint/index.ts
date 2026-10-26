@@ -39,13 +39,14 @@ function diffuseCpu(cur: LinearImage, src: LinearImage, mask: Float32Array): Lin
 export const inpaint = defineFilter({
   id: 'inpaint',
   label: 'Remove (inpaint)',
+  tryThis: 'Paint a thin scratch or a wire, and watch it disappear; use a larger reach for wider areas.',
   description: 'Paint a mask over what to remove; it is rebuilt from the surrounding pixels. For wider areas, raise the reach to at least half their width.',
   category: 'classic',
   kind: 'multipass',
   usesMask: true,
   params: {
-    sigma: { type: 'float', min: 1, max: 100, step: 0.5, default: 12, unit: 'px', label: 'Reach (px)' },
-    iterations: { type: 'int', min: 0, max: 400, default: 30, label: 'Smoothing iterations' },
+    sigma: { type: 'float', min: 1, max: 100, step: 0.5, default: 12, unit: 'px', label: 'Reach (px)', description: 'How far into the surroundings the fill reaches, in pixels. Use at least half the width of the area you remove.' },
+    iterations: { type: 'int', min: 0, max: 400, default: 30, label: 'Smoothing iterations', description: 'Smoothing rounds applied to the fill. More is smoother but slower.' },
   },
   passes: [
     { name: 'num', inputs: ['input', 'mask'], wgsl: 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy) * (1.0 - load_mask(xy).r); }' },

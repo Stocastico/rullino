@@ -8,10 +8,12 @@ import { clampLoad } from '../convolution';
 export const sharpen = defineFilter({
   id: 'sharpen',
   label: 'Sharpen',
+  description: 'Makes edges crisper by emphasising the difference between each pixel and its four neighbours.',
+  tryThis: 'Zoom to 100% and raise it until edges stand out, then back off before halos appear.',
   category: 'classic',
   kind: 'multipass',
   params: {
-    amount: { type: 'float', min: 0, max: 3, step: 0.01, default: 0.5, label: 'Amount' },
+    amount: { type: 'float', min: 0, max: 3, step: 0.01, default: 0.5, label: 'Amount', description: 'Strength of the sharpening; 0 changes nothing.' },
   },
   passes: [
     {
