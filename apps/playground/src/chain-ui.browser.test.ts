@@ -20,19 +20,20 @@ function setup(initial: ChainState = { steps: [], selected: undefined }) {
   const root = document.createElement('div');
   document.body.append(root);
   const states: ChainState[] = [];
-  renderChain(root, filters, initial, (s) => states.push(s));
+  const chain = renderChain(root, filters, initial, (s) => states.push(s));
   const last = () => states.at(-1)!;
-  const add = (id: string) => {
-    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
-    sel.value = id;
-    sel.dispatchEvent(new Event('change'));
+  const add = (id: string) => chain.add(filters.find((f) => f.id === id)!);
+  const uidAt = (i: number) => last().steps[i]!.uid;
+  const click = (i: number, action: 'up' | 'down' | 'remove' | 'select') => {
+    if (action === 'up') chain.move(i, i - 1);
+    else if (action === 'down') chain.move(i, i + 1);
+    else if (action === 'remove') chain.remove(uidAt(i));
+    else chain.select(uidAt(i));
   };
-  const click = (uidIndex: number, action: string) =>
-    root.querySelectorAll<HTMLElement>('[data-step]')[uidIndex]!.querySelector<HTMLElement>(`[data-action=${action}]`)!.click();
-  return { root, states, last, add, click };
+  return { root, states, last, add, click, chain, uidAt };
 }
 
-describe('renderChain', () => {
+describe('renderChain (the chain state and the inspector of the selected step)', () => {
   it('adds steps with default params and selects the new one', () => {
     const { root, last, add } = setup();
     add('beta');
@@ -40,13 +41,13 @@ describe('renderChain', () => {
     expect(last().steps.map((s) => s.filterId)).toEqual(['beta', 'alpha']);
     expect(last().steps[1]!.params).toEqual({ k: 1 });
     expect(last().selected).toBe(last().steps[1]!.uid);
-    expect(root.querySelectorAll('[data-step]')).toHaveLength(2);
-    // Only the selected step shows its controls.
+    // Only the selected step has an inspector, with its controls.
+    expect(root.querySelectorAll('[data-step]')).toHaveLength(1);
     expect(root.querySelectorAll('input[name=k]')).toHaveLength(1);
   });
 
   it('removes, reorders and toggles steps', () => {
-    const { last, add, click, root } = setup();
+    const { last, add, click, chain } = setup();
     add('alpha');
     add('beta');
     add('gamma');
@@ -54,12 +55,18 @@ describe('renderChain', () => {
     expect(last().steps.map((s) => s.filterId)).toEqual(['alpha', 'gamma', 'beta']);
     click(0, 'down');
     expect(last().steps.map((s) => s.filterId)).toEqual(['gamma', 'alpha', 'beta']);
-    const toggle = root.querySelectorAll<HTMLInputElement>('[data-step] input[data-action=toggle]')[1]!;
-    toggle.checked = false;
-    toggle.dispatchEvent(new Event('change'));
+    chain.toggle(last().steps[1]!.uid, false);
     expect(last().steps[1]!.enabled).toBe(false);
+    chain.toggle(last().steps[1]!.uid, true);
+    expect(last().steps[1]!.enabled).toBe(true);
+    chain.move(0, 2);
+    expect(last().steps.map((s) => s.filterId)).toEqual(['alpha', 'beta', 'gamma']);
+    chain.move(0, 0);
+    chain.move(0, 7);
+    chain.move(-1, 1);
+    expect(last().steps.map((s) => s.filterId)).toEqual(['alpha', 'beta', 'gamma']);
     click(0, 'remove');
-    expect(last().steps.map((s) => s.filterId)).toEqual(['alpha', 'beta']);
+    expect(last().steps.map((s) => s.filterId)).toEqual(['beta', 'gamma']);
   });
 
   it('edits the params of the selected step without rebuilding the list', () => {
@@ -73,6 +80,16 @@ describe('renderChain', () => {
     expect(root.querySelector('[data-step]')).toBe(card); // same DOM node: a drag in progress survives
   });
 
+  it('tells subscribers about every change, from here or from set(), and once on subscribing', () => {
+    const { chain, add, last } = setup();
+    const seen: number[] = [];
+    chain.subscribe((st) => seen.push(st.steps.length));
+    add('alpha');
+    add('beta');
+    chain.set({ ...last(), steps: [] }, false);
+    expect(seen).toEqual([0, 1, 2, 0]);
+  });
+
   it('selects a step by clicking its title', () => {
     const { root, last, add, click } = setup();
     add('alpha');
@@ -83,7 +100,7 @@ describe('renderChain', () => {
   });
 
   it('shows a hint for an empty chain', () => {
-    expect(setup().root.textContent).toMatch(/add a filter/i);
+    expect(setup().root.textContent).toMatch(/browse effects/i);
   });
 
   it('removing the selected step selects its neighbour (previous first)', () => {
@@ -101,45 +118,13 @@ describe('renderChain', () => {
     expect(last()).toEqual({ steps: [], selected: undefined });
   });
 
-  it('moving past the ends does nothing (buttons disabled)', () => {
-    const { root, states, add } = setup();
-    add('alpha');
-    add('beta');
-    const [first, second] = [...root.querySelectorAll('[data-step]')];
-    expect(first!.querySelector<HTMLButtonElement>('[data-action=up]')!.disabled).toBe(true);
-    expect(second!.querySelector<HTMLButtonElement>('[data-action=down]')!.disabled).toBe(true);
-    const n = states.length;
-    first!.querySelector<HTMLButtonElement>('[data-action=up]')!.click();
-    expect(states.length).toBe(n);
-  });
-
-  it('adds a look as a group of steps, selecting its first step', () => {
-    const root = document.createElement('div');
-    document.body.append(root);
-    const states: ChainState[] = [];
-    renderChain(root, filters, { steps: [], selected: undefined }, (s) => states.push(s), [
-      { id: 'pair', label: 'Pair', steps: () => [{ filter: filters[0]! }, { filter: filters[1]!, params: { k: 2 } }] },
-    ]);
-    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add-look]')!;
-    sel.value = 'unknown';
-    sel.dispatchEvent(new Event('change'));
-    expect(states).toHaveLength(0);
-    sel.value = 'pair';
-    sel.dispatchEvent(new Event('change'));
-    const last = states.at(-1)!;
-    expect(last.steps.map((s) => [s.filterId, s.params.k])).toEqual([['alpha', 1], ['beta', 2]]);
-    expect(last.selected).toBe(last.steps[0]!.uid);
-  });
-
   it('mask-aware filters start with a brush mask that cannot be removed; descriptions show as hints', () => {
     const needsMask = { ...filters[0]!, id: 'needs', kind: 'multipass', usesMask: true, description: 'Paints over things.', tryThis: 'Paint a small area first.', passes: [] } as never;
     const root = document.createElement('div');
     document.body.append(root);
     const states: ChainState[] = [];
     const chain = renderChain(root, [needsMask], { steps: [], selected: undefined }, (s) => states.push(s));
-    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
-    sel.value = 'needs';
-    sel.dispatchEvent(new Event('change'));
+    chain.add(needsMask);
     expect(states.at(-1)!.steps[0]!.mask?.kind).toBe('raster');
     expect(root.querySelector('.hint')!.textContent).toBe('Paints over things.');
     expect(root.querySelector('.try-this')!.textContent).toBe('Try this: Paint a small area first.');
@@ -159,14 +144,10 @@ describe('renderChain', () => {
     document.body.append(root);
     const states: ChainState[] = [];
     const filled: string[] = [];
-    renderChain(root, [filters[0]!, patch], { steps: [], selected: undefined }, (s) => states.push(s), [], {
+    const ui = renderChain(root, [filters[0]!, patch], { steps: [], selected: undefined }, (s) => states.push(s), {
       fill: async (uid) => void filled.push(uid),
     });
-    const add = (id: string) => {
-      const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
-      sel.value = id;
-      sel.dispatchEvent(new Event('change'));
-    };
+    const add = (id: string) => ui.add(id === 'patch' ? patch : filters[0]!);
     add('alpha');
     expect(root.querySelector('[data-action=fill]')).toBeNull();
     add('patch');
@@ -184,13 +165,11 @@ describe('renderChain', () => {
     document.body.append(root);
     const states: ChainState[] = [];
     const calls: string[] = [];
-    const chain = renderChain(root, [lens], { steps: [], selected: undefined }, (s) => states.push(s), [], {
+    const chain = renderChain(root, [lens], { steps: [], selected: undefined }, (s) => states.push(s), {
       estimateDepth: async (uid) => void calls.push(`depth:${uid}`),
       pickFocus: (uid) => void calls.push(`focus:${uid}`),
     });
-    const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
-    sel.value = 'lensBlur';
-    sel.dispatchEvent(new Event('change'));
+    chain.add(lens);
     const uid = states.at(-1)!.steps[0]!.uid;
     expect(states.at(-1)!.steps[0]!.mask).toBeUndefined();
     const pick = () => root.querySelector<HTMLButtonElement>('[data-action=pick-focus]')!;
@@ -217,13 +196,13 @@ describe('renderChain', () => {
       expect(effectiveMask({ steps: [], selected: undefined }, step({ useSelection: true, mask: radial }))).toBeUndefined();
     });
 
-    it('the chain always has a Selection entry; selecting it shows the mask controls of the selection', () => {
-      const { root, last, add } = setup();
+    it('selecting the Selection shows the mask controls of the selection, not a step\'s', () => {
+      const { root, last, add, chain } = setup();
       add('alpha');
-      expect(root.querySelector('[data-selection]')).not.toBeNull();
+      expect(root.querySelector('[data-selection]')).toBeNull();
       // the step's own mask controls are open, not the selection's
       expect(root.querySelectorAll('[data-action=mask-kind]')).toHaveLength(1);
-      root.querySelector<HTMLElement>('[data-selection] [data-action=select]')!.click();
+      chain.select(SELECTION);
       expect(last().selected).toBe(SELECTION);
       const kind = root.querySelector<HTMLSelectElement>('[data-selection] [data-action=mask-kind]')!;
       expect(kind.value).toBe('none');
@@ -254,10 +233,7 @@ describe('renderChain', () => {
       const needsMask = { ...filters[0]!, id: 'needs', kind: 'multipass', usesMask: true, passes: [] } as never;
       const root = document.createElement('div');
       document.body.append(root);
-      renderChain(root, [needsMask], { steps: [], selected: undefined }, () => {});
-      const sel = root.querySelector<HTMLSelectElement>('select[data-action=add]')!;
-      sel.value = 'needs';
-      sel.dispatchEvent(new Event('change'));
+      renderChain(root, [needsMask], { steps: [], selected: undefined }, () => {}).add(needsMask);
       expect(root.querySelector('[data-action=use-selection]')).toBeNull();
     });
 
