@@ -19,14 +19,20 @@ rullino spans the arc from classic computer-vision operations (thresholds, convo
 
 ## Why
 
-| Existing | Problem |
-|---|---|
-| OpenCV.js | WASM, several MB, translated C++ API, no GPU |
-| glfx.js | WebGL1, unmaintained since 2015 |
-| CamanJS | abandoned, CPU only |
-| pixi-filters | tied to the Pixi renderer |
+Image processing in the browser is well served by general tools; what is missing is a **WebGPU-first, typed filter library with a specification you can test against**. The closest alternatives, by what they are built for:
 
-rullino aims to be modern, typed, composable and GPU-first, with zero runtime dependencies.
+| Library | Approach | Note |
+|---|---|---|
+| OpenCV.js | WASM, CPU; broad computer-vision toolkit | Much wider scope than filters; no GPU path in current releases |
+| glfx.js | WebGL 1 filters | Last npm release 2016, last commit 2022 |
+| CamanJS | Canvas pixel manipulation (CPU) | Marked no longer maintained in 2020; last npm release 2013 |
+| pixi-filters | Filters for PixiJS (WebGL; WebGPU through Pixi v8) | Meant to be used inside a Pixi scene |
+| three.js / Babylon.js post-processing | Scene-graph post-process nodes (WebGPU or WebGL) | Built for 3D rendering |
+| Jimp, sharp, wasm-vips, magick-wasm | CPU image processing (JS, native or WASM) | Server-side or batch oriented; no GPU |
+| Fabric.js, Konva | Canvas libraries with built-in filters | Object model first, filters second |
+| small WebGPU filter repos | Demos and single-purpose tools (for example LUT-only) | Not published as general libraries, as far as we could find |
+
+rullino is modern, typed, composable and GPU-first, with zero runtime dependencies: every filter is a WebGPU compute shader **and** a plain TypeScript reference, tested against each other; filters chain into fused shaders; masks, geometry, 3D LUTs and export are part of the same model. The trade-off is that it needs WebGPU (no WebGL fallback). *Comparison last checked in October 2026; corrections welcome.*
 
 ## Design highlights
 
