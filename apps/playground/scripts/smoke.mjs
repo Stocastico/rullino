@@ -97,17 +97,17 @@ try {
   check(thumbs.length >= 3 && thumbs.every((t) => t.ready && t.sig > 0), `look thumbnails not rendered: ${JSON.stringify(thumbs.map((t) => t.ready))}`);
   check(new Set(thumbs.map((t) => t.sig)).size === thumbs.length, 'every look thumbnail should differ');
   {
-    const before = (await page.$$('#chain li[data-step]')).length;
+    const before = (await page.$$('#strip li[data-step]')).length;
     await after(() => page.click('.look-card[data-look="noir"]'));
-    check((await page.$$('#chain li[data-step]')).length === before + 3, 'clicking the Noir card should add its 3 steps');
+    check((await page.$$('#strip li[data-step]')).length === before + 3, 'clicking the Noir card should add its 3 steps');
     await after(() => page.keyboard.press('Control+z'));
-    check((await page.$$('#chain li[data-step]')).length === before, 'undo should remove the added look');
+    check((await page.$$('#strip li[data-step]')).length === before, 'undo should remove the added look');
   }
 
   // Auto adds white balance and levels steps in front of the chain; one undo removes both.
-  const stepTitles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
+  const stepTitles = () => page.$$eval('#strip li[data-step] .step-title', (b) => b.map((x) => x.textContent));
   await after(() => page.click('#auto'));
-  await page.waitForFunction(() => document.querySelectorAll('#chain li[data-step]').length === 3, null, { timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => document.querySelectorAll('#strip li[data-step]').length === 3, null, { timeout: 20000 }).catch(() => {});
   check(JSON.stringify(await stepTitles()) === JSON.stringify(['White balance', 'Levels', 'Exposure']), `Auto should add White balance and Levels first: ${await stepTitles()}`);
   check(/Auto: temperature/.test(await page.textContent('#announce')), `Auto should announce its values: ${await page.textContent('#announce')}`);
   await after(() => page.keyboard.press('Control+z'));
@@ -145,31 +145,31 @@ try {
   check((await page.$$('#overlay [data-handle]')).length === 0, 'mask handles should disappear with the mask');
 
   // Selection: one shared area (here a linear gradient, bottom half) that steps opt into with "Only in selection".
-  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(() => page.click('#strip [data-selection] [data-action=select]'));
   check((await page.$$('#chain [data-selection] select[data-action=mask-kind]')).length === 1, 'the Selection entry should show its mask controls when selected');
   await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'linear'));
   const [stop, sbottom] = await rowDiff();
   check(stop > 10 && sbottom > 10, `a selection alone changes nothing about the steps: top ${stop.toFixed(1)}, bottom ${sbottom.toFixed(1)}`);
-  await after(() => page.click('#chain li[data-step] .step-title'));
+  await after(() => page.click('#strip li[data-step] .step-title'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
   const [utop, ubottom] = await rowDiff();
   check(utop < 1 && ubottom > 10, `"Only in selection": top row differs by ${utop.toFixed(1)}, bottom by ${ubottom.toFixed(1)}`);
   // A second step shares the same selection.
-  await after(() => page.selectOption('#chain select[data-action=add]', 'invert'));
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'invert'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
   const [ntop, nbottom] = await rowDiff();
   check(ntop < 1 && nbottom > 10, `two steps in the same selection: top row differs by ${ntop.toFixed(1)}, bottom by ${nbottom.toFixed(1)}`);
   // Removing the invert step; clearing the selection then makes the Exposure step act on the whole image.
-  await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+  await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
   check(JSON.stringify(await stepTitles()) === JSON.stringify(['Exposure']), `removing the invert step: ${await stepTitles()}`);
-  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(() => page.click('#strip [data-selection] [data-action=select]'));
   await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'none'));
   // The selection is part of the undo history.
-  check((await page.textContent('#chain [data-selection] .selection-summary')) === 'whole image', 'clearing the selection should say "whole image"');
+  check((await page.textContent('#strip [data-selection] small')) === 'whole image', 'clearing the selection should say "whole image"');
   await after(() => page.keyboard.press('Control+z'));
-  check((await page.textContent('#chain [data-selection] .selection-summary')) === 'set', 'undo should bring the selection back');
+  check((await page.textContent('#strip [data-selection] small')) === 'set', 'undo should bring the selection back');
   await after(() => page.keyboard.press('Control+Shift+z'));
-  await after(() => page.click('#chain li[data-step] .step-title'));
+  await after(() => page.click('#strip li[data-step] .step-title'));
   const [wtop, wbottom] = await rowDiff();
   check(wtop > 10 && wbottom > 10, `with nothing selected the step acts everywhere: top ${wtop.toFixed(1)}, bottom ${wbottom.toFixed(1)}`);
   // Shape tools: a rectangle dragged on the image becomes the selection (lower right quarter).
@@ -180,7 +180,7 @@ try {
       const patch = (fx, fy) => { let n = 0; const [x0, y0] = [Math.floor(w * fx), Math.floor(h * fy)]; for (let y = y0; y < y0 + 4; y++) for (let x = x0; x < x0 + 4; x++) for (let c = 0; c < 3; c++) n += Math.abs(a[(y * w + x) * 4 + c] - b[(y * w + x) * 4 + c]); return n / 48; };
       return [patch(0.75, 0.75), patch(0.15, 0.15), patch(0.75, 0.15)];
     });
-  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(() => page.click('#strip [data-selection] [data-action=select]'));
   await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'brush'));
   await page.click('#chain [data-selection] button[data-action=tool-rect]');
   await after(async () => {
@@ -190,12 +190,12 @@ try {
     await page.mouse.move(box.x + box.width * 0.95, box.y + box.height * 0.95, { steps: 4 });
     await page.mouse.up();
   });
-  await after(() => page.click('#chain li[data-step] .step-title'));
+  await after(() => page.click('#strip li[data-step] .step-title'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }));
   const [inRect, outLeft, outTop] = await patchDiff();
   check(inRect > 10 && outLeft < 1 && outTop < 1, `rectangle selection: inside differs by ${inRect.toFixed(1)}, left ${outLeft.toFixed(1)}, top ${outTop.toFixed(1)}`);
   // Alt+drag over the same box removes it again.
-  await after(() => page.click('#chain [data-selection] [data-action=select]'));
+  await after(() => page.click('#strip [data-selection] [data-action=select]'));
   await after(async () => {
     const box = await page.locator('#after').boundingBox();
     await page.keyboard.down('Alt');
@@ -209,7 +209,7 @@ try {
   check(gone < 1, `Alt+drag should remove the rectangle again: inside differs by ${gone.toFixed(1)}`);
   await page.click('#chain [data-selection] button[data-action=tool-paint]'); // the tool is shared: back to the brush for the checks below
   await after(() => page.selectOption('#chain [data-selection] select[data-action=mask-kind]', 'none'));
-  await after(() => page.click('#chain li[data-step] .step-title'));
+  await after(() => page.click('#strip li[data-step] .step-title'));
   await after(() => page.$eval('#chain input[data-action=use-selection]', (t) => { t.checked = false; t.dispatchEvent(new Event('change', { bubbles: true })); }));
 
   // Brush: an empty mask changes nothing; a stroke across the middle changes only that band.
@@ -284,7 +284,7 @@ try {
 
   // Inpainting: the new step comes with an empty brush mask (no "No mask" option); painting over
   // a chart patch replaces it with its surroundings while far patches stay as they were.
-  await after(() => page.selectOption('#chain select[data-action=add]', 'inpaint'));
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'inpaint'));
   check(!(await page.$$eval('#chain select[data-action=mask-kind] option', (o) => o.map((x) => x.value))).includes('none'), 'inpaint should not offer "No mask"');
   const afterPx = (fx, fy) => page.$eval('#after', (c, [fx, fy]) => [...c.getContext('2d').getImageData(Math.floor(c.width * fx), Math.floor(c.height * fy), 1, 1).data], [fx, fy]);
   const [centreBefore, farBefore] = [await afterPx(0.09, 0.12), await afterPx(0.75, 0.85)];
@@ -300,16 +300,16 @@ try {
   const dist = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])));
   check(dist(centreBefore, centreAfter) > 20, `inpainting did not change the painted patch: ${centreBefore} -> ${centreAfter}`);
   check(dist(farBefore, farAfter) <= 2, `inpainting changed a far patch: ${farBefore} -> ${farAfter}`);
-  await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+  await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
   await after(() => page.selectOption('#sample', 'ramps'));
   await after(() => page.selectOption('#chain select[data-action=mask-kind]', 'none'));
 
   // Disabling the step brings the original back.
-  await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
+  await after(() => page.$eval('#strip input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
   check((await differs()) < 0.01, 'disabled step should leave the image unchanged');
 
   // Dragging a slider renders the reduced preview, releasing renders full resolution.
-  await after(() => page.$eval('#chain input[data-action=toggle]', (t) => { t.checked = true; t.dispatchEvent(new Event('change')); }));
+  await after(() => page.$eval('#strip input[data-action=toggle]', (t) => { t.checked = true; t.dispatchEvent(new Event('change')); }));
   await after(async () => {
     await page.$eval('#chain [name=ev]', (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
     await slider('ev', -1);
@@ -320,7 +320,7 @@ try {
 
   // A .cube file loaded into a LUT step changes the image (an inverting LUT).
   const afterPixels = () => page.$eval('#after', (c) => Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data));
-  await after(() => page.selectOption('#chain select[data-action=add]', 'applyLut'));
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'applyLut'));
   const beforeLut = await afterPixels();
   const cube = ['LUT_3D_SIZE 2', ...[0, 1].flatMap((b) => [0, 1].flatMap((g) => [0, 1].map((r) => `${1 - r} ${1 - g} ${1 - b}`)))].join('\n');
   await after(() => page.setInputFiles('#chain input[type=file][name=look]', { name: 'invert.cube', mimeType: 'text/plain', buffer: Buffer.from(cube) }));
@@ -330,9 +330,9 @@ try {
   check(/invert · 2³/.test(await page.textContent('#chain .lut-info')), 'LUT step should show the loaded file');
 
   // Adding a look appends its steps (LUT, vignette, grain for Noir) and turns the image black and white.
-  const stepsBefore = await page.$$eval('#chain li[data-step]', (l) => l.length);
-  await after(() => page.selectOption('#chain select[data-action=add-look]', 'noir'));
-  check((await page.$$eval('#chain li[data-step]', (l) => l.length)) === stepsBefore + 3, 'the Noir look should add 3 steps');
+  const stepsBefore = await page.$$eval('#strip li[data-step]', (l) => l.length);
+  await after(() => page.click('.look-card[data-look=noir]'));
+  check((await page.$$eval('#strip li[data-step]', (l) => l.length)) === stepsBefore + 3, 'the Noir look should add 3 steps');
   const colourful = await page.$eval('#after', (c) => {
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     let n = 0;
@@ -341,7 +341,7 @@ try {
   });
   check(colourful < 0.01, `after the Noir look ${(colourful * 100).toFixed(1)}% of pixels still have colour`);
   // Back to the chain without the look's steps, so the checks below see a known chain.
-  for (let i = 0; i < 3; i++) await after(() => page.click('#chain li[data-step]:last-of-type button[data-action=remove]'));
+  for (let i = 0; i < 3; i++) await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
 
   // Export happens at full resolution, not at the 2048 px display size.
   await after(() =>
@@ -571,11 +571,11 @@ try {
     new MutationObserver(() => (window.sawBusy ||= document.getElementById('stage').classList.contains('busy'))).observe(document.getElementById('stage'), { attributes: true });
   });
   // Every filter in one chain renders without errors.
-  const ids = await page.$$eval('#chain select[data-action=add] option', (o) => o.map((x) => x.value).filter(Boolean));
-  for (const id of ids) await after(() => page.selectOption('#chain select[data-action=add]', id));
+  const ids = await page.evaluate(() => window.rullino.filterIds());
+  for (const id of ids) await after(() => page.evaluate((id) => window.rullino.add(id), id));
   // Transparency at full strength (its default) would hide everything after it; the checks below
   // need to see a drawn image.
-  await after(() => page.click('#chain button[data-action=select][aria-label="Edit Transparency"]'));
+  await after(() => page.click('#strip button[data-action=select][aria-label="Edit Transparency"]'));
   await after(() => slider('amount', 0));
   check((await status()).includes(`${ids.length + 2} steps`), `expected ${ids.length + 2} steps, status: ${await status()}`);
   check(await page.evaluate(() => window.sawBusy), 'the busy spinner never showed while compiling 30+ filters');
@@ -609,7 +609,7 @@ try {
   await page.selectOption('#sample', 'ramps');
   await page.waitForTimeout(500);
   await page.selectOption('#sample', 'chart');
-  await page.selectOption('#chain select[data-action=add]', 'canny');
+  await page.evaluate((id) => window.rullino.add(id), 'canny');
   // Initial exposure + the LUT step + every filter + the canny just added.
   const expected = new RegExp(`Colour chart .* ${ids.length + 3} steps`);
   await page.waitForFunction((re) => new RegExp(re).test(document.getElementById('status').textContent), expected.source, { timeout: 20000 }).catch(() => {});
@@ -635,11 +635,26 @@ try {
   await page.goto(url);
   await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
   await page.waitForTimeout(1500);
-  check((await page.$$('#chain li[data-step]')).length > 1, 'a first visit should open on an example chain');
+  check((await page.$$('#strip li[data-step]')).length > 1, 'a first visit should open on an example chain');
   check((await differs()) > 0.05, `the first-visit chain should change the picture, ${((await differs()) * 100).toFixed(1)}% differs`);
 
+  // The film strip: a frame per step with the picture after it; "up to here" shows the photo cut at that step.
+  await page.waitForFunction(() => document.querySelectorAll('#strip li[data-step] canvas[data-ready]').length === 3 && document.querySelector('#strip [data-original] canvas[data-ready]'), null, { timeout: 60000 }).catch(() => {});
+  const frameInfo = await page.$$eval('#strip li[data-step] canvas', (cs) => cs.map((c) => 'ready' in c.dataset));
+  check(frameInfo.length === 3 && frameInfo.every(Boolean), `every frame of the strip should show its picture, got ${frameInfo.join(', ')}`);
+  const afterSum = () => page.$eval('#after', (c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let t = 0; for (let i = 0; i < d.length; i += 37) t += d[i]; return t; });
+  const frameBefore = Number(await page.getAttribute('#status', 'data-frame'));
+  const full = await afterSum();
+  await page.click('#strip li[data-step]:first-of-type [data-action=solo]');
+  await page.waitForFunction((n) => Number(document.getElementById('status').dataset.frame) > n && /up to one step/.test(document.getElementById('status').textContent), frameBefore, { timeout: 30000 }).catch(() => {});
+  check(/up to one step/.test(await status()), `"up to here" should say so in the status, got: ${await status()}`);
+  check(Math.abs((await afterSum()) - full) > 1000, 'showing the photo up to the first step should change the picture (no vignette, no grain)');
+  await page.click('#strip li[data-step]:first-of-type [data-action=solo]');
+  await page.waitForFunction(() => !/up to one step/.test(document.getElementById('status').textContent), null, { timeout: 30000 }).catch(() => {});
+  check(!/up to one step/.test(await status()), 'pressing it again should show the whole chain');
+
   // The effect browser: Ctrl+K, search, thumbnails drawn on the photo, Enter adds the first match.
-  const browserTitles = () => page.$$eval('#chain li[data-step] .step-title', (b) => b.map((x) => x.textContent));
+  const browserTitles = () => page.$$eval('#strip li[data-step] .step-title', (b) => b.map((x) => x.textContent));
   const browserStepsBefore = (await browserTitles()).length;
   await page.keyboard.press('Control+k');
   await page.waitForSelector('dialog.effect-browser[open]', { timeout: 5000 });
@@ -655,7 +670,7 @@ try {
   });
   check(thumb.ready && thumb.w > 0 && thumb.spread > 100, `the halftone thumbnail should be drawn (ready ${thumb.ready}, width ${thumb.w}, contrast ${thumb.spread})`);
   await page.keyboard.press('Enter');
-  await page.waitForFunction((n) => document.querySelectorAll('#chain li[data-step]').length === n + 1, browserStepsBefore, { timeout: 10000 }).catch(() => {});
+  await page.waitForFunction((n) => document.querySelectorAll('#strip li[data-step]').length === n + 1, browserStepsBefore, { timeout: 10000 }).catch(() => {});
   const after2 = await browserTitles();
   check(after2.length === browserStepsBefore + 1 && after2.at(-1) === 'Halftone', `Enter should add Halftone, steps were ${after2.join(', ')}`);
   check(!(await page.$eval('dialog.effect-browser', (d) => d.open)), 'adding an effect should close the browser');
