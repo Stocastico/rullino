@@ -30,9 +30,9 @@ const gaps = BANDS.map((b, i) => {
 
 const params: Record<string, FloatParam> = {};
 for (const b of BANDS) {
-  params[`${b.id}Hue`] = { type: 'float', min: -30, max: 30, step: 1, default: 0, label: `${b.label} (°)`, group: 'Hue' };
-  params[`${b.id}Sat`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: b.label, group: 'Saturation' };
-  params[`${b.id}Lum`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: b.label, group: 'Luminance' };
+  params[`${b.id}Hue`] = { type: 'float', min: -30, max: 30, step: 1, default: 0, label: `${b.label} (°)`, group: 'Hue', description: `Rotates the hue of ${b.label.toLowerCase()} tones.` };
+  params[`${b.id}Sat`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: b.label, group: 'Saturation', description: `How colourful ${b.label.toLowerCase()} tones are.` };
+  params[`${b.id}Lum`] = { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: b.label, group: 'Luminance', description: `How light or dark ${b.label.toLowerCase()} tones are.` };
 }
 
 /** Signed angle from a to b in degrees, in [-180, 180). */
@@ -45,6 +45,8 @@ const wrap = (d: number) => d - 360 * Math.floor((d + 180) / 360);
 export const colorMixer = defineFilter({
   id: 'colorMixer',
   label: 'Colour mixer',
+  description: 'Adjusts hue, saturation and lightness separately for eight colour ranges, so you can change the sky without touching the skin.',
+  tryThis: 'Darken Blue and raise its saturation for a deeper sky, then shift Orange slightly to warm the skin.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',

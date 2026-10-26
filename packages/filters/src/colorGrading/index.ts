@@ -28,17 +28,19 @@ const smoothstep = (e0: number, e1: number, x: number) => {
 export const colorGrading = defineFilter({
   id: 'colorGrading',
   label: 'Colour grading',
+  description: 'Tints shadows, midtones and highlights separately, the way split toning and three-way colour wheels do.',
+  tryThis: 'Give the shadows a teal tint and the highlights an orange one at low strength.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    shadows: { type: 'color', default: [0.2, 0.45, 0.6], label: 'Colour', group: 'Shadows' },
-    shadowsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Shadows' },
-    midtones: { type: 'color', default: [0.75, 0.6, 0.45], label: 'Colour', group: 'Midtones' },
-    midtonesStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Midtones' },
-    highlights: { type: 'color', default: [1, 0.7, 0.35], label: 'Colour', group: 'Highlights' },
-    highlightsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Highlights' },
-    balance: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Balance' },
+    shadows: { type: 'color', default: [0.2, 0.45, 0.6], label: 'Colour', group: 'Shadows', description: 'The colour added to the dark tones.' },
+    shadowsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Shadows', description: 'How strongly the shadows are tinted; 0 turns it off.' },
+    midtones: { type: 'color', default: [0.75, 0.6, 0.45], label: 'Colour', group: 'Midtones', description: 'The colour added to the middle tones.' },
+    midtonesStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Midtones', description: 'How strongly the midtones are tinted; 0 turns it off.' },
+    highlights: { type: 'color', default: [1, 0.7, 0.35], label: 'Colour', group: 'Highlights', description: 'The colour added to the bright tones.' },
+    highlightsStrength: { type: 'float', min: 0, max: 1, step: 0.01, default: 0, label: 'Strength', group: 'Highlights', description: 'How strongly the highlights are tinted; 0 turns it off.' },
+    balance: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Balance', description: 'Moves the boundary between shadows and highlights: negative widens the shadows, positive widens the highlights.' },
   },
   wgsl: /* wgsl */ `
 fn tint(c: vec4f, strength: f32) -> vec2f {

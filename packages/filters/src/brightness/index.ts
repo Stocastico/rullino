@@ -9,11 +9,13 @@ import { OKLAB_TOLERANCE } from '../shared';
 export const brightness = defineFilter({
   id: 'brightness',
   label: 'Brightness',
+  description: 'Makes the picture lighter or darker while keeping the colours as they are (unlike Exposure, it works on perceived lightness).',
+  tryThis: 'Push it up and compare with Exposure: brightness leaves hue and colourfulness alone.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount' },
+    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount', description: 'Negative darkens, positive lightens; 0 changes nothing.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

@@ -21,15 +21,17 @@ const level = (e: number, inBlack: number, inWhite: number, gamma: number, outBl
 export const levels = defineFilter({
   id: 'levels',
   label: 'Levels',
+  description: 'Maps a range of input tones to a range of output tones: set the black and white points, then adjust the midtones.',
+  tryThis: 'Move Input black and Input white towards the edges of the histogram, then use the midtone gamma to set the mood.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    inBlack: { type: 'float', min: 0, max: 1, step: 0.005, default: 0, label: 'Input black' },
-    inWhite: { type: 'float', min: 0, max: 1, step: 0.005, default: 1, label: 'Input white' },
-    gamma: { type: 'float', min: 0.1, max: 10, step: 0.01, default: 1, label: 'Gamma (midtones)' },
-    outBlack: { type: 'float', min: 0, max: 1, step: 0.005, default: 0, label: 'Output black' },
-    outWhite: { type: 'float', min: 0, max: 1, step: 0.005, default: 1, label: 'Output white' },
+    inBlack: { type: 'float', min: 0, max: 1, step: 0.005, default: 0, label: 'Input black', description: 'Input tones at or below this become black.' },
+    inWhite: { type: 'float', min: 0, max: 1, step: 0.005, default: 1, label: 'Input white', description: 'Input tones at or above this become white.' },
+    gamma: { type: 'float', min: 0.1, max: 10, step: 0.01, default: 1, label: 'Gamma (midtones)', description: 'Above 1 lightens the midtones, below 1 darkens them.' },
+    outBlack: { type: 'float', min: 0, max: 1, step: 0.005, default: 0, label: 'Output black', description: 'Black is raised to this level: a higher value gives a faded look.' },
+    outWhite: { type: 'float', min: 0, max: 1, step: 0.005, default: 1, label: 'Output white', description: 'White is lowered to this level.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

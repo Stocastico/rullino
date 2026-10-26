@@ -5,11 +5,13 @@ import { OKLAB_TOLERANCE } from '../shared';
 export const saturation = defineFilter({
   id: 'saturation',
   label: 'Saturation',
+  description: 'Makes colours stronger or weaker, all by the same amount.',
+  tryThis: 'Take it to the minimum for a grey picture, then bring it back to just under natural.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount' },
+    amount: { type: 'float', min: -1, max: 1, step: 0.01, default: 0, label: 'Amount', description: '-1 removes all colour, +1 doubles the colourfulness; 0 changes nothing.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

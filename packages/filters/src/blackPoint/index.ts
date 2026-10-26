@@ -9,11 +9,13 @@ import { OKLAB_TOLERANCE } from '../shared';
 export const blackPoint = defineFilter({
   id: 'blackPoint',
   label: 'Black point',
+  description: 'Sets how dark the darkest tones are: raising the black point deepens shadows, lowering it lifts them into a faded look.',
+  tryThis: 'Lower it slightly for a matte, filmic shadow, or raise it to make blacks richer.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    amount: { type: 'float', min: -0.2, max: 0.2, step: 0.005, default: 0, label: 'Amount' },
+    amount: { type: 'float', min: -0.2, max: 0.2, step: 0.005, default: 0, label: 'Amount', description: 'Positive values crush the shadows towards black; negative values lift them.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

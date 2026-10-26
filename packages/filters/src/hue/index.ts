@@ -5,11 +5,13 @@ import { OKLAB_TOLERANCE } from '../shared';
 export const hue = defineFilter({
   id: 'hue',
   label: 'Hue',
+  description: 'Rotates all colours around the colour wheel, so reds turn to greens, blues to oranges, and so on.',
+  tryThis: 'Rotate by 180° for complementary colours, or by a few degrees to fix a colour cast.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    degrees: { type: 'float', min: -180, max: 180, step: 1, default: 0, label: 'Rotation (°)' },
+    degrees: { type: 'float', min: -180, max: 180, step: 1, default: 0, label: 'Rotation (°)', description: 'How far to rotate the hues; ±180° is the opposite colour.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

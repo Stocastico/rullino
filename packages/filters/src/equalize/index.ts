@@ -10,10 +10,12 @@ import { OKLAB_TOLERANCE } from '../shared';
 export const equalize = defineFilter({
   id: 'equalize',
   label: 'Equalise histogram',
+  description: 'Spreads the tones evenly across the brightness range, which stretches contrast on flat images.',
+  tryThis: 'Try it on a dull, hazy photo, then lower Amount until it stops looking harsh.',
   category: 'adjust',
   kind: 'multipass',
   params: {
-    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount' },
+    amount: { type: 'float', min: 0, max: 1, step: 0.01, default: 1, label: 'Amount', description: 'Blend between the original (0) and the fully equalised picture (1).' },
   },
   buffers: equalizeBuffers(1),
   passes: equalizePasses('1', '1e9'),

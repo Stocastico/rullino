@@ -19,4 +19,16 @@ describe('filter registry', () => {
     expect(() => f.cpu({ width: 1, height: 1, data: new Float32Array([0.2, 0.3, 0.4, 1]) }, defaultParams(f.params), mask)).not.toThrow();
     for (const p of Object.values(f.params as ParamSchema)) expect(p.label, `${f.id} param label`).toBeTruthy();
   });
+
+  // The playground explains filters from their schemas. Categories are added here as their texts are
+  // written; once every category is listed, this becomes a rule for all filters.
+  const DESCRIBED = ['adjust'];
+  it.each(filters.filter((f) => DESCRIBED.includes(f.category)).map((f) => [f.id, f] as const))(
+    '%s: has a description, a try-this and a description on every param',
+    (_, f) => {
+      expect(f.description, `${f.id} description`).toBeTruthy();
+      expect(f.tryThis, `${f.id} tryThis`).toBeTruthy();
+      for (const [key, p] of Object.entries(f.params as ParamSchema)) expect(p.description, `${f.id}.${key} description`).toBeTruthy();
+    },
+  );
 });

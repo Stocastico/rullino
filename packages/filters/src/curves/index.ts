@@ -10,14 +10,16 @@ const IDENTITY = [[0, 0], [1, 1]] as const;
 export const curves = defineFilter({
   id: 'curves',
   label: 'Curves',
+  description: 'Redraws the tone response with a curve: drag points to lift or lower any range of tones, overall or per colour channel.',
+  tryThis: 'Pull the middle of the RGB curve up for a brighter mood, or drag the ends in for a faded look.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'straight',
   params: {
-    rgb: { type: 'curve', default: IDENTITY, label: 'RGB' },
-    red: { type: 'curve', default: IDENTITY, label: 'Red' },
-    green: { type: 'curve', default: IDENTITY, label: 'Green' },
-    blue: { type: 'curve', default: IDENTITY, label: 'Blue' },
+    rgb: { type: 'curve', default: IDENTITY, label: 'RGB', description: 'The curve for all channels together: brightness and contrast.' },
+    red: { type: 'curve', default: IDENTITY, label: 'Red', description: 'Applied to red only, after the RGB curve.' },
+    green: { type: 'curve', default: IDENTITY, label: 'Green', description: 'Applied to green only, after the RGB curve.' },
+    blue: { type: 'curve', default: IDENTITY, label: 'Blue', description: 'Applied to blue only, after the RGB curve.' },
   },
   wgsl: /* wgsl */ `
 fn apply(c: vec4f, p: Params) -> vec4f {

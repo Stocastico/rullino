@@ -1,6 +1,6 @@
 import { defineFilter } from '@rullino/core';
 
-const mix = (group: string, label: string, def: number) => ({ type: 'float', min: -2, max: 2, step: 0.01, default: def, label, group }) as const;
+const mix = (group: string, label: string, def: number) => ({ type: 'float', min: -2, max: 2, step: 0.01, default: def, label, group, description: `How much of the input ${label.slice(5)} goes into the ${group.toLowerCase()}.` }) as const;
 
 /**
  * Each output channel as a weighted sum of the input channels, on linear light. Linear in colour,
@@ -9,6 +9,8 @@ const mix = (group: string, label: string, def: number) => ({ type: 'float', min
 export const channelMixer = defineFilter({
   id: 'channelMixer',
   label: 'Channel mixer',
+  description: 'Builds each output colour channel from a weighted mix of the input channels, on linear light.',
+  tryThis: 'Feed some red into the blue output for a surreal colour swap, or set the red output to 0.3 / 0.6 / 0.1 for a classic black-and-white look.',
   category: 'adjust',
   kind: 'pointwise',
   alpha: 'premultiplied',
