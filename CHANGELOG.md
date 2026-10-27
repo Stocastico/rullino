@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the `@rullino/*` packages (core, filters, presets, ml). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
+All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
 
 ## Releasing (maintainer checklist)
 
@@ -11,11 +11,14 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml). T
 
 ## [Unreleased]
 
+## [0.2.0]
+
+Render on the server what the browser previews: a new `@rullino/node` package runs the same WGSL shaders on Dawn (CPU fallback), and edit documents (version 2) now carry their output settings, so one JSON describes the whole render. Version 1 documents are still read (migrated on parse).
+
 ### Added
 - **core**: edit documents version 2: an optional `output` (format, quality, bit depth, background, `longSide`) next to the steps and geometry (`serializeChain(steps, { output })`, `parseChain(doc).output`, type `OutputSettings`); `migrateChain` brings version 1 documents up to date, and `parseChain` accepts both. A JSON Schema of the format ships as `@rullino/core/edit.schema.json`.
 - **core**: `applyEdit(image, doc, { filters, gpu?, scale? })` renders an edit document in one call (geometry, steps, `output.longSide` shrink), on the GPU when given a context, on the CPU otherwise.
 - **presets**: looks as edit documents: `lookEdit(look, options)`, and `lookLutRef` / `resolveLookLut` to name a look's LUT `look:<id>` in any document (what the playground's share links already did).
-
 - **node** (new package `@rullino/node`): `createRenderer()` renders edit documents in Node with the same WGSL shaders as the browser through Dawn (`webgpu`, optional peer), falling back to the CPU reference (`backend: 'auto' | 'gpu' | 'cpu'`, `renderer.reason`); `render(file or rgba8, doc)` → PNG 8 / 16 bit (rullino's encoder), JPEG or WebP (through `sharp`, optional peer, which also decodes input files with their EXIF orientation); every filter and look built in.
 - **core**: `createGpuContext({ gpu })` takes a WebGPU entry point other than `navigator.gpu` (e.g. Dawn's); `decodeSrgb8` accepts a `Uint8Array` too.
 
