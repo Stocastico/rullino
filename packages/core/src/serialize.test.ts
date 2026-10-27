@@ -6,7 +6,7 @@ import { createImage } from './image';
 import { identityLut } from './lut';
 import { createRasterMask } from './mask';
 import type { Step } from './pipeline/chain';
-import { parseChain, serializeChain } from './serialize';
+import { CHAIN_VERSION, migrateChain, parseChain, serializeChain, type OutputSettings } from './serialize';
 
 const gain = defineFilter({
   id: 'gain',
@@ -94,11 +94,52 @@ describe('serializeChain / parseChain', () => {
 
   it('rejects unknown filters, versions and invalid values with a useful message', () => {
     expect(() => parseChain({ version: 1, steps: [{ filter: 'nope', params: {} }] }, { filters })).toThrow(/nope/);
-    expect(() => parseChain({ version: 2, steps: [] }, { filters })).toThrow(/version/);
+    expect(() => parseChain({ version: 3, steps: [] }, { filters })).toThrow(/version/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: { amount: 'x' } }] }, { filters })).toThrow(/amount/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: { bogus: 1 } }] }, { filters })).toThrow(/bogus/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: {}, mask: { kind: 'radial', center: [0, 0], radius: [0, 1], feather: 0 } }] }, { filters })).toThrow(/radius/);
     expect(() => parseChain({ version: 1, steps: [], geometry: { ...IDENTITY_GEOMETRY, straighten: 90 } }, { filters })).toThrow(/straighten/);
     expect(() => parseChain('garbage', { filters })).toThrow();
+  });
+});
+
+describe('edit document v2', () => {
+  it('writes version 2 and round-trips the output settings', () => {
+    const output: OutputSettings = { format: 'jpeg', quality: 0.85, longSide: 2048, background: [1, 0.5, 0] };
+    const doc = viaJson(serializeChain([{ filter: gain, params: { amount: 2 } }], { output }));
+    expect(CHAIN_VERSION).toBe(2);
+    expect(doc.version).toBe(2);
+    expect(doc.output).toEqual(output);
+    expect(parseChain(doc, { filters }).output).toEqual(output);
+    expect(parseChain(viaJson(serializeChain([])), { filters }).output).toBeUndefined();
+    expect(serializeChain([])).not.toHaveProperty('output');
+  });
+
+  it('rejects invalid output settings with a useful message', () => {
+    const bad: [unknown, RegExp][] = [
+      [{ format: 'gif' }, /format/],
+      [{ quality: 1.5 }, /quality/],
+      [{ bitDepth: 12 }, /bitDepth/],
+      [{ format: 'jpeg', bitDepth: 16 }, /bitDepth/],
+      [{ longSide: 0 }, /longSide/],
+      [{ longSide: 10.5 }, /longSide/],
+      [{ background: [1, 2, 0] }, /background/],
+      [{ size: 3 }, /size/],
+    ];
+    for (const [output, message] of bad) {
+      expect(() => parseChain({ version: 2, steps: [], output }, { filters }), JSON.stringify(output)).toThrow(message);
+      expect(() => serializeChain([], { output: output as OutputSettings }), JSON.stringify(output)).toThrow(message);
+    }
+  });
+
+  it('migrates a version 1 document (old share links keep working)', () => {
+    const v1 = { version: 1, steps: [{ filter: 'gain', params: { amount: 2 } }], geometry: IDENTITY_GEOMETRY };
+    const v2 = migrateChain(v1);
+    expect(v2).toEqual({ version: 2, steps: v1.steps, geometry: IDENTITY_GEOMETRY });
+    expect(v1.version).toBe(1); // the input is not mutated
+    expect(migrateChain(v2)).toBe(v2); // already current
+    expect(parseChain(v1, { filters }).steps[0]!.params).toEqual({ amount: 2 });
+    expect(() => migrateChain({ version: 0, steps: [] })).toThrow(/version/);
+    expect(() => migrateChain('{}')).toThrow(/object/);
   });
 });

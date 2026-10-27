@@ -109,6 +109,25 @@ export async function savePng(ctx: GpuContext, texture: GPUTexture): Promise<Blo
 }
 ```
 
+## Edits as JSON
+
+An edit document holds the steps, optionally the geometry and how to export the result. It is what share links, saved presets and server renders exchange. Params equal to their defaults are left out; LUTs travel by name (`lutRef` / `resolveLut`).
+
+```ts
+import { parseChain, serializeChain, type Step } from '@rullino/core';
+import { filters } from '@rullino/filters';
+
+export function saveEdit(steps: Step[]): string {
+  return JSON.stringify(serializeChain(steps, { output: { format: 'jpeg', quality: 0.9, longSide: 2048 } }));
+}
+
+export function loadEdit(json: string) {
+  return parseChain(JSON.parse(json), { filters }); // { steps, geometry?, output? }; version 1 documents are migrated
+}
+```
+
+The format is described by a JSON Schema, `@rullino/core/edit.schema.json`, for validating documents outside rullino (other languages, API gateways). `parseChain` checks more than the schema can: filter ids and their params, convex perspective quads.
+
 ## License
 
 MIT. See the [repository](https://github.com/Stocastico/rullino) for the design notes, the filter reference and the playground.

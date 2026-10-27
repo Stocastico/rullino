@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stefanomasneri.com/rullino/edit.schema.json",
+  "title": "rullino edit document",
+  "description": "A photo edit as JSON (version 2): a chain of filter steps, optionally a geometry (orientation, perspective, straighten, crop) and how to export the result. Written by serializeChain and read by parseChain in @rullino/core, which also checks what a schema cannot: filter ids and their params, convex perspective quads, crops inside the frame. Version 1 documents (no output) are migrated by migrateChain.",
+  "type": "object",
+  "required": [
+    "version",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "geometry": {
+      "$ref": "#/$defs/geometry"
+    },
+    "output": {
+      "$ref": "#/$defs/output"
+    }
+  },
+  "$defs": {
+    "unit": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "point": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "filter",
+        "params"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "filter": {
+          "type": "string",
+          "description": "The filter's id, e.g. \"exposure\" (see docs/filters.md)."
+        },
+        "params": {
+          "type": "object",
+          "description": "Only the params that differ from the filter's defaults; a LUT param is { \"ref\": \"<name>\" }."
+        },
+        "enabled": {
+          "const": false,
+          "description": "Present only when the step is switched off."
+        },
+        "mask": {
+          "$ref": "#/$defs/mask"
+        }
+      }
+    },
+    "mask": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "linear"
+            },
+            "from": {
+              "$ref": "#/$defs/point"
+            },
+            "to": {
+              "$ref": "#/$defs/point"
+            },
+            "invert": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "$ref": "#/$defs/unit"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "center",
+            "radius",
+            "feather"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "radial"
+            },
+            "center": {
+              "$ref": "#/$defs/point"
+            },
+            "radius": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "feather": {
+              "$ref": "#/$defs/unit"
+            },
+            "invert": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "$ref": "#/$defs/unit"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "width",
+            "height",
+            "data"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "raster"
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "data": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "description": "width × height bytes of coverage (0 to 255), row by row."
+            },
+            "invert": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "$ref": "#/$defs/unit"
+            }
+          }
+        }
+      ]
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "rotate",
+        "flipH",
+        "flipV",
+        "straighten",
+        "crop"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rotate": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "description": "Quarter turns, clockwise."
+        },
+        "flipH": {
+          "type": "boolean"
+        },
+        "flipV": {
+          "type": "boolean"
+        },
+        "perspective": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Top-left, top-right, bottom-right, bottom-left, normalised to the oriented image."
+        },
+        "straighten": {
+          "type": "number",
+          "minimum": -45,
+          "maximum": 45,
+          "description": "Degrees, positive turns the content clockwise."
+        },
+        "crop": {
+          "type": "object",
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "$ref": "#/$defs/unit"
+            },
+            "y": {
+              "$ref": "#/$defs/unit"
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": [
+            "png",
+            "jpeg",
+            "webp"
+          ],
+          "description": "Default png."
+        },
+        "quality": {
+          "$ref": "#/$defs/unit",
+          "description": "JPEG / WebP quality."
+        },
+        "bitDepth": {
+          "enum": [
+            8,
+            16
+          ],
+          "description": "PNG only. Default 8."
+        },
+        "background": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unit"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "sRGB colour to flatten transparency onto (default white for JPEG)."
+        },
+        "longSide": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Shrink so the long side is at most this many pixels; never enlarges."
+        }
+      },
+      "if": {
+        "properties": {
+          "bitDepth": {
+            "const": 16
+          }
+        },
+        "required": [
+          "bitDepth"
+        ]
+      },
+      "then": {
+        "properties": {
+          "format": {
+            "const": "png"
+          }
+        }
+      }
+    }
+  }
+}
