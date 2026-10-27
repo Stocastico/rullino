@@ -1,4 +1,5 @@
 import { playwright } from '@vitest/browser-playwright';
+import { renderOnDawn } from './packages/node/test/dawn-command';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -55,6 +56,8 @@ export default defineConfig({
           include: ['packages/*/src/**/*.browser.test.ts', 'apps/*/src/**/*.browser.test.ts'],
           browser: {
             enabled: true,
+            // Runs in Node: the browser-vs-Node test renders the same documents on Dawn through it.
+            commands: { renderOnDawn },
             headless: true,
             provider: playwright({
               // Headless Chromium only exposes navigator.gpu behind this flag.
