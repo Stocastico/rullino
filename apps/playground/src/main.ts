@@ -35,7 +35,7 @@ import {
 } from '@rullino/core';
 import { autoAdjust, filters } from '@rullino/filters';
 import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
-import { lookLut, looks, lookSteps } from '@rullino/presets';
+import { lookLutRef, looks, lookSteps, resolveLookLut } from '@rullino/presets';
 import { createEffectBrowser } from './effect-browser';
 import { createFilmStrip } from './film-strip';
 import { effectiveMask, newStep, renderChain, SELECTION, withMask, withSelection, type ChainState } from './chain-ui';
@@ -1040,15 +1040,9 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
 });
 
-// LUTs travel by name: only the looks' baked LUTs can be referenced.
-const lutRef = (lut: unknown) => {
-  const look = looks.find((l) => lookLut(l) === lut);
-  return look && `look:${look.id}`;
-};
-const resolveLut = (ref: string) => {
-  const look = looks.find((l) => `look:${l.id}` === ref);
-  return look && lookLut(look);
-};
+// LUTs travel by name: only the looks' baked LUTs can be referenced (`look:<id>`).
+const lutRef = lookLutRef;
+const resolveLut = resolveLookLut;
 
 ui.share.addEventListener('click', async () => {
   try {

@@ -1,4 +1,4 @@
-import type { CurvePoints, Lut, Step } from '@rullino/core';
+import { serializeChain, type ChainDocument, type CurvePoints, type Lut, type Step } from '@rullino/core';
 import { applyLut, contrast, curves, grain, grayscale, saturation, vibrance, vignette, whiteBalance } from '@rullino/filters';
 import { bakeLut } from './bake';
 
@@ -181,4 +181,24 @@ export function lookSteps(look: Look, options: LookOptions = {}): Step[] {
   if (look.vignette && options.vignette !== false) steps.push({ filter: vignette, params: { ...look.vignette, amount: look.vignette.amount * t } });
   if (look.grain && options.grain !== false) steps.push({ filter: grain, params: { ...look.grain, amount: look.grain.amount * t } });
   return steps;
+}
+
+// Edit documents carry LUTs by name only (a 33³ table does not fit in a link). A look's baked LUT
+// is named `look:<id>`; pass these two to serializeChain / parseChain / applyEdit.
+
+/** The name of a look's baked LUT (`look:<id>`), or undefined for any other LUT. */
+export function lookLutRef(lut: Lut): string | undefined {
+  const look = looks.find((l) => baked.get(l) === lut);
+  return look && `look:${look.id}`;
+}
+
+/** The look LUT a `look:<id>` name refers to, or undefined. */
+export function resolveLookLut(ref: string): Lut | undefined {
+  const look = ref.startsWith('look:') ? looks.find((l) => l.id === ref.slice(5)) : undefined;
+  return look && lookLut(look);
+}
+
+/** A look as an edit document (version 2): its steps, with the LUT by name. */
+export function lookEdit(look: Look, options: LookOptions = {}): ChainDocument {
+  return serializeChain(lookSteps(look, options), { lutRef: lookLutRef });
 }

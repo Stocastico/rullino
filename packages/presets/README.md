@@ -27,6 +27,23 @@ console.log(out.width);
 
 `lookLut(look)` returns the baked 33³ LUT, and `bakeLut` bakes any chain of pointwise filters into one. A baked grade clamps HDR values to [0, 1] and differs from the live chain by less than 1/255 on average.
 
+## Looks as edit documents
+
+A look is also an edit document (see `@rullino/core`'s "Edits as JSON"): its LUT travels by name (`look:<id>`), so the document fits in a link and renders anywhere `applyEdit` runs.
+
+```ts
+import { applyEdit, type LinearImage } from '@rullino/core';
+import { filters } from '@rullino/filters';
+import { lookEdit, looks, resolveLookLut } from '@rullino/presets';
+
+export async function withLook(image: LinearImage): Promise<LinearImage> {
+  const doc = JSON.parse(JSON.stringify(lookEdit(looks[0]!, { intensity: 0.8 }))); // e.g. stored or sent
+  return applyEdit(image, doc, { filters, resolveLut: resolveLookLut });
+}
+```
+
+Pass `lutRef: lookLutRef` to `serializeChain` to save your own chains that use looks.
+
 ## License
 
 MIT.

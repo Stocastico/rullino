@@ -5,7 +5,7 @@ import * as api from './index';
 describe('@rullino/presets public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'bakeLut', 'lookLut', 'lookSteps', 'looks',
+    'bakeLut', 'lookEdit', 'lookLut', 'lookLutRef', 'lookSteps', 'looks', 'resolveLookLut',
     ]);
   });
 });
