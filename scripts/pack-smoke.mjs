@@ -12,7 +12,7 @@ import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 
 const repo = new URL('..', import.meta.url).pathname;
-const PACKAGES = ['core', 'filters', 'presets', 'ml'];
+const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node'];
 const version = JSON.parse(readFileSync(join(repo, 'packages/core/package.json'), 'utf8')).version;
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
@@ -66,6 +66,7 @@ import { filters, exposure } from '@rullino/filters';
 import * as presets from '@rullino/presets';
 import * as ml from '@rullino/ml';
 import * as mlInternal from '@rullino/ml/internal';
+import { createRenderer } from '@rullino/node';
 const out = {};
 out.core = typeof core.defineFilter === 'function' && !('passShader' in core) && typeof internal.passShader === 'function';
 out.ml = typeof ml.createMiganInpainter === 'function' && !('samInput' in ml) && typeof mlInternal.samInput === 'function';
@@ -90,6 +91,11 @@ const edit = JSON.stringify(core.serializeChain([{ filter: exposure, params: { e
 const replayed = await core.applyEdit(img, JSON.parse(edit), { filters });
 const manual = core.runChainCpu(core.parseChain(JSON.parse(edit), { filters }).steps, img);
 out.readmeJson = edit.startsWith('{"version":2,"steps":[{"filter":"exposure","params":{"ev":0.3}},') && replayed.data.every((v, i) => v === manual.data[i]);
+// @rullino/node without the optional webgpu package: 'auto' falls back to the CPU and says why,
+// and a look document renders to a PNG.
+const renderer = await createRenderer();
+const png = (await renderer.render({ data: new Uint8Array(8 * 6 * 4).fill(200), width: 8, height: 6 }, presets.lookEdit(presets.looks[0]))).bytes;
+out.nodeFallback = renderer.backend === 'cpu' && /webgpu/.test(renderer.reason ?? '') && png[1] === 0x50 && png[2] === 0x4e && png[3] === 0x47;
 console.log(JSON.stringify(out));
 `,
   );

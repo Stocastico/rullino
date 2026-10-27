@@ -5,7 +5,8 @@
     "../../packages/core",
     "../../packages/filters",
     "../../packages/presets",
-    "../../packages/ml"
+    "../../packages/ml",
+    "../../packages/node"
   ],
   "entryPointStrategy": "packages",
   "packageOptions": {

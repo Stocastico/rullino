@@ -44,6 +44,8 @@ jobs:
       # The same checks as CI, minus coverage and the e2e runs of the playground.
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # @rullino/node's tests run Dawn: on a runner without a GPU it needs a software Vulkan driver.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers
       - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build
@@ -56,13 +58,13 @@ jobs:
       - name: Pack
         run: |
           mkdir tarballs
-          for p in core filters presets ml; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
+          for p in core filters presets ml node; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
       - name: Publish
         env:
           VERSION: ${{ steps.info.outputs.version }}
           NPM_TAG: ${{ steps.info.outputs.tag }}
         run: |
-          for p in core filters presets ml; do
+          for p in core filters presets ml node; do
             if npm view "@rullino/$p@$VERSION" version >/dev/null 2>&1; then
               echo "@rullino/$p@$VERSION is already on npm, skipping"
               continue

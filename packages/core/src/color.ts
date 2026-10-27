@@ -29,7 +29,7 @@ export function encodeSrgb16(img: LinearImage): Uint16Array {
 }
 
 /** Decodes 8-bit sRGB, straight-alpha RGBA (as in ImageData) into a linear premultiplied image. */
-export function decodeSrgb8(src: Uint8ClampedArray, width: number, height: number): LinearImage {
+export function decodeSrgb8(src: Uint8ClampedArray | Uint8Array, width: number, height: number): LinearImage {
   if (src.length !== width * height * 4) {
     throw new RangeError(`expected ${width * height * 4} bytes for ${width}x${height}, got ${src.length}`);
   }

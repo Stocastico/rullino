@@ -18,7 +18,12 @@ export interface GpuContextOptions extends GPURequestAdapterOptions {
    * (`ShaderCompileError`, naming the shader and the lines), validation and out-of-memory errors.
    * They arrive asynchronously, after the call that caused them. Without it they go to `console.error`.
    */
-  readonly onError?: (error: GpuError) => void;
+  readonly onError?: ((error: GpuError) => void) | undefined;
+  /**
+   * The WebGPU entry point to use instead of `navigator.gpu`, e.g. Dawn's `create([])` from the
+   * `webgpu` package in Node (`@rullino/node` does this for you).
+   */
+  readonly gpu?: GPU | undefined;
 }
 
 const reporters = new WeakMap<GPUDevice, (error: GpuError) => void>();
@@ -32,11 +37,10 @@ export function reportGpuError(ctx: Pick<GpuContext, 'device'>, error: GpuError)
 const RAISED_LIMITS = ['maxTextureDimension2D', 'maxBufferSize', 'maxStorageBufferBindingSize'] as const;
 
 export async function createGpuContext(options: GpuContextOptions = {}): Promise<GpuContext> {
-  const { onError, ...adapterOptions } = options;
-  if (typeof navigator === 'undefined' || !navigator.gpu) {
-    throw new WebGpuUnavailableError('WebGPU is not available in this environment');
-  }
-  const adapter = await navigator.gpu.requestAdapter(adapterOptions);
+  const { onError, gpu: given, ...adapterOptions } = options;
+  const gpu = given ?? (typeof navigator === 'undefined' ? undefined : navigator.gpu);
+  if (!gpu) throw new WebGpuUnavailableError('WebGPU is not available in this environment');
+  const adapter = await gpu.requestAdapter(adapterOptions);
   if (!adapter) throw new WebGpuUnavailableError('no WebGPU adapter found');
   const device = await adapter.requestDevice({ requiredLimits: Object.fromEntries(RAISED_LIMITS.map((k) => [k, adapter.limits[k]])) });
   if (onError) {

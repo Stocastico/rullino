@@ -7,7 +7,7 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) {
   console.error(`set-version: "${version}" is not a version (expected X.Y.Z or X.Y.Z-rc.N)`);
   process.exit(1);
 }
-for (const name of ['core', 'filters', 'presets', 'ml']) {
+for (const name of ['core', 'filters', 'presets', 'ml', 'node']) {
   const file = new URL(`../packages/${name}/package.json`, import.meta.url);
   const pkg = JSON.parse(readFileSync(file, 'utf8'));
   pkg.version = version;
