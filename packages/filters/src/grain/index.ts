@@ -1,4 +1,5 @@
 import { createImage, defineFilter, linearToSrgb, srgbToLinear } from '@rullino/core';
+import { toLinear, toSrgb } from '../fast';
 
 /** PCG hash (O'Neill), u32 -> u32; identical on CPU and GPU. */
 function pcg(v: number): number {
@@ -93,6 +94,28 @@ fn run(xy: vec2i, p: Params) -> vec4f {
         const n = valueNoise(x, y, size, seed) * 0.2 * amount * response(lum);
         for (let c = 0; c < 3; c++) out.data[i + c] = srgbToLinear(Math.max(e[c]! + n, 0)) * a;
         out.data[i + 3] = a;
+      }
+    }
+    return out;
+  },
+  fast: (src, { amount, size, seed }) => {
+    const { width: w, height: h } = src;
+    const s = src.data;
+    const out = createImage(w, h);
+    const d = out.data;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const a = s[i + 3]!;
+        if (a <= 0) continue;
+        const r = toSrgb(s[i]! / a);
+        const g = toSrgb(s[i + 1]! / a);
+        const b = toSrgb(s[i + 2]! / a);
+        const n = valueNoise(x, y, size, seed) * 0.2 * amount * response(0.2126 * r + 0.7152 * g + 0.0722 * b);
+        d[i] = toLinear(Math.max(r + n, 0)) * a;
+        d[i + 1] = toLinear(Math.max(g + n, 0)) * a;
+        d[i + 2] = toLinear(Math.max(b + n, 0)) * a;
+        d[i + 3] = a;
       }
     }
     return out;

@@ -92,7 +92,7 @@ describe('looks as edit documents', () => {
   it('renders like lookSteps, through parseChain and applyEdit', async () => {
     for (const look of looks) {
       const doc = JSON.parse(JSON.stringify(lookEdit(look, { intensity: 0.7, grain: false })));
-      const direct = runChainCpu(lookSteps(look, { intensity: 0.7, grain: false }), chart);
+      const direct = runChainCpu(lookSteps(look, { intensity: 0.7, grain: false }), chart, { fast: true }); // applyEdit takes the fast path
       const viaEdit = await applyEdit(chart, doc, { filters, resolveLut: resolveLookLut });
       expect(Array.from(viaEdit.data), look.id).toEqual(Array.from(direct.data));
     }

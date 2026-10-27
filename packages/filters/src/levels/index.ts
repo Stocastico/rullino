@@ -1,4 +1,5 @@
 import { defineFilter, linearToSrgb, srgbToLinear } from '@rullino/core';
+import { mapChannels, toLinear, toSrgb } from '../fast';
 
 /**
  * Narrowest input range: one 8-bit step. A collapsed range then acts as a very steep ramp instead
@@ -44,6 +45,10 @@ fn apply(c: vec4f, p: Params) -> vec4f {
   pixel: ([r, g, b, a], p) => {
     const f = (x: number) => srgbToLinear(level(linearToSrgb(x), p.inBlack, p.inWhite, p.gamma, p.outBlack, p.outWhite));
     return [f(r), f(g), f(b), a];
+  },
+  fast: (src, p) => {
+    const f = (x: number) => toLinear(level(toSrgb(x), p.inBlack, p.inWhite, p.gamma, p.outBlack, p.outWhite));
+    return mapChannels(src, f, f, f);
   },
   tolerance: { abs: 2e-4, rel: 2e-3 },
 });

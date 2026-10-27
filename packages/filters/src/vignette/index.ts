@@ -63,5 +63,37 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     }
     return out;
   },
+  fast: (src, { amount, midpoint, feather, roundness }) => {
+    const { width: w, height: h } = src;
+    const s = src.data;
+    const out = createImage(w, h);
+    const d = out.data;
+    // distance() with its per-image constants hoisted.
+    const side = Math.max(w, h);
+    const sx = (1 + (w / side - 1) * roundness) / (w / 2);
+    const sy = (1 + (h / side - 1) * roundness) / (h / 2);
+    const norm = 1 / Math.hypot(1 + (w / side - 1) * roundness, 1 + (h / side - 1) * roundness);
+    for (let y = 0; y < h; y++) {
+      const qy = (y + 0.5 - h / 2) * sy;
+      for (let x = 0; x < w; x++) {
+        const qx = (x + 0.5 - w / 2) * sx;
+        const t = Math.min(1, Math.max(0, (Math.sqrt(qx * qx + qy * qy) * norm - midpoint) / feather));
+        const k = t * t * (3 - 2 * t) * amount;
+        const i = (y * w + x) * 4;
+        const a = s[i + 3]!;
+        if (k < 0) {
+          d[i] = s[i]! * (1 + k);
+          d[i + 1] = s[i + 1]! * (1 + k);
+          d[i + 2] = s[i + 2]! * (1 + k);
+        } else {
+          d[i] = s[i]! + (a - s[i]!) * k;
+          d[i + 1] = s[i + 1]! + (a - s[i + 1]!) * k;
+          d[i + 2] = s[i + 2]! + (a - s[i + 2]!) * k;
+        }
+        d[i + 3] = a;
+      }
+    }
+    return out;
+  },
   tolerance: { abs: 1e-4, rel: 2 ** -9 },
 });

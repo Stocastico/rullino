@@ -1,15 +1,14 @@
-// CPU timings: every registered filter's reference at 1024x768 and the three PLAN §6b chains at
-// 12 MP, with their fast paths where they have one. Not a test: run with `pnpm bench:cpu`.
-import { writeFileSync } from 'node:fs';
+// CPU timings: the three PLAN §6b chains at 12 MP and every registered filter at 1024x768, the
+// reference and the fast path (where a filter has one). Not a test: `pnpm bench:cpu` bundles this
+// file and runs it in plain Node, because Vitest's module runner turns every call to an imported
+// function into a getter call, which made the small functions of the fast paths look 4x slower.
+// Arguments: `chains` and/or `filters` (default both), `--only <filter id>`.
 import { createImage, defaultParams, lutFromFunction, runChainCpu, type LinearImage, type Step } from '@rullino/core';
 import { filters } from '../src';
-import { afterAll, it } from 'vitest';
 
-const rows: string[] = [];
-afterAll(() => writeFileSync(new URL('./cpu-results.txt', import.meta.url), `${rows.join('\n')}\n`));
 const ms = (t: number) => `${t.toFixed(0).padStart(8)} ms`;
 /** Reference time, and the fast path's when the filter (or a filter of the chain) has one. */
-const row = (name: string, ref: number, fast?: number) => rows.push(`${name.padEnd(34)} ${ms(ref)}${fast === undefined ? '' : `   fast ${ms(fast)}`}`);
+const row = (name: string, ref: number, fast?: number) => console.log(`${name.padEnd(34)} ${ms(ref)}${fast === undefined ? '' : `   fast ${ms(fast)}`}`);
 
 function image(w: number, h: number): LinearImage {
   const data = new Float32Array(w * h * 4);
@@ -30,8 +29,8 @@ function time(run: () => unknown): number {
 const byId = new Map(filters.map((f) => [f.id, f]));
 const step = (id: string, params: Record<string, unknown> = {}): Step => ({ filter: byId.get(id)!, params });
 
-/** The chains PLAN §6b measured (26 Oct: 10.0 s, 8.0 s, 14.3 s at 12 MP). */
-export const planChains: Record<string, Step[]> = {
+/** The chains PLAN §6b measured (26 Oct, another machine: 10.0 s, 8.0 s, 14.3 s at 12 MP). */
+const planChains: Record<string, Step[]> = {
   'exposure + curves + LUT': [
     step('exposure', { ev: 0.3 }),
     step('curves', { rgb: [[0, 0], [0.3, 0.25], [0.7, 0.8], [1, 1]] }),
@@ -41,18 +40,27 @@ export const planChains: Record<string, Step[]> = {
   'levels + vignette + grain': [step('levels', { inBlack: 0.05 }), step('vignette'), step('grain')],
 };
 
-it('chains at 12 MP', () => {
-  const src = image(4000, 3000);
-  for (const [name, steps] of Object.entries(planChains))
-    row(`chain: ${name}`, time(() => runChainCpu(steps, src)), time(() => runChainCpu(steps, src, { fast: true })));
-});
+const args = process.argv.slice(2);
+const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
+const parts: string[] = args.filter((a) => a === 'chains' || a === 'filters');
+const run = (part: string) => parts.length === 0 || parts.includes(part);
 
-it('filters at 1024x768', () => {
+if (run('chains')) {
+  const src = image(4000, 3000);
+  for (const [name, steps] of Object.entries(planChains)) {
+    row(`chain: ${name}`, time(() => runChainCpu(steps, src)), time(() => runChainCpu(steps, src, { fast: true })));
+    for (const s of steps) if (s.filter.fast) row(`  ${s.filter.id}`, time(() => runChainCpu([s], src)), time(() => runChainCpu([s], src, { fast: true })));
+  }
+}
+
+if (run('filters')) {
+  console.log('1024x768:');
   const src = image(1024, 768);
   const hole = { kind: 'radial', center: [0.5, 0.5], radius: [0.15, 0.1], feather: 0.3 } as const;
   for (const f of filters) {
+    if (only && f.id !== only) continue;
     const mask = f.kind === 'multipass' && f.usesMask ? hole : undefined;
     const steps: Step[] = [{ filter: f, params: defaultParams(f.params), ...(mask && { mask }) }];
     row(f.id, time(() => runChainCpu(steps, src)), f.fast && time(() => runChainCpu(steps, src, { fast: true })));
   }
-});
+}

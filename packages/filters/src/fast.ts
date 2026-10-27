@@ -2,7 +2,7 @@
 // convolution.ts computes, without per-sample closures or bounds clamping in the inner loop;
 // fast.test.ts checks every filter that uses them against its reference.
 
-import { createImage, type LinearImage } from '@rullino/core';
+import { createImage, linearToSrgb, srgbToLinear, type LinearImage, type Lut } from '@rullino/core';
 import { gaussianWeights } from './convolution';
 
 /**
@@ -79,3 +79,76 @@ export const gaussianFast = (src: LinearImage, sigma: number): LinearImage => {
   const w = gaussianWeights(sigma);
   return convolve1dFast(convolve1dFast(src, w, 'x'), w, 'y');
 };
+
+// sRGB transfer functions by table lookup with linear interpolation on their curved segment up
+// to 1 (exact elsewhere: the linear segment, HDR and negatives): a pow() per channel was half the time of the pointwise references.
+// linearToSrgb is steep near 0, so its table is indexed by sqrt(x), where it is smooth.
+const N = 4096;
+const SRGB_OF_SQRT = Float64Array.from({ length: N + 1 }, (_, i) => linearToSrgb((i / N) ** 2));
+const LINEAR_OF = Float64Array.from({ length: N + 1 }, (_, i) => srgbToLinear(i / N));
+
+/** {@link linearToSrgb} within 1e-6 on its curved segment, exact elsewhere. */
+export function toSrgb(x: number): number {
+  if (!(x > 0.0031308 && x < 1)) return linearToSrgb(x); // the linear segment is cheap and exact
+  const u = Math.sqrt(x) * N;
+  const i = u | 0;
+  const a = SRGB_OF_SQRT[i]!;
+  return a + (SRGB_OF_SQRT[i + 1]! - a) * (u - i);
+}
+
+/** {@link srgbToLinear} within 1e-6 on its curved segment, exact elsewhere. */
+export function toLinear(x: number): number {
+  if (!(x > 0.04045 && x < 1)) return srgbToLinear(x);
+  const u = x * N;
+  const i = u | 0;
+  const a = LINEAR_OF[i]!;
+  return a + (LINEAR_OF[i + 1]! - a) * (u - i);
+}
+
+/**
+ * A straight-alpha filter whose channels map independently (curves, levels): each channel of the
+ * un-premultiplied colour goes through its function, the result is premultiplied again; colour of
+ * a transparent pixel is 0, alpha is kept. One pass, nothing allocated per pixel.
+ */
+export function mapChannels(src: LinearImage, fr: (v: number) => number, fg: (v: number) => number, fb: (v: number) => number): LinearImage {
+  const s = src.data;
+  const out = createImage(src.width, src.height);
+  const d = out.data;
+  for (let i = 0; i < s.length; i += 4) {
+    const a = s[i + 3]!;
+    d[i + 3] = a;
+    if (a <= 0) continue;
+    d[i] = fr(s[i]! / a) * a;
+    d[i + 1] = fg(s[i + 1]! / a) * a;
+    d[i + 2] = fb(s[i + 2]! / a) * a;
+  }
+  return out;
+}
+
+/** `applyLutCpu` writing into `out[0..2]` instead of allocating: trilinear, domain-normalised, clamped. */
+export function sampleLutInto(lut: Lut, r: number, g: number, b: number, out: Float64Array): void {
+  const n = lut.size - 1;
+  const { domainMin: lo, domainMax: hi, data } = lut;
+  const pr = Math.min(1, Math.max(0, (r - lo[0]!) / (hi[0]! - lo[0]!))) * n;
+  const pg = Math.min(1, Math.max(0, (g - lo[1]!) / (hi[1]! - lo[1]!))) * n;
+  const pb = Math.min(1, Math.max(0, (b - lo[2]!) / (hi[2]! - lo[2]!))) * n;
+  const r0 = Math.min(Math.floor(pr), n - 1);
+  const g0 = Math.min(Math.floor(pg), n - 1);
+  const b0 = Math.min(Math.floor(pb), n - 1);
+  const fr = pr - r0;
+  const fg = pg - g0;
+  const fb = pb - b0;
+  const sr = 3;
+  const sg = 3 * lut.size;
+  const sb = 3 * lut.size * lut.size;
+  const base = b0 * sb + g0 * sg + r0 * sr;
+  for (let c = 0; c < 3; c++) {
+    const i = base + c;
+    const c00 = data[i]! + (data[i + sr]! - data[i]!) * fr;
+    const c10 = data[i + sg]! + (data[i + sg + sr]! - data[i + sg]!) * fr;
+    const c01 = data[i + sb]! + (data[i + sb + sr]! - data[i + sb]!) * fr;
+    const c11 = data[i + sb + sg]! + (data[i + sb + sg + sr]! - data[i + sb + sg]!) * fr;
+    const lo0 = c00 + (c10 - c00) * fg;
+    out[c] = lo0 + (c01 + (c11 - c01) * fg - lo0) * fb;
+  }
+}
