@@ -14,6 +14,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml). T
 ### Added
 - **core**: edit documents version 2: an optional `output` (format, quality, bit depth, background, `longSide`) next to the steps and geometry (`serializeChain(steps, { output })`, `parseChain(doc).output`, type `OutputSettings`); `migrateChain` brings version 1 documents up to date, and `parseChain` accepts both. A JSON Schema of the format ships as `@rullino/core/edit.schema.json`.
 - **core**: `applyEdit(image, doc, { filters, gpu?, scale? })` renders an edit document in one call (geometry, steps, `output.longSide` shrink), on the GPU when given a context, on the CPU otherwise.
+- **presets**: looks as edit documents: `lookEdit(look, options)`, and `lookLutRef` / `resolveLookLut` to name a look's LUT `look:<id>` in any document (what the playground's share links already did).
 
 ### Changed
 - **core**: `serializeChain` writes `version: 2` (`CHAIN_VERSION` is 2). Readers of version 1 keep working through `parseChain` / `migrateChain`.

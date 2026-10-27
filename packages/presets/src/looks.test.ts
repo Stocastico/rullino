@@ -1,7 +1,7 @@
-import { createImage, linearToSrgb, resolveParams, runChainCpu, srgbToLinear, type LinearImage } from '@rullino/core';
+import { applyEdit, createImage, identityLut, linearToSrgb, resolveParams, runChainCpu, srgbToLinear, type LinearImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { describe, expect, it } from 'vitest';
-import { lookLut, looks, lookSteps } from './looks';
+import { lookEdit, lookLut, lookLutRef, looks, lookSteps, resolveLookLut } from './looks';
 
 /** A 4x3 chart: greys, primaries, skin, sky, foliage... straight sRGB-encoded, alpha 1. */
 const CHART = [
@@ -76,5 +76,33 @@ describe('looks', () => {
   it.each(looks.map((l) => [l.id, l] as const))('%s matches its golden chart', (_, l) => {
     const out = encoded(runChainCpu(lookSteps(l), chart())).map((c) => c.map((v) => Math.round(v * 1000) / 1000));
     expect(out).toMatchSnapshot();
+  });
+});
+
+describe('looks as edit documents', () => {
+  const chart = createImage(4, 3, Float32Array.from({ length: 48 }, (_, i) => ((i * 37) % 97) / 97));
+
+  it('lookEdit is a version 2 document whose LUT travels by name', () => {
+    const doc = JSON.parse(JSON.stringify(lookEdit(looks[0]!, { intensity: 0.6 })));
+    expect(doc.version).toBe(2);
+    expect(doc.steps[0].params.look).toEqual({ ref: `look:${looks[0]!.id}` });
+    expect(JSON.stringify(doc).length).toBeLessThan(500); // a link, not a 33³ table
+  });
+
+  it('renders like lookSteps, through parseChain and applyEdit', async () => {
+    for (const look of looks) {
+      const doc = JSON.parse(JSON.stringify(lookEdit(look, { intensity: 0.7, grain: false })));
+      const direct = runChainCpu(lookSteps(look, { intensity: 0.7, grain: false }), chart);
+      const viaEdit = await applyEdit(chart, doc, { filters, resolveLut: resolveLookLut });
+      expect(Array.from(viaEdit.data), look.id).toEqual(Array.from(direct.data));
+    }
+  });
+
+  it('names only the looks’ own LUTs and resolves only known names', () => {
+    expect(lookLutRef(lookLut(looks[1]!))).toBe(`look:${looks[1]!.id}`);
+    expect(lookLutRef(identityLut(2))).toBeUndefined();
+    expect(resolveLookLut(`look:${looks[1]!.id}`)).toBe(lookLut(looks[1]!));
+    expect(resolveLookLut('look:nope')).toBeUndefined();
+    expect(resolveLookLut(looks[1]!.id)).toBeUndefined();
   });
 });

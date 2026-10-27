@@ -1,2 +1,2 @@
 export { bakeLut } from './bake';
-export { lookLut, looks, lookSteps, type Look, type LookOptions } from './looks';
+export { lookEdit, lookLut, lookLutRef, looks, lookSteps, resolveLookLut, type Look, type LookOptions } from './looks';
