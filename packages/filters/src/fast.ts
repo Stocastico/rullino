@@ -152,3 +152,25 @@ export function sampleLutInto(lut: Lut, r: number, g: number, b: number, out: Fl
     out[c] = lo0 + (c01 + (c11 - c01) * fg - lo0) * fb;
   }
 }
+
+/**
+ * A straight-alpha filter that keeps alpha, in one pass: `f` receives the un-premultiplied colour
+ * of each pixel with alpha > 0 and writes its result to `o[0..2]`, which is premultiplied again.
+ * Colour of a transparent pixel is 0.
+ */
+export function mapStraight(src: LinearImage, f: (r: number, g: number, b: number, o: Float64Array) => void): LinearImage {
+  const s = src.data;
+  const out = createImage(src.width, src.height);
+  const d = out.data;
+  const o = new Float64Array(3);
+  for (let i = 0; i < s.length; i += 4) {
+    const a = s[i + 3]!;
+    d[i + 3] = a;
+    if (a <= 0) continue;
+    f(s[i]! / a, s[i + 1]! / a, s[i + 2]! / a, o);
+    d[i] = o[0]! * a;
+    d[i + 1] = o[1]! * a;
+    d[i + 2] = o[2]! * a;
+  }
+  return out;
+}
