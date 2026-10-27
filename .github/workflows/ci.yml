@@ -27,6 +27,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # @rullino/node's tests run Dawn (the webgpu package): without a GPU it needs a software
+      # Vulkan driver, Mesa's lavapipe.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers
       # Unit tests first: the fastest feedback.
       - run: pnpm test
       # No GPU on hosted runners: Chromium runs WebGPU on SwiftShader.

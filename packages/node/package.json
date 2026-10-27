@@ -1,0 +1,65 @@
+{
+  "name": "@rullino/node",
+  "version": "0.1.0",
+  "description": "Render rullino edit documents in Node: the same WebGPU shaders as the browser through Dawn, with a CPU fallback.",
+  "keywords": [
+    "webgpu",
+    "image-processing",
+    "photo-editing",
+    "server-side-rendering",
+    "node",
+    "dawn",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/node"
+  },
+  "homepage": "https://stefanomasneri.com/rullino/",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "@rullino/core": "workspace:*",
+    "@rullino/filters": "workspace:*",
+    "@rullino/presets": "workspace:*"
+  },
+  "peerDependencies": {
+    "webgpu": ">=0.6.2"
+  },
+  "peerDependenciesMeta": {
+    "webgpu": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "webgpu": "0.6.2"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ]
+}
