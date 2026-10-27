@@ -13,6 +13,10 @@ const files = (dir) => readdirSync(dir).flatMap((name) => (statSync(join(dir, na
 // from '…', import '…', import('…'), export … from '…' with a relative specifier.
 const SPECIFIER = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"]*|\.{1,2})\2/g;
 
+// new URL('./worker.ts', import.meta.url): a module worker's source file, named as Vite and the
+// sources need it; the emitted file is .js.
+const ASSET_URL = /(\bnew\s+URL\s*\(\s*)(['"])(\.{1,2}\/[^'"]*)\.ts\2(\s*,\s*import\.meta\.url)/g;
+
 let rewritten = 0;
 for (const file of files(root)) {
   const ext = file.endsWith('.d.ts') ? '.d.ts' : file.endsWith('.js') ? '.js' : undefined;
@@ -24,6 +28,10 @@ for (const file of files(root)) {
     if (!resolved) throw new Error(`${file}: cannot resolve "${spec}"`);
     rewritten++;
     return `${head}${quote}${resolved}${quote}`;
+  }).replace(ASSET_URL, (match, head, quote, spec, tail) => {
+    if (!existsSync(resolve(dirname(file), `${spec}.js`))) throw new Error(`${file}: cannot resolve "${spec}.ts"`);
+    rewritten++;
+    return `${head}${quote}${spec}.js${quote}${tail}`;
   });
   writeFileSync(file, out);
 }

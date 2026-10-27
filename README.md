@@ -51,7 +51,7 @@ const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0
 const result = await applyEdit(image, JSON.parse(edit), { filters }); // CPU; pass { gpu: ctx } to render with WebGPU
 ```
 
-GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). On a server, [`@rullino/node`](./packages/node/README.md) renders the same documents with the same shaders through Dawn (falling back to the CPU reference); CI renders every look and mixed edits on Chromium's WebGPU and on Dawn in Node and checks they agree. The CPU path is the readable reference today (seconds for a 12 MP photo); a fast CPU path and an automatic fallback in browsers without WebGPU are in progress ([roadmap](./PLAN.md#6b-reach-and-adoption-from-26-oct-2026-16-weeks)).
+GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). On a server, [`@rullino/node`](./packages/node/README.md) renders the same documents with the same shaders through Dawn (falling back to the CPU reference); CI renders every look and mixed edits on Chromium's WebGPU and on Dawn in Node and checks they agree. In the browser, [`@rullino/web`](./packages/web/README.md) does the same with one call: WebGPU when the browser has it, otherwise the fast CPU path in a Web Worker (a few hundred ms for a 1 MP preview, a few seconds for 12 MP).
 
 > **Status:** 0.x, the API may still change between minor versions. What exists:
 > - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, edits as JSON.
@@ -96,6 +96,7 @@ packages/
   presets/     looks = LUT + parameters
   ml/          optional ML tools (select, remove, depth); ONNX Runtime is passed in, never imported
   node/        Node renderer: edit documents on Dawn (the webgpu package), CPU fallback
+  web/         Browser renderer: WebGPU, else the CPU in a Web Worker
 apps/
   playground/  Vite demo site
 ```
@@ -104,7 +105,7 @@ apps/
 
 - [Filter reference](./docs/filters.md): every filter with its parameters, ranges and defaults, generated from the schemas.
 - [Parity table](./docs/parity.md): how far GPU and CPU output may differ, per filter.
-- Per package: [core](./packages/core/README.md), [filters](./packages/filters/README.md), [presets](./packages/presets/README.md), [ml](./packages/ml/README.md), [node](./packages/node/README.md). Their `ts` examples are type-checked against the sources.
+- Per package: [core](./packages/core/README.md), [filters](./packages/filters/README.md), [presets](./packages/presets/README.md), [ml](./packages/ml/README.md), [node](./packages/node/README.md), [web](./packages/web/README.md). Their `ts` examples are type-checked against the sources.
 - [PLAN.md](./PLAN.md) for the design and roadmap, [CLAUDE.md](./CLAUDE.md) for conventions and the reasoning behind decisions.
 
 ## Development

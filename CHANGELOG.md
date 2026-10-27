@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
+All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node, web). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
 
 ## Releasing (maintainer checklist)
 
@@ -13,6 +13,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ### Added
 - **core**: filters can carry `fast`, a second CPU implementation held to the reference within the filter's tolerance; `runChainCpu(steps, src, { fast: true })` uses it where present, and `applyEdit` without a GPU (so `@rullino/node`'s CPU fallback) always does.
+- **web** (new package `@rullino/web`): `createRenderer()` renders edit documents in the browser on WebGPU, or, when the browser has none (or `backend: 'cpu'`), with the fast CPU path in a module Web Worker; `renderer.reason` says why it fell back, `backend: 'gpu'` throws `WebGpuUnavailableError` instead. `render(file or ImageData, doc)` → a PNG / JPEG / WebP `Blob`; `apply(image, doc, { scale })` for linear images and reduced-size previews. Every filter and look built in; custom filters run on the main thread.
 - **filters**: fast CPU paths for Gaussian blur, box blur, unsharp mask, exposure, curves, levels, LUT, vignette, grain and the colour mixer: about 4–5× faster than the reference on typical chains (12 MP: 24–28 s → 5–7 s in a cloud container).
 
 ### Changed

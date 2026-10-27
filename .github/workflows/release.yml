@@ -58,13 +58,13 @@ jobs:
       - name: Pack
         run: |
           mkdir tarballs
-          for p in core filters presets ml node; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
+          for p in core filters presets ml node web; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
       - name: Publish
         env:
           VERSION: ${{ steps.info.outputs.version }}
           NPM_TAG: ${{ steps.info.outputs.tag }}
         run: |
-          for p in core filters presets ml node; do
+          for p in core filters presets ml node web; do
             if npm view "@rullino/$p@$VERSION" version >/dev/null 2>&1; then
               echo "@rullino/$p@$VERSION is already on npm, skipping"
               continue
