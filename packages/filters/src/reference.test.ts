@@ -2,7 +2,7 @@ import type { Filter } from '@rullino/core';
 import { createImage, identityLut } from '@rullino/core';
 import { describe, expect, it } from 'vitest';
 import { filters } from './index';
-import { filterReference } from './reference';
+import { filterReference, parityTable } from './reference';
 
 const fake = (over: Record<string, unknown>) => ({ id: 'thing', label: 'Thing', category: 'adjust', kind: 'pointwise', alpha: 'straight', params: {}, ...over }) as unknown as Filter<any>;
 
@@ -61,5 +61,25 @@ describe('filterReference', () => {
 
   it('the committed reference matches the registry (run `npx vitest run packages/filters -u` after changing a filter)', async () => {
     await expect(filterReference(filters)).toMatchFileSnapshot('../../../docs/filters.md');
+  });
+});
+
+describe('parityTable', () => {
+  it('lists abs / rel / outliers per filter, grouped by category, with the error allowed at 1.0', () => {
+    const md = parityTable([
+      fake({ id: 'a', label: 'A', category: 'adjust', tolerance: { abs: 1e-7, rel: 2 ** -10 } }),
+      fake({ id: 'b', label: 'B', category: 'classic', kind: 'multipass', passes: [{ name: 'x' }], tolerance: { abs: 0, rel: 0, outliers: 0.002 } }),
+      fake({ id: 'c', label: 'C', category: 'stylize', kind: 'multipass', passes: [{ name: 'x' }], tolerance: { abs: 1e-2, rel: 1e-2, outliers: 0.02 } }),
+    ]);
+    expect(md).toContain('3 filters');
+    expect(md.indexOf('## Adjust (1)')).toBeLessThan(md.indexOf('## Classic (1)'));
+    expect(md).toContain('| A (`a`) | pointwise | 1e-7 | 0.000977 | 0.000977 | 0 |');
+    expect(md).toContain('| B (`b`) | multipass | 0 | 0 | 0 | 0.2% |');
+    expect(md).toContain('| C (`c`) | multipass | 0.01 | 0.01 | 0.02 | 2% |');
+    expect(md).not.toContain('## Look');
+  });
+
+  it('the committed table matches the registry (run `npx vitest run packages/filters -u` after changing a tolerance)', async () => {
+    await expect(parityTable(filters)).toMatchFileSnapshot('../../../docs/parity.md');
   });
 });

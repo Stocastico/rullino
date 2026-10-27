@@ -80,3 +80,37 @@ export function filterReference(filters: readonly Filter<any>[]): string {
   }
   return `${out.join('\n').trimEnd()}\n`;
 }
+
+const short = (n: number) => String(Number(n.toPrecision(3)));
+
+/**
+ * The parity table (docs/parity.md): how far each filter's GPU output may be from its CPU
+ * reference, straight from the tolerances the parity tests use.
+ */
+export function parityTable(filters: readonly Filter<any>[]): string {
+  const out = [
+    '# GPU ↔ CPU parity',
+    '',
+    `${filters.length} filter${filters.length === 1 ? '' : 's'}. Generated from the filters' tolerances (\`packages/filters\`): do not edit by hand; \`npx vitest run packages/filters -u\` rewrites it.`,
+    '',
+    'Every filter has two implementations: a WGSL compute shader (GPU) and a plain TypeScript reference (CPU), which is the specification. They do not produce identical numbers (the GPU keeps intermediate images in float16 and its maths functions differ slightly), so each filter declares how far apart they may be, and CI checks it on every change. This table is that declaration.',
+    '',
+    '**What is checked.** For every channel of every pixel, in linear light (0 = black, 1 = white, values above 1 are HDR): `|gpu − cpu| ≤ abs + rel · |cpu|`. *At 1.0* is the resulting allowance for a full-white channel. *Outliers* is the fraction of channels allowed to exceed that: only filters with hard decisions (thresholds, comparisons, cell or glyph choices) have one, because a float16 intermediate can flip a pixel that sits right on the decision.',
+    '',
+    '**On what.** Two odd-sized images (random noise with transparent and HDR pixels; concentric rings with fading contrast), both quantised to float16 first so CPU and GPU read the same input, at the default parameters and at the extremes of every parameter (every option, an asymmetric kernel, a non-linear LUT). See `packages/filters/src/parity.browser.test.ts`. Chains add up their filters\' tolerances.',
+    '',
+    'For scale: one 8-bit step of sRGB output is about 0.0003 in linear light near black and 0.009 near white.',
+    '',
+  ];
+  for (const [category, title] of CATEGORIES) {
+    const group = filters.filter((f) => f.category === category);
+    if (group.length === 0) continue;
+    out.push(`## ${title} (${group.length})`, '', '| Filter | Kind | abs | rel | At 1.0 | Outliers |', '|---|---|---|---|---|---|');
+    for (const f of group) {
+      const { abs, rel, outliers = 0 } = f.tolerance as { abs: number; rel: number; outliers?: number };
+      out.push(`| ${cell(f.label)} (\`${f.id}\`) | ${f.kind} | ${short(abs)} | ${short(rel)} | ${short(abs + rel)} | ${outliers ? `${short(outliers * 100)}%` : 0} |`);
+    }
+    out.push('');
+  }
+  return out.join('\n');
+}
