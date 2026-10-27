@@ -1,0 +1,50 @@
+{
+  "name": "@rullino/web",
+  "version": "0.2.0",
+  "description": "Render rullino edit documents in the browser: WebGPU when it is there, else the fast CPU path in a Web Worker.",
+  "keywords": [
+    "webgpu",
+    "image-processing",
+    "photo-editing",
+    "browser",
+    "web-worker",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/web"
+  },
+  "homepage": "https://stefanomasneri.com/rullino/",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rullino/core": "workspace:*",
+    "@rullino/filters": "workspace:*",
+    "@rullino/presets": "workspace:*"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ]
+}

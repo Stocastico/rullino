@@ -122,6 +122,18 @@ importers:
         specifier: workspace:*
         version: link:../filters
 
+  packages/web:
+    dependencies:
+      '@rullino/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rullino/filters':
+        specifier: workspace:*
+        version: link:../filters
+      '@rullino/presets':
+        specifier: workspace:*
+        version: link:../presets
+
 packages:
 
   '@babel/helper-string-parser@7.29.7':
