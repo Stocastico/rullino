@@ -1,6 +1,6 @@
 {
   "name": "@rullino/web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Render rullino edit documents in the browser: WebGPU when it is there, else the fast CPU path in a Web Worker.",
   "keywords": [
     "webgpu",

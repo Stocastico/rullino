@@ -1,6 +1,6 @@
 {
   "name": "@rullino/filters",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "WebGPU image filters with CPU reference implementations: adjustments, convolutions, edges, morphology, stylize, lens blur.",
   "keywords": [
     "webgpu",
