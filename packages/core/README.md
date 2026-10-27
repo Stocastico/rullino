@@ -126,6 +126,18 @@ export function loadEdit(json: string) {
 }
 ```
 
+`applyEdit` renders a document in one call: geometry, steps, then the `output.longSide` shrink, on the GPU if you pass a context and on the CPU otherwise. Encode with `encodeImage(result, doc.output)`.
+
+```ts
+import { applyEdit, encodeImage, type GpuContext, type LinearImage } from '@rullino/core';
+import { filters } from '@rullino/filters';
+
+export async function render(image: LinearImage, json: string, gpu?: GpuContext): Promise<Blob> {
+  const doc = JSON.parse(json);
+  return encodeImage(await applyEdit(image, doc, { filters, gpu }), doc.output);
+}
+```
+
 The format is described by a JSON Schema, `@rullino/core/edit.schema.json`, for validating documents outside rullino (other languages, API gateways). `parseChain` checks more than the schema can: filter ids and their params, convex perspective quads.
 
 ## License

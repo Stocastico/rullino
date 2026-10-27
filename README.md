@@ -39,17 +39,16 @@ Call `pipeline.run` again with new params when a slider moves: shaders are compi
 The same edit is plain JSON, and every filter has a CPU implementation that the GPU is tested against, so the edit can be stored, sent and replayed anywhere, Node included:
 
 ```ts
-import { createImage, parseChain, runChainCpu, serializeChain } from '@rullino/core';
+import { applyEdit, createImage, serializeChain } from '@rullino/core';
 import { contrast, exposure, filters } from '@rullino/filters';
 
-const edit = JSON.stringify(serializeChain([
-  { filter: exposure, params: { ev: 0.3 } },
-  { filter: contrast, params: { amount: 0.15 } },
-])); // '{"version":2,"steps":[{"filter":"exposure","params":{"ev":0.3}},...]}'
+const edit = JSON.stringify(serializeChain(
+  [{ filter: exposure, params: { ev: 0.3 } }, { filter: contrast, params: { amount: 0.15 } }],
+  { output: { format: 'png', longSide: 2048 } },
+)); // '{"version":2,"steps":[{"filter":"exposure","params":{"ev":0.3}},...],"output":{...}}'
 
-const { steps } = parseChain(JSON.parse(edit), { filters });
 const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0.1, 0.5])); // linear, premultiplied RGBA
-const result = runChainCpu(steps, image);
+const result = await applyEdit(image, JSON.parse(edit), { filters }); // CPU; pass { gpu: ctx } to render with WebGPU
 ```
 
 GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). Today the CPU path is the readable reference (seconds for a 12 MP photo, decoded pixels in); a fast CPU path, automatic fallback when WebGPU is missing and a Node renderer that reads and writes files are in progress ([roadmap](./PLAN.md#6b-reach-and-adoption-from-26-oct-2026-16-weeks)).
