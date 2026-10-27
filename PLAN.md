@@ -170,11 +170,11 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 - **Konva and Fabric filters are synchronous** (`(imageData) => void`, Fabric `applyTo`); WebGPU is async. Adapters cannot be plain filters: they render asynchronously and swap the node's image source.
 - **Node has no decoder or JPEG / WebP encoder without dependencies** (`encodeImage` uses `OffscreenCanvas`). The Node renderer takes decoded RGBA in and writes PNG itself; JPEG / WebP and decoding go through an optional peer (`sharp`), outside the zero-dependency packages.
 
-### Phase 0 — release hygiene (week 1) — [#64](https://github.com/Stocastico/rullino/issues/64)
-- [ ] `0.1.0` on `latest` for all four packages; deprecate `0.0.0`. Done when the README quick-start runs in a clean project after `npm install @rullino/core @rullino/filters`.
-- [ ] Root README quick-start: one install line, ~10 lines, a before / after image; works in under 5 minutes.
-- [ ] Playground header: version, install line, GitHub link, link to the filter reference.
-- [ ] Parity badge + generated tolerance table (`docs/parity.md`, per filter: abs / rel / outliers).
+### Phase 0 — release hygiene (week 1) — [#64](https://github.com/Stocastico/rullino/issues/64) — done
+- [x] `0.1.0` on `latest` for all four packages; deprecate `0.0.0` (27 Oct; `0.0.0-stage` deprecated too). Done when the README quick-start runs in a clean project after `npm install @rullino/core @rullino/filters`.
+- [x] Root README quick-start: one install line, ~10 lines, a before / after image; works in under 5 minutes.
+- [x] Playground header: version, install line, GitHub link, link to the filter reference.
+- [x] Parity badge + generated tolerance table (`docs/parity.md`, per filter: abs / rel / outliers).
 
 ### Phase 1 — the product (weeks 2–6) — [#65](https://github.com/Stocastico/rullino/issues/65)
 0. **Spike: WebGPU in Node through Dawn** (`webgpu` package, 1–2 days, first — [#72](https://github.com/Stocastico/rullino/issues/72)): if it runs headless on CI, the server renders the *same shaders* and the fast CPU path is only the fallback (looser speed target); if not, the CPU path is the server renderer. Moved ahead of the CPU work (27 Oct) because its answer sets that work's target.
