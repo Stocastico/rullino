@@ -170,21 +170,21 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 - **Konva and Fabric filters are synchronous** (`(imageData) => void`, Fabric `applyTo`); WebGPU is async. Adapters cannot be plain filters: they render asynchronously and swap the node's image source.
 - **Node has no decoder or JPEG / WebP encoder without dependencies** (`encodeImage` uses `OffscreenCanvas`). The Node renderer takes decoded RGBA in and writes PNG itself; JPEG / WebP and decoding go through an optional peer (`sharp`), outside the zero-dependency packages.
 
-### Phase 0 — release hygiene (week 1)
+### Phase 0 — release hygiene (week 1) — [#64](https://github.com/Stocastico/rullino/issues/64)
 - [ ] `0.1.0` on `latest` for all four packages; deprecate `0.0.0`. Done when the README quick-start runs in a clean project after `npm install @rullino/core @rullino/filters`.
 - [ ] Root README quick-start: one install line, ~10 lines, a before / after image; works in under 5 minutes.
 - [ ] Playground header: version, install line, GitHub link, link to the filter reference.
 - [ ] Parity badge + generated tolerance table (`docs/parity.md`, per filter: abs / rel / outliers).
 
-### Phase 1 — the product (weeks 2–6)
-1. **Edit document v2** (weeks 2–3): extend `ChainDocument` rather than start over — add export settings (format, size, bit depth, background), a JSON Schema file and a migration function from v1; `applyEdit(image, edit, { backend })`; looks (`@rullino/presets`) available as edit documents.
-2. **Fast CPU path** (weeks 2–4): fused pointwise chains in one pass over the buffer, separable convolutions without per-pixel allocations, then the worst offenders found by a CPU bench; every fast filter has a parity test against its reference (the reference stays the specification). Target to set after the first profile: 12 MP common chain < 1 s in Node.
-3. **One entry point with fallback** (weeks 3–4): `createContext()` picks WebGPU, else CPU in a Web Worker, and reports the backend; CPU previews at reduced resolution; `WebGpuUnavailableError` only when the caller demands the GPU. No WebGL2.
-4. **Node renderer** (weeks 4–5): Node entry (subpath of core or `@rullino/node`): RGBA in, `applyEdit` on CPU, PNG 8/16 out; `sharp` as optional peer for decode / JPEG / WebP. CI test: browser GPU vs Node output on a fixed image set within the table's tolerances. Example: one-file Express route.
-   - Spike first (1–2 days): WebGPU in Node through Dawn (`webgpu` package) — if it runs headless on CI, the server renders the *same shaders* and the CPU path is only the fallback.
-5. **Benchmarks** (weeks 5–6): 3 chains (exposure + curves + LUT; blur + unsharp; levels + vignette + grain) at 12 and 24 MP vs pixi-filters, Photon, wasm-vips: first preview, per-change latency, memory, gzip size. **Run on real hardware** (SwiftShader numbers are meaningless here); publish the losses too; drop the fusion claim if it shows no win.
+### Phase 1 — the product (weeks 2–6) — [#65](https://github.com/Stocastico/rullino/issues/65)
+0. **Spike: WebGPU in Node through Dawn** (`webgpu` package, 1–2 days, first — [#72](https://github.com/Stocastico/rullino/issues/72)): if it runs headless on CI, the server renders the *same shaders* and the fast CPU path is only the fallback (looser speed target); if not, the CPU path is the server renderer. Moved ahead of the CPU work (27 Oct) because its answer sets that work's target.
+1. **Edit document v2** (weeks 2–3, [#73](https://github.com/Stocastico/rullino/issues/73)): extend `ChainDocument` rather than start over — add export settings (format, size, bit depth, background), a JSON Schema file and a migration function from v1; `applyEdit(image, edit, { backend })`; looks (`@rullino/presets`) available as edit documents.
+2. **Fast CPU path** (weeks 2–4, [#74](https://github.com/Stocastico/rullino/issues/74)): fused pointwise chains in one pass over the buffer, separable convolutions without per-pixel allocations, then the worst offenders found by a CPU bench; every fast filter has a parity test against its reference (the reference stays the specification). Target to set after the first profile and the spike: 12 MP common chain < 1 s in Node if the CPU is the server renderer.
+3. **One entry point with fallback** (weeks 3–4, [#75](https://github.com/Stocastico/rullino/issues/75)): `createContext()` picks WebGPU, else CPU in a Web Worker, and reports the backend; CPU previews at reduced resolution; `WebGpuUnavailableError` only when the caller demands the GPU. No WebGL2.
+4. **Node renderer** (weeks 4–5, [#76](https://github.com/Stocastico/rullino/issues/76)): Node entry (subpath of core or `@rullino/node`): RGBA in, `applyEdit` (GPU through Dawn if the spike says so, else CPU), PNG 8/16 out; `sharp` as optional peer for decode / JPEG / WebP. CI test: browser GPU vs Node output on a fixed image set within the table's tolerances. Example: one-file Express route.
+5. **Benchmarks** (weeks 5–6, [#77](https://github.com/Stocastico/rullino/issues/77)): 3 chains (exposure + curves + LUT; blur + unsharp; levels + vignette + grain) at 12 and 24 MP vs pixi-filters, Photon, wasm-vips: first preview, per-change latency, memory, gzip size. **Run on real hardware** (SwiftShader numbers are meaningless here); publish the losses too; drop the fusion claim if it shows no win.
 
-### Phase 2 — distribution (weeks 6–10)
+### Phase 2 — distribution (weeks 6–10) — [#66](https://github.com/Stocastico/rullino/issues/66)
 - [ ] `@rullino/konva` (Konva.Image source swapped after an async render) — first, it is where GPU speed shows most.
 - [ ] `@rullino/fabric` — after Konva, only if Konva gets interest; Fabric already has WebGL filters and two GPU contexts cannot share textures (one readback per render).
 - [ ] Each adapter: < 200 lines, README, StackBlitz demo.
@@ -192,7 +192,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 - [ ] Migration notes from glfx and tui.image-editor (filter mapping).
 - [ ] Playground: **Copy as code** (edit JSON + snippet; was UX review step 6), backend + render time in plain words. The film strip (UX review step 4) is done; the examples gallery (step 5) waits: the playground is a developer demo, not an editor.
 
-### Phase 3 — launch and first users (weeks 10–16)
+### Phase 3 — launch and first users (weeks 10–16) — [#67](https://github.com/Stocastico/rullino/issues/67)
 - [ ] 3–5 design partners (teams on Konva / Fabric), one production integration live before launch.
 - [ ] Launch post (preview / render mismatch, honest benchmarks), Show HN around the job, Konva / Fabric discussions, r/webdev, r/javascript, JavaScript Weekly, Frontend Focus.
 - [ ] After launch: issues answered within 48 h for a month, good-first-issue labels, monthly release, a talk proposal on CPU/GPU parity testing.
