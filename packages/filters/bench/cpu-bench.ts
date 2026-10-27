@@ -1,8 +1,9 @@
-// CPU timings: the three PLAN §6b chains at 12 MP and every registered filter at 1024x768, the
-// reference and the fast path (where a filter has one). Not a test: `pnpm bench:cpu` bundles this
+// CPU timings: the three PLAN §6b chains (12 MP by default) and every registered filter at
+// 1024x768, the reference and the fast path (where a filter has one). Not a test: `pnpm bench:cpu` bundles this
 // file and runs it in plain Node, because Vitest's module runner turns every call to an imported
 // function into a getter call, which made the small functions of the fast paths look 4x slower.
-// Arguments: `chains` and/or `filters` (default both), `--only <filter id>`.
+// Arguments: `chains` and/or `filters` (default both), `--only <filter id>`, `--size <w>x<h>` for the
+// chains (default 4000x3000).
 import { createImage, defaultParams, lutFromFunction, runChainCpu, type LinearImage, type Step } from '@rullino/core';
 import { filters } from '../src';
 
@@ -42,11 +43,13 @@ const planChains: Record<string, Step[]> = {
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
+const [cw, ch] = (args.includes('--size') ? args[args.indexOf('--size') + 1]! : '4000x3000').split('x').map(Number) as [number, number];
 const parts: string[] = args.filter((a) => a === 'chains' || a === 'filters');
 const run = (part: string) => parts.length === 0 || parts.includes(part);
 
 if (run('chains')) {
-  const src = image(4000, 3000);
+  const src = image(cw, ch);
+  console.log(`${cw}x${ch}:`);
   for (const [name, steps] of Object.entries(planChains)) {
     row(`chain: ${name}`, time(() => runChainCpu(steps, src)), time(() => runChainCpu(steps, src, { fast: true })));
     for (const s of steps) if (s.filter.fast) row(`  ${s.filter.id}`, time(() => runChainCpu([s], src)), time(() => runChainCpu([s], src, { fast: true })));

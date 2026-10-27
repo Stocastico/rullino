@@ -11,6 +11,13 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+### Added
+- **core**: filters can carry `fast`, a second CPU implementation held to the reference within the filter's tolerance; `runChainCpu(steps, src, { fast: true })` uses it where present, and `applyEdit` without a GPU (so `@rullino/node`'s CPU fallback) always does.
+- **filters**: fast CPU paths for Gaussian blur, box blur, unsharp mask, exposure, curves, levels, LUT, vignette, grain and the colour mixer: about 4–5× faster than the reference on typical chains (12 MP: 24–28 s → 5–7 s in a cloud container).
+
+### Changed
+- **core**: OKLab → linear conversion cubes by multiplication instead of `** 3` (the OKLab filters' CPU references are ~2× faster); `runChainCpu` no longer copies the source up front.
+
 ## [0.2.0]
 
 Render on the server what the browser previews: a new `@rullino/node` package runs the same WGSL shaders on Dawn (CPU fallback), and edit documents (version 2) now carry their output settings, so one JSON describes the whole render. Version 1 documents are still read (migrated on parse).

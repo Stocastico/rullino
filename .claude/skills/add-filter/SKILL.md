@@ -33,7 +33,10 @@ Start with `{ abs: 1e-3, rel: 2e-3 }` and `outliers: 0`. If it fails, find out w
 ## 6. Mutation check (mandatory)
 Break the shader slightly (a constant × 1.003, an offset, a threshold) and confirm parity goes red in most cases; restore and confirm green. A generous `outliers` allowance hides subtle mutations.
 
-## 7. Finish
+## 7. Optional: a fast CPU path
+Only for filters people actually chain (adjustments, looks, blurs) or that `pnpm bench:cpu filters --only <id>` shows to be very slow. Add `fast: (src, p) => …` next to `cpu`, built from `../fast` (`mapChannels`, `mapStraight`, `toSrgb` / `toLinear`, `convolve1dFast`, `sampleLutInto`): one pass, no per-pixel arrays or closures, `x * x * x` not `x ** 3`. `fast.test.ts` picks it up automatically (parity images + special values, the filter's tolerance). Mutation-check it like a shader, and measure with `pnpm bench:cpu`, never under Vitest.
+
+## 8. Finish
 - `pnpm typecheck && pnpm test` and the filter's browser tests; `pnpm bench` (note the timing at 1024×768; slow filters go into Decisions as performance-review candidates).
 - `pnpm build && pnpm test:e2e` (the smoke test chains every filter).
 - CLAUDE.md: a Decisions row for any non-obvious choice (space, algorithm variant, tolerance) and a Traps entry for anything that bit you.
