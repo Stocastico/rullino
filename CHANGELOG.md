@@ -11,6 +11,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.3.0]
+
+The CPU path becomes usable: filters can carry a fast CPU implementation held to the reference within each filter's tolerance (about 4–5× faster on typical chains), and a new `@rullino/web` package renders edit documents in the browser on WebGPU or, without it, on that CPU path in a Web Worker.
+
 ### Added
 - **core**: filters can carry `fast`, a second CPU implementation held to the reference within the filter's tolerance; `runChainCpu(steps, src, { fast: true })` uses it where present, and `applyEdit` without a GPU (so `@rullino/node`'s CPU fallback) always does.
 - **web** (new package `@rullino/web`): `createRenderer()` renders edit documents in the browser on WebGPU, or, when the browser has none (or `backend: 'cpu'`), with the fast CPU path in a module Web Worker; `renderer.reason` says why it fell back, `backend: 'gpu'` throws `WebGpuUnavailableError` instead. `render(file or ImageData, doc)` → a PNG / JPEG / WebP `Blob`; `apply(image, doc, { scale })` for linear images and reduced-size previews. Every filter and look built in; custom filters run on the main thread.
