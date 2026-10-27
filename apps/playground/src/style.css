@@ -14,11 +14,17 @@ body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; 
 header { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 header .actions { display: flex; gap: 6px; }
 header .actions button:disabled { opacity: 0.4; }
-header .actions a { align-self: center; color: var(--muted); font-size: 13px; text-decoration: none; padding: 0 6px; }
-header .actions a:hover { color: var(--text); text-decoration: underline; }
+header h1 { white-space: nowrap; }
+#version { color: var(--muted); font-size: 12px; font-weight: normal; font-variant-numeric: tabular-nums; }
+header .actions button { white-space: nowrap; }
+header nav { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 100 auto; margin-left: auto; }
+header nav a { color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }
+header nav a:hover { color: var(--text); text-decoration: underline; }
+/* Shrinks with an ellipsis instead of wrapping the header; selecting it still copies the whole command. */
+#install { font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; user-select: all; cursor: text; white-space: nowrap; min-width: 8ch; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 h1 { margin: 0; font-size: 20px; letter-spacing: 0.02em; }
 h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-#status { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+#status { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 0.001 auto; }
 main { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: calc(100vh - 50px); }
 #workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; --strip-h: 148px; }
 #workspace figure { flex: 1; min-height: 0; }
@@ -87,6 +93,7 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
   aside { border-right: 0; border-top: 1px solid var(--line); }
   header { flex-wrap: wrap; gap: 8px 12px; }
   #status { flex-basis: 100%; font-size: 12px; order: 3; }
+  header nav { flex-basis: 100%; margin-left: 0; order: 2; }
 }
 .control-kernel { display: flex; flex-direction: column; gap: 6px; }
 .kernel { display: grid; gap: 3px; }

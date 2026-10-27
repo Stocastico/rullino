@@ -50,6 +50,17 @@ try {
   await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
   check((await status()).startsWith('WebGPU'), `expected the WebGPU renderer, status was: ${await status()}`);
 
+  // Project header: the version being demoed, what to install, where the code and docs are.
+  const version = JSON.parse(readFileSync(new URL('../../../packages/core/package.json', import.meta.url), 'utf8')).version;
+  check((await page.textContent('#version')) === `v${version}`, `header version should be v${version}, got ${await page.textContent('#version')}`);
+  const tag = version.includes('-') ? '@next' : '';
+  const install = `npm install @rullino/core${tag} @rullino/filters${tag}`;
+  check((await page.textContent('#install')) === install, `install line should be "${install}", got "${await page.textContent('#install')}"`);
+  const links = await page.$$eval('header nav a', (as) => Object.fromEntries(as.map((a) => [a.textContent.trim(), a.getAttribute('href')])));
+  for (const [text, href] of [['GitHub', 'https://github.com/Stocastico/rullino'], ['Filters', 'https://github.com/Stocastico/rullino/blob/main/docs/filters.md'], ['Parity', 'https://github.com/Stocastico/rullino/blob/main/docs/parity.md'], ['API docs', './docs/']]) {
+    check(links[text] === href, `header link "${text}" should point to ${href}, got ${links[text]}`);
+  }
+
   // Initial chain is a single exposure step at 0 EV: identity.
   const identity = await differs();
   check(identity < 0.01, `exposure 0 EV should match the original, ${(identity * 100).toFixed(1)}% differs`);
