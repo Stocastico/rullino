@@ -45,7 +45,7 @@ import { contrast, exposure, filters } from '@rullino/filters';
 const edit = JSON.stringify(serializeChain([
   { filter: exposure, params: { ev: 0.3 } },
   { filter: contrast, params: { amount: 0.15 } },
-])); // '{"version":1,"steps":[{"filter":"exposure","params":{"ev":0.3}},...]}'
+])); // '{"version":2,"steps":[{"filter":"exposure","params":{"ev":0.3}},...]}'
 
 const { steps } = parseChain(JSON.parse(edit), { filters });
 const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0.1, 0.5])); // linear, premultiplied RGBA

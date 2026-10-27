@@ -12,7 +12,7 @@ describe('@rullino/core public API', () => {
     'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
     'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
     'isIdentityGeometry', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
-    'maskImage', 'maskValue', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseHald',
+    'maskImage', 'maskValue', 'migrateChain', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseHald',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',
     'runChainCpu', 'runFilter', 'sampleCurve', 'sampleImage', 'serializeChain', 'srgbToLinear',
     'toFloat16Array', 'turnGeometry', 'uploadImage', 'validateGeometry', 'validateMask',

@@ -35,14 +35,16 @@
       "./internal": {
         "types": "./dist/internal.d.ts",
         "default": "./dist/internal.js"
-      }
+      },
+      "./edit.schema.json": "./edit.schema.json"
     }
   },
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./internal": "./src/internal.ts"
+    "./internal": "./src/internal.ts",
+    "./edit.schema.json": "./edit.schema.json"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
@@ -50,7 +52,8 @@
   },
   "files": [
     "dist",
-    "LICENSE"
+    "LICENSE",
+    "edit.schema.json"
   ],
   "peerDependencies": {
     "@webgpu/types": ">=0.1.40"

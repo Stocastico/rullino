@@ -9,6 +9,15 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml). T
 3. `git tag vX.Y.Z[-rc.N] origin/main && git push origin vX.Y.Z[-rc.N]` (from a maintainer's machine: Claude cloud sessions cannot push tags). The workflow checks the tag, runs the tests, publishes with provenance (`next` for a pre-release, `latest` otherwise) and creates the GitHub release from the section below.
 4. Never `npm publish` from a package directory (`prepublishOnly` refuses): the dist exports exist only in the packed tarball.
 
+## [Unreleased]
+
+### Added
+- **core**: edit documents version 2: an optional `output` (format, quality, bit depth, background, `longSide`) next to the steps and geometry (`serializeChain(steps, { output })`, `parseChain(doc).output`, type `OutputSettings`); `migrateChain` brings version 1 documents up to date, and `parseChain` accepts both. A JSON Schema of the format ships as `@rullino/core/edit.schema.json`.
+
+### Changed
+- **core**: `serializeChain` writes `version: 2` (`CHAIN_VERSION` is 2). Readers of version 1 keep working through `parseChain` / `migrateChain`.
+- **core**: `fromFloat16Array` (and so every `readImage`) is ~20× faster: a lookup table instead of a conversion per value.
+
 ## [0.1.0]
 
 First stable 0.x release, on the `latest` tag. Same library as `0.1.0-rc.1`, plus what is listed below.

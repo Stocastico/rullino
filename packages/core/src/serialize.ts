@@ -1,3 +1,4 @@
+import type { ExportOptions } from './encode';
 import type { Filter } from './filter';
 import { validateGeometry, type Geometry } from './geometry';
 import type { Lut } from './lut';
@@ -5,11 +6,13 @@ import { createRasterMask, validateMask, type Mask } from './mask';
 import type { Step } from './pipeline/chain';
 import { resolveParams, type ParamSchema } from './params';
 
-// A chain (and optionally its geometry) as plain JSON: for share links, saved presets and files.
-// Params equal to their defaults are left out, raster masks are stored as 8-bit coverage in base64,
-// and LUTs only by reference (a LUT's table is far too large for a link): the caller names them.
+// An edit as plain JSON: the chain, optionally its geometry and how to export the result. For share
+// links, saved presets, files and server renders. Params equal to their defaults are left out, raster
+// masks are stored as 8-bit coverage in base64, and LUTs only by reference (a LUT's table is far too
+// large for a link): the caller names them. edit.schema.json describes the same format.
 
-export const CHAIN_VERSION = 1;
+/** Version 2 added `output`; version 1 documents are migrated by {@link migrateChain}. */
+export const CHAIN_VERSION = 2;
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -26,14 +29,22 @@ export interface StepDocument {
   readonly mask?: MaskDocument;
 }
 
+/** How to export the result: the encoding options plus an optional size. */
+export interface OutputSettings extends ExportOptions {
+  /** Shrink (in linear light, after the chain) so the long side is at most this many pixels. Never enlarges. */
+  readonly longSide?: number;
+}
+
 export interface ChainDocument {
   readonly version: typeof CHAIN_VERSION;
   readonly steps: readonly StepDocument[];
   readonly geometry?: Geometry;
+  readonly output?: OutputSettings;
 }
 
 export interface SerializeOptions {
   readonly geometry?: Geometry;
+  readonly output?: OutputSettings;
   /** A stable name for a LUT (e.g. 'look:teal-orange'), or undefined if it cannot be referenced. */
   readonly lutRef?: (lut: Lut) => string | undefined;
 }
@@ -70,13 +81,24 @@ export function serializeChain(steps: readonly Step[], options: SerializeOptions
       };
     }),
     ...(options.geometry ? { geometry: options.geometry } : {}),
+    ...(options.output ? { output: parseOutput(options.output) } : {}),
   };
 }
 
-/** Validates a document (e.g. parsed from a link) and turns it back into chain steps. */
-export function parseChain(doc: unknown, options: ParseOptions): { steps: Step[]; geometry?: Geometry } {
+/**
+ * Brings an older document up to the current version (a new object; the input is not changed).
+ * Version 1 is version 2 without `output`. Does not validate the steps: {@link parseChain} does.
+ */
+export function migrateChain(doc: unknown): ChainDocument {
   if (!isObject(doc)) throw new Error('chain: not an object');
-  if (doc.version !== CHAIN_VERSION) throw new Error(`chain: unsupported version ${JSON.stringify(doc.version)}`);
+  if (doc.version === CHAIN_VERSION) return doc as unknown as ChainDocument;
+  if (doc.version === 1) return { ...doc, version: CHAIN_VERSION } as unknown as ChainDocument;
+  throw new Error(`chain: unsupported version ${JSON.stringify(doc.version)}`);
+}
+
+/** Validates a document (e.g. parsed from a link) and turns it back into chain steps. */
+export function parseChain(input: unknown, options: ParseOptions): { steps: Step[]; geometry?: Geometry; output?: OutputSettings } {
+  const doc = migrateChain(input) as unknown as Record<string, unknown>;
   if (!Array.isArray(doc.steps)) throw new Error('chain: steps must be an array');
   const byId = new Map(options.filters.map((f) => [f.id, f]));
   const steps = doc.steps.map((s: unknown, i): Step => {
@@ -102,8 +124,35 @@ export function parseChain(doc: unknown, options: ParseOptions): { steps: Step[]
     const mask = s.mask === undefined ? undefined : parseMask(s.mask);
     return { filter, params, enabled: s.enabled !== false, ...(mask ? { mask } : {}) };
   });
-  if (doc.geometry === undefined) return { steps };
-  return { steps, geometry: parseGeometry(doc.geometry) };
+  return {
+    steps,
+    ...(doc.geometry !== undefined ? { geometry: parseGeometry(doc.geometry) } : {}),
+    ...(doc.output !== undefined ? { output: parseOutput(doc.output) } : {}),
+  };
+}
+
+const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide']);
+
+/** Validates output settings and rebuilds them from known fields. */
+function parseOutput(o: unknown): OutputSettings {
+  if (!isObject(o)) throw new Error('output: not an object');
+  for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key)) throw new Error(`output: unknown setting "${key}"`);
+  const { format, quality, bitDepth, background, longSide } = o;
+  if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new Error(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
+  if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new Error('output: quality must be a number in [0, 1]');
+  if (bitDepth !== undefined && bitDepth !== 8 && bitDepth !== 16) throw new Error('output: bitDepth must be 8 or 16');
+  if (bitDepth === 16 && (format ?? 'png') !== 'png') throw new Error('output: bitDepth 16 needs format png');
+  if (longSide !== undefined && !(Number.isInteger(longSide) && (longSide as number) >= 1)) throw new Error('output: longSide must be a positive integer');
+  if (background !== undefined && !(Array.isArray(background) && background.length === 3 && background.every((c) => typeof c === 'number' && c >= 0 && c <= 1))) {
+    throw new Error('output: background must be [r, g, b] in [0, 1]');
+  }
+  return {
+    ...(format !== undefined ? { format } : {}),
+    ...(quality !== undefined ? { quality: quality as number } : {}),
+    ...(bitDepth !== undefined ? { bitDepth } : {}),
+    ...(background !== undefined ? { background: [...(background as number[])] as [number, number, number] } : {}),
+    ...(longSide !== undefined ? { longSide: longSide as number } : {}),
+  };
 }
 
 function isObject(x: unknown): x is Record<string, unknown> {
