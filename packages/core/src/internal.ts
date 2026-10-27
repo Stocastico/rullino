@@ -9,7 +9,7 @@ export { poolStats } from './gpu/pool';
 export { runPointwise } from './gpu/pointwise';
 export { fusedShader, namespaceWgsl, runFused, type FusedRun } from './pipeline/fuse';
 export { encodeToTexture, type EncodeOptions } from './gpu/io';
-export { encodeSamples } from './encode';
+export { encodeSamples, exportSamples } from './encode';
 export { createWorkingTexture, WORKING_FORMAT } from './gpu/texture';
 export { float16ToFloat32, float32ToFloat16 } from './half';
 export { imageSamplerWgsl } from './image';
