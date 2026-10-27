@@ -14,8 +14,6 @@ rullino spans the arc from classic computer-vision operations (thresholds, convo
 npm install @rullino/core @rullino/filters
 ```
 
-> Until `0.1.0` reaches the `latest` tag (this week), install `@rullino/core@next @rullino/filters@next`.
-
 Edit a photo on the GPU and draw it on a canvas:
 
 ```ts

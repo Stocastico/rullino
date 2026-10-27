@@ -9,6 +9,18 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml). T
 3. `git tag vX.Y.Z[-rc.N] && git push origin vX.Y.Z[-rc.N]`. The workflow checks the tag, runs the tests, publishes with provenance (`next` for a pre-release, `latest` otherwise) and creates the GitHub release from the section below.
 4. Never `npm publish` from a package directory (`prepublishOnly` refuses): the dist exports exist only in the packed tarball.
 
+## [0.1.0]
+
+First stable 0.x release, on the `latest` tag. Same library as `0.1.0-rc.1`, plus what is listed below.
+
+### Added
+- **core**: filters can carry `tryThis` (a suggestion for exploring them) and `preview` (params that make a filter visible on a thumbnail when it does nothing at its defaults). `Mat3`, `Json` and `ImageParam` are exported as types, since public signatures mention them.
+- **filters**: every filter has a description, a "try this" and parameter help, shown by the generated reference (`docs/filters.md`).
+- Docs: an [API reference](https://stefanomasneri.com/rullino/docs/) generated from the sources, and a [parity table](docs/parity.md) with the GPU ↔ CPU tolerance of each filter, generated from the tolerances the tests use.
+
+### Changed
+- npm keywords, and the homepage now points at the playground.
+
 ## [0.1.0-rc.1]
 
 First release candidate. (`0.1.0-rc.0` was tagged but never published: the release workflow's publish step read the tarball path as a GitHub repository. Nothing was released under that version.)
