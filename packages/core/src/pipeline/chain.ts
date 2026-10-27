@@ -36,7 +36,9 @@ export function effectiveParams(step: Step, scale = 1): Record<string, unknown> 
  * fast implementations). Never returns `src` itself.
  */
 export function runChainCpu(steps: readonly Step[], src: LinearImage, options: ChainOptions = {}): LinearImage {
-  let img = createImage(src.width, src.height, src.data.slice());
+  // No copy up front (192 MB at 12 MP): steps never mutate their input, so only a chain that
+  // ends on `src` itself needs one.
+  let img = src;
   for (const s of activeSteps(steps)) {
     if (s.mask) validateMask(s.mask);
     const params = effectiveParams(s, options.scale) as never;
@@ -50,5 +52,5 @@ export function runChainCpu(steps: readonly Step[], src: LinearImage, options: C
     }
     img = s.mask ? blendMasked(img, out, s.mask) : out;
   }
-  return img;
+  return img === src ? createImage(src.width, src.height, src.data.slice()) : img;
 }

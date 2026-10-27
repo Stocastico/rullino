@@ -1,5 +1,6 @@
 import { defineFilter } from '@rullino/core';
 import { gaussianCpu, gaussianPass } from '../convolution';
+import { gaussianFast } from '../fast';
 
 /** Separable Gaussian blur (two passes), radius 3σ, on premultiplied linear light. */
 export const gaussianBlur = defineFilter({
@@ -14,6 +15,7 @@ export const gaussianBlur = defineFilter({
   },
   passes: [gaussianPass('h', 'input', 'x'), gaussianPass('v', 'h', 'y')],
   cpu: (src, { sigma }) => gaussianCpu(src, sigma),
+  fast: (src, { sigma }) => gaussianFast(src, sigma),
   // Two f16 roundings (intermediate + output) on sums of positive terms.
   tolerance: { abs: 1e-4, rel: 2 ** -9 },
 });
