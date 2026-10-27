@@ -81,8 +81,9 @@ export const gaussianFast = (src: LinearImage, sigma: number): LinearImage => {
 };
 
 // sRGB transfer functions by table lookup with linear interpolation on their curved segment up
-// to 1 (exact elsewhere: the linear segment, HDR and negatives): a pow() per channel was half the time of the pointwise references.
-// linearToSrgb is steep near 0, so its table is indexed by sqrt(x), where it is smooth.
+// to 1 (exact elsewhere: the linear segment, HDR and negatives): a pow() per channel was half the
+// time of the pointwise references. linearToSrgb is steep near 0, so its table is indexed by
+// sqrt(x), where it is smooth.
 const N = 4096;
 const SRGB_OF_SQRT = Float64Array.from({ length: N + 1 }, (_, i) => linearToSrgb((i / N) ** 2));
 const LINEAR_OF = Float64Array.from({ length: N + 1 }, (_, i) => srgbToLinear(i / N));

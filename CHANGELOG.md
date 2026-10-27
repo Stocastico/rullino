@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
+All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node, web). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
 
 ## Releasing (maintainer checklist)
 
-1. One-time, per package on npmjs.com: Settings → Trusted Publisher → GitHub Actions: user `Stocastico`, repository `rullino`, workflow `release.yml`, no environment.
+1. One-time, per package on npmjs.com: Settings → Trusted Publisher → GitHub Actions: user `Stocastico`, repository `rullino`, workflow `release.yml`, no environment. A **new package** must exist on npm before that page is there: publish a placeholder once from a maintainer's machine (`npm publish` of a `0.0.0` package.json with just name, version and description, `--access public`), configure the Trusted Publisher, then `npm deprecate @rullino/<name>@0.0.0 "placeholder"`.
 2. `node scripts/set-version.mjs X.Y.Z[-rc.N]`, add a `## [X.Y.Z[-rc.N]]` section below, merge to `main` through a pull request.
 3. `git tag vX.Y.Z[-rc.N] origin/main && git push origin vX.Y.Z[-rc.N]` (from a maintainer's machine: Claude cloud sessions cannot push tags). The workflow checks the tag, runs the tests, publishes with provenance (`next` for a pre-release, `latest` otherwise) and creates the GitHub release from the section below.
 4. Never `npm publish` from a package directory (`prepublishOnly` refuses): the dist exports exist only in the packed tarball.
@@ -13,6 +13,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ### Added
 - **core**: filters can carry `fast`, a second CPU implementation held to the reference within the filter's tolerance; `runChainCpu(steps, src, { fast: true })` uses it where present, and `applyEdit` without a GPU (so `@rullino/node`'s CPU fallback) always does.
+- **web** (new package `@rullino/web`): `createRenderer()` renders edit documents in the browser on WebGPU, or, when the browser has none (or `backend: 'cpu'`), with the fast CPU path in a module Web Worker; `renderer.reason` says why it fell back, `backend: 'gpu'` throws `WebGpuUnavailableError` instead. `render(file or ImageData, doc)` → a PNG / JPEG / WebP `Blob`; `apply(image, doc, { scale })` for linear images and reduced-size previews. Every filter and look built in; custom filters run on the main thread.
 - **filters**: fast CPU paths for Gaussian blur, box blur, unsharp mask, exposure, curves, levels, LUT, vignette, grain and the colour mixer: about 4–5× faster than the reference on typical chains (12 MP: 24–28 s → 5–7 s in a cloud container).
 
 ### Changed

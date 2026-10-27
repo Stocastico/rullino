@@ -12,7 +12,7 @@ import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 
 const repo = new URL('..', import.meta.url).pathname;
-const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node'];
+const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web'];
 const version = JSON.parse(readFileSync(join(repo, 'packages/core/package.json'), 'utf8')).version;
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
@@ -108,6 +108,7 @@ console.log(JSON.stringify(out));
     join(project, 'main.js'),
     `import { createGpuContext, createImage, fromFloat16Array, importImage, Pipeline, readImage, readSrgb8, runFilter, toFloat16Array, uploadImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
+import { createRenderer } from '@rullino/web';
 const ctx = await createGpuContext();
 const w = 17, h = 9; // odd sizes: workgroup bounds, row padding
 const data = new Float32Array(w * h * 4);
@@ -133,6 +134,18 @@ const pipeline = new Pipeline(ctx);
 pipeline.setSource(importImage(ctx, await createImageBitmap(flat, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })));
 const rgba = await readSrgb8(ctx, pipeline.run([{ filter: exposure, params: { ev: 0 } }]));
 result.quickstartPixel = Math.max(Math.abs(rgba[0] - 100), Math.abs(rgba[1] - 150), Math.abs(rgba[2] - 200), Math.abs(rgba[3] - 255)); // an ev 0 chain returns the image (8-bit rounding)
+// @rullino/web: the CPU backend in its module worker (the worker file must survive the bundle)
+// against the WebGPU backend, on a look (LUT by name) and a blur.
+let workers = 0;
+const NativeWorker = Worker;
+window.Worker = class extends NativeWorker { constructor(...a) { super(...a); workers++; } };
+const doc = { version: 2, steps: [{ filter: 'applyLut', params: { look: { ref: 'look:noir' } } }, { filter: 'gaussianBlur', params: { sigma: 1.5 } }] };
+const onGpu = await createRenderer();
+const onCpu = await createRenderer({ backend: 'cpu' });
+const [a, b] = [await onGpu.apply(src, doc), await onCpu.apply(src, doc)];
+let webWorst = onGpu.backend === 'gpu' && onCpu.backend === 'cpu' ? 0 : 1;
+for (let i = 0; i < a.data.length; i++) webWorst = Math.max(webWorst, Math.abs(a.data[i] - b.data[i]));
+result.webCpuWorkerVsGpu = workers === 1 ? webWorst : 1;
 window.__result = result;
 `,
   );

@@ -4,7 +4,7 @@
 // (`next` for a pre-release, `latest` otherwise) and `prerelease` as GITHUB_OUTPUT-style lines.
 import { readFileSync } from 'node:fs';
 
-const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node'];
+const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web'];
 const SEMVER = /^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/;
 
 const tag = process.argv[2] ?? '';
