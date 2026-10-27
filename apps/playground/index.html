@@ -14,13 +14,19 @@
   </head>
   <body>
     <header>
-      <h1>rullino</h1>
+      <h1>rullino <span id="version" title="Version of the packages this playground runs">%RULLINO_VERSION%</span></h1>
       <div class="actions">
         <button id="undo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
         <button id="redo" type="button" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
         <button id="share" type="button" title="Copy a link to these edits">Copy link</button>
-        <a id="docs-link" href="./docs/" target="_blank" rel="noopener" title="API reference of the packages">API docs</a>
       </div>
+      <nav aria-label="Project">
+        <code id="install" title="Install the library (click to select)">%RULLINO_INSTALL%</code>
+        <a href="https://github.com/Stocastico/rullino" target="_blank" rel="noopener" title="Source code, issues and README">GitHub</a>
+        <a href="https://github.com/Stocastico/rullino/blob/main/docs/filters.md" target="_blank" rel="noopener" title="Every filter with its parameters, ranges and defaults">Filters</a>
+        <a href="https://github.com/Stocastico/rullino/blob/main/docs/parity.md" target="_blank" rel="noopener" title="How far GPU and CPU output may differ, per filter">Parity</a>
+        <a id="docs-link" href="./docs/" target="_blank" rel="noopener" title="API reference of the packages">API docs</a>
+      </nav>
       <p id="status">Starting…</p>
       <p id="announce" class="visually-hidden" aria-live="polite"></p>
     </header>

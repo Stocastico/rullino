@@ -14,8 +14,11 @@ body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; 
 header { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 header .actions { display: flex; gap: 6px; }
 header .actions button:disabled { opacity: 0.4; }
-header .actions a { align-self: center; color: var(--muted); font-size: 13px; text-decoration: none; padding: 0 6px; }
-header .actions a:hover { color: var(--text); text-decoration: underline; }
+#version { color: var(--muted); font-size: 12px; font-weight: normal; font-variant-numeric: tabular-nums; }
+header nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-left: auto; }
+header nav a { color: var(--muted); font-size: 13px; text-decoration: none; }
+header nav a:hover { color: var(--text); text-decoration: underline; }
+#install { font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; user-select: all; cursor: text; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 h1 { margin: 0; font-size: 20px; letter-spacing: 0.02em; }
 h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 #status { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -87,6 +90,7 @@ body.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
   aside { border-right: 0; border-top: 1px solid var(--line); }
   header { flex-wrap: wrap; gap: 8px 12px; }
   #status { flex-basis: 100%; font-size: 12px; order: 3; }
+  header nav { flex-basis: 100%; margin-left: 0; order: 2; }
 }
 .control-kernel { display: flex; flex-direction: column; gap: 6px; }
 .kernel { display: grid; gap: 3px; }
