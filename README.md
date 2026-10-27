@@ -2,20 +2,68 @@
 
 [![CI](https://github.com/Stocastico/rullino/actions/workflows/ci.yml/badge.svg)](https://github.com/Stocastico/rullino/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE) [![Playground](https://img.shields.io/badge/playground-live-brightgreen.svg)](https://stefanomasneri.com/rullino/) [![GPU ↔ CPU parity: per-filter tolerances](https://img.shields.io/badge/GPU%20%E2%86%94%20CPU-parity%20table-blue.svg)](./docs/parity.md)
 
-GPU-first image processing for the web, built on **WebGPU** and written in **TypeScript**.
+Photo edits you describe once, as JSON: **preview them live on the GPU** in the browser, **replay them on the CPU** anywhere, with output that agrees within a [published per-filter tolerance](./docs/parity.md). TypeScript, WebGPU, MIT, zero runtime dependencies.
 
 rullino spans the arc from classic computer-vision operations (thresholds, convolutions, Canny edges, morphology, median, bilateral, CLAHE) to photo-app adjustments and looks (exposure, curves, white balance, LUT-based "insta" presets, vignette, grain), with a few optional AI tools. A companion **playground** lets you load a photo, chain filters and tweak their parameters live: **[try it](https://stefanomasneri.com/rullino/)** · **[API reference](https://stefanomasneri.com/rullino/docs/)**. Photos are processed on your machine and never uploaded.
 
 [![The rullino playground: a photo with a look applied, before / after split, histogram and look gallery](./docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 
-> **Status:** pre-alpha, working towards a first `0.1.0` release (see [PLAN.md](./PLAN.md)). What exists:
-> - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, share-link serialisation.
+## Quick start
+
+```sh
+npm install @rullino/core @rullino/filters
+```
+
+> Until `0.1.0` reaches the `latest` tag (this week), install `@rullino/core@next @rullino/filters@next`.
+
+Edit a photo on the GPU and draw it on a canvas:
+
+```ts
+import { createGpuContext, importImage, Pipeline, readSrgb8 } from '@rullino/core';
+import { contrast, exposure, vignette } from '@rullino/filters';
+
+const ctx = await createGpuContext(); // throws WebGpuUnavailableError without WebGPU
+const photo = await createImageBitmap(await (await fetch('photo.jpg')).blob());
+const pipeline = new Pipeline(ctx);
+pipeline.setSource(importImage(ctx, photo));
+const out = pipeline.run([
+  { filter: exposure, params: { ev: 0.3 } },
+  { filter: contrast, params: { amount: 0.15 } },
+  { filter: vignette }, // defaults: a soft darkening of the corners
+]);
+const canvas = document.querySelector('canvas')!;
+[canvas.width, canvas.height] = [photo.width, photo.height];
+canvas.getContext('2d')!.putImageData(new ImageData(await readSrgb8(ctx, out), photo.width, photo.height), 0, 0);
+```
+
+Call `pipeline.run` again with new params when a slider moves: shaders are compiled once and only the steps after the change are recomputed. TypeScript users also want `npm install -D @webgpu/types`.
+
+The same edit is plain JSON, and every filter has a CPU implementation that the GPU is tested against, so the edit can be stored, sent and replayed anywhere, Node included:
+
+```ts
+import { createImage, parseChain, runChainCpu, serializeChain } from '@rullino/core';
+import { contrast, exposure, filters } from '@rullino/filters';
+
+const edit = JSON.stringify(serializeChain([
+  { filter: exposure, params: { ev: 0.3 } },
+  { filter: contrast, params: { amount: 0.15 } },
+])); // '{"version":1,"steps":[{"filter":"exposure","params":{"ev":0.3}},...]}'
+
+const { steps } = parseChain(JSON.parse(edit), { filters });
+const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0.1, 0.5])); // linear, premultiplied RGBA
+const result = runChainCpu(steps, image);
+```
+
+GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). Today the CPU path is the readable reference (seconds for a 12 MP photo, decoded pixels in); a fast CPU path, automatic fallback when WebGPU is missing and a Node renderer that reads and writes files are in progress ([roadmap](./PLAN.md#6b-reach-and-adoption-from-26-oct-2026-16-weeks)).
+
+> **Status:** 0.x, the API may still change between minor versions. What exists:
+> - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, edits as JSON.
 > - **Filters**: adjustments (exposure, curves, levels, white balance, colour mixer, grading...), convolutions, edges (Canny, Sobel / Scharr / Prewitt, Laplacian), thresholds, morphology, median, bilateral, histogram equalisation / CLAHE, inpainting, stylize (halftone, dither, Kuwahara, bloom...), lens blur.
 > - **Presets**: ten looks built from a LUT recipe, vignette and grain.
 > - **ML (optional, `@rullino/ml`)**: click-to-select objects (SlimSAM), object removal (MI-GAN) and depth for lens blur (Depth Anything V2 Small), with ONNX Runtime passed in by the caller.
 > - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links.
 >
-> Published on npm as `0.1.0-rc.1` under the `next` tag (`npm install @rullino/core@next @rullino/filters@next`); `latest` follows with `0.1.0`. Input is 8-bit sRGB (what the browser decodes); not done yet: Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
+> Input is 8-bit sRGB (what the browser decodes); not done yet: Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
 
 ## Why
 
@@ -54,20 +102,10 @@ apps/
   playground/  Vite demo site
 ```
 
-## Install
-
-Not on npm yet; once published:
-
-```sh
-npm install @rullino/core @rullino/filters
-npm install -D @webgpu/types   # TypeScript only: the declarations mention GPUDevice, GPUTexture...
-```
-
-The per-package READMEs below have the quick starts.
-
 ## Documentation
 
 - [Filter reference](./docs/filters.md): every filter with its parameters, ranges and defaults, generated from the schemas.
+- [Parity table](./docs/parity.md): how far GPU and CPU output may differ, per filter.
 - Per package: [core](./packages/core/README.md), [filters](./packages/filters/README.md), [presets](./packages/presets/README.md), [ml](./packages/ml/README.md). Their `ts` examples are type-checked against the sources.
 - [PLAN.md](./PLAN.md) for the design and roadmap, [CLAUDE.md](./CLAUDE.md) for conventions and the reasoning behind decisions.
 

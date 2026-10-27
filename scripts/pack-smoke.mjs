@@ -82,6 +82,11 @@ const looked = core.runChainCpu(presets.lookSteps(presets.looks[0], { intensity:
 out.readmePresets = looked.width === 16 && presets.looks.length >= 10;
 const { autoAdjust } = await import('@rullino/filters');
 out.readmeAuto = typeof autoAdjust(core.createImage(32, 32)) === 'object';
+// The root README quick start: the edit as JSON, replayed on the CPU.
+const edit = JSON.stringify(core.serializeChain([{ filter: exposure, params: { ev: 0.3 } }, { filter: filters.find((f) => f.id === 'contrast'), params: { amount: 0.15 } }]));
+const { steps } = core.parseChain(JSON.parse(edit), { filters });
+const replayed = core.runChainCpu(steps, img);
+out.readmeJson = edit.startsWith('{"version":1,"steps":[{"filter":"exposure","params":{"ev":0.3}},') && steps.length === 2 && replayed.width === 2;
 console.log(JSON.stringify(out));
 `,
   );
