@@ -32,6 +32,12 @@ export interface PointwiseFilterDef<S extends ParamSchema = ParamSchema> {
   readonly wgsl: string;
   /** CPU reference for `apply()`: obvious, not fast. Same alpha convention. */
   readonly pixel: (c: Rgba, p: ParamValues<S>) => Rgba;
+  /**
+   * Optional fast CPU implementation of the whole image, used by `runChainCpu(..., { fast: true })`
+   * and so by `applyEdit` without a GPU. Same result as the reference within `tolerance`, which a
+   * test checks; receives resolved params; must not mutate `src`.
+   */
+  readonly fast?: (src: LinearImage, p: ParamValues<S>) => LinearImage;
   /** Allowed GPU <-> CPU difference, on top of rgba16float quantisation of the input. */
   readonly tolerance: Tolerance;
 }
@@ -113,6 +119,12 @@ export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends
   readonly passes: readonly PassDef[];
   /** Whole-image CPU reference: obvious, not fast. Must not mutate `src`. */
   readonly cpu: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array) => LinearImage;
+  /**
+   * Optional fast CPU implementation of the whole image, used by `runChainCpu(..., { fast: true })`
+   * and so by `applyEdit` without a GPU. Same result as the reference within `tolerance`, which a
+   * test checks; receives resolved params; must not mutate `src`.
+   */
+  readonly fast?: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array) => LinearImage;
 }
 
 export interface MultipassFilter<S extends ParamSchema = ParamSchema> extends Omit<MultipassFilterDef<S>, 'cpu'> {

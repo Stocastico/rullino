@@ -1,4 +1,5 @@
 import { defineFilter, linearToOklab, oklabToLinear, type FloatParam } from '@rullino/core';
+import { mapStraight } from '../fast';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /**
@@ -105,6 +106,41 @@ ${BANDS.map(
     const t = ((h + dh) * Math.PI) / 180;
     const C2 = C * Math.max(0, 1 + ds);
     return [...oklabToLinear(L * (1 + LUM_RANGE * dl), C2 * Math.cos(t), C2 * Math.sin(t)), a];
+  },
+  fast: (src, p) => {
+    const v = p as Record<string, number>;
+    const n = BANDS.length;
+    const centre = BANDS.map((b) => b.centre);
+    const prev = gaps.map((g) => g.prev);
+    const next = gaps.map((g) => g.next);
+    const hue = BANDS.map((b) => v[`${b.id}Hue`]!);
+    const sat = BANDS.map((b) => v[`${b.id}Sat`]!);
+    const lum = BANDS.map((b) => v[`${b.id}Lum`]!);
+    return mapStraight(src, (r, g, b, o) => {
+      const [L, A, B] = linearToOklab(r, g, b);
+      const C = Math.hypot(A, B);
+      if (C === 0) {
+        o[0] = r;
+        o[1] = g;
+        o[2] = b;
+        return;
+      }
+      const grey = Math.min(1, C / GREY_CHROMA);
+      const h = (Math.atan2(B, A) * 180) / Math.PI;
+      let dh = 0;
+      let ds = 0;
+      let dl = 0;
+      for (let i = 0; i < n; i++) {
+        const d = wrap(h - centre[i]!);
+        const w = (d < 0 ? Math.max(0, 1 + d / prev[i]!) : Math.max(0, 1 - d / next[i]!)) * grey;
+        dh += w * hue[i]!;
+        ds += w * sat[i]!;
+        dl += w * lum[i]!;
+      }
+      const t = ((h + dh) * Math.PI) / 180;
+      const C2 = C * Math.max(0, 1 + ds);
+      o.set(oklabToLinear(L * (1 + LUM_RANGE * dl), C2 * Math.cos(t), C2 * Math.sin(t)));
+    });
   },
   tolerance: OKLAB_TOLERANCE,
 });

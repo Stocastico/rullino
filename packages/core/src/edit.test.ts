@@ -38,6 +38,13 @@ function ramp(w: number, h: number) {
 }
 
 describe('applyEdit (CPU)', () => {
+  it('uses the filters\' fast implementations', async () => {
+    // A fast path that differs from the reference, so the result shows which one ran.
+    const marked = defineFilter({ ...gain, fast: (src) => createImage(src.width, src.height, new Float32Array(src.data.length).fill(0.5)) });
+    const out = await applyEdit(ramp(3, 2), serializeChain([{ filter: marked }]), { filters: [marked] });
+    expect(Array.from(out.data).every((v) => v === 0.5)).toBe(true);
+  });
+
   const geometry: Geometry = { ...IDENTITY_GEOMETRY, rotate: 90, crop: { x: 0.1, y: 0.2, width: 0.6, height: 0.5 } };
   const steps = [{ filter: gain, params: { amount: 1.5 } }, { filter: shift, params: { by: 4 } }];
 

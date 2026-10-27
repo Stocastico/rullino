@@ -1,4 +1,6 @@
 import { defineFilter, linearToSrgb, sampleCurve, srgbToLinear } from '@rullino/core';
+import { curveLut, sampleCurveLut } from '@rullino/core/internal';
+import { mapChannels, toLinear, toSrgb } from '../fast';
 
 const IDENTITY = [[0, 0], [1, 1]] as const;
 
@@ -36,5 +38,11 @@ fn apply(c: vec4f, p: Params) -> vec4f {
     srgbToLinear(sampleCurve(p.blue, sampleCurve(p.rgb, linearToSrgb(b)))),
     a,
   ],
+  fast: (src, p) => {
+    const rgb = curveLut(p.rgb);
+    const ch = [p.red, p.green, p.blue].map((c) => curveLut(c)) as [Float32Array, Float32Array, Float32Array];
+    const f = (c: Float32Array) => (v: number) => toLinear(sampleCurveLut(c, sampleCurveLut(rgb, toSrgb(v))));
+    return mapChannels(src, f(ch[0]), f(ch[1]), f(ch[2]));
+  },
   tolerance: { abs: 2e-4, rel: 2e-3 },
 });

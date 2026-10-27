@@ -1,5 +1,6 @@
 import { defineFilter, type PassDef } from '@rullino/core';
 import { convolve1d } from '../convolution';
+import { convolve1dFast } from '../fast';
 
 const pass = (name: string, input: string, axis: string): PassDef => ({
   name,
@@ -27,6 +28,10 @@ export const boxBlur = defineFilter({
   cpu: (src, { radius }) => {
     const w = new Array(2 * radius + 1).fill(1 / (2 * radius + 1));
     return convolve1d(convolve1d(src, w, 'x'), w, 'y');
+  },
+  fast: (src, { radius }) => {
+    const w = new Array(2 * radius + 1).fill(1 / (2 * radius + 1));
+    return convolve1dFast(convolve1dFast(src, w, 'x'), w, 'y');
   },
   tolerance: { abs: 1e-4, rel: 2 ** -9 },
 });

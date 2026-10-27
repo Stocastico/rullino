@@ -19,6 +19,23 @@ const scale = defineFilter({
 const img = () => createImage(1, 1, new Float32Array([0.1, 0.2, 0.3, 1]));
 
 describe('runChainCpu', () => {
+  it('with fast: true uses a filter\'s fast implementation (resolved, scaled params) and the reference otherwise', () => {
+    const calls: unknown[] = [];
+    const fastScale = defineFilter({
+      ...scale,
+      id: 'fastScale',
+      fast: (src, p) => {
+        calls.push(p);
+        return createImage(src.width, src.height, src.data.map((v, i) => (i % 4 === 3 ? v : v * p.k * 10)));
+      },
+    });
+    const steps = [{ filter: fastScale }, { filter: scale, params: { k: 0.5 } }];
+    expect(runChainCpu(steps, img()).data[0]).toBeCloseTo(0.1, 6);
+    expect(calls).toEqual([]);
+    expect(runChainCpu(steps, img(), { fast: true }).data[0]).toBeCloseTo(1, 6);
+    expect(calls).toEqual([{ k: 2 }]);
+  });
+
   it('applies enabled steps in order, with defaults for missing params', () => {
     const out = runChainCpu([{ filter: scale }, { filter: scale, params: { k: 0.5 } }, { filter: scale, params: { k: 3 } }], img());
     expect(out.data[0]).toBeCloseTo(0.3, 6);

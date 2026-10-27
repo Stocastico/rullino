@@ -1,4 +1,5 @@
 import { applyLutCpu, createImage, defineFilter, identityLut, linearToSrgb, srgbToLinear } from '@rullino/core';
+import { sampleLutInto, toLinear, toSrgb } from '../fast';
 
 /**
  * Applies a 3D LUT (.cube / HaldCLUT) to the straight, sRGB-encoded colour, as LUT files expect,
@@ -39,6 +40,25 @@ fn run(xy: vec2i, p: Params) -> vec4f {
       const l = applyLutCpu(look, e[0]!, e[1]!, e[2]!);
       for (let c = 0; c < 3; c++) out.data[i + c] = srgbToLinear(e[c]! + (l[c]! - e[c]!) * intensity) * a;
       out.data[i + 3] = a;
+    }
+    return out;
+  },
+  fast: (src, { look, intensity }) => {
+    const out = createImage(src.width, src.height);
+    const s = src.data;
+    const d = out.data;
+    const l = new Float64Array(3);
+    for (let i = 0; i < s.length; i += 4) {
+      const a = s[i + 3]!;
+      if (a <= 0) continue;
+      const r = toSrgb(s[i]! / a);
+      const g = toSrgb(s[i + 1]! / a);
+      const b = toSrgb(s[i + 2]! / a);
+      sampleLutInto(look, r, g, b, l);
+      d[i] = toLinear(r + (l[0]! - r) * intensity) * a;
+      d[i + 1] = toLinear(g + (l[1]! - g) * intensity) * a;
+      d[i + 2] = toLinear(b + (l[2]! - b) * intensity) * a;
+      d[i + 3] = a;
     }
     return out;
   },
