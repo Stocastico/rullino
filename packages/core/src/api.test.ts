@@ -23,7 +23,7 @@ describe('@rullino/core public API', () => {
     const internal = await import('./internal');
     expect(Object.keys(internal).sort()).toEqual([
     'CURVE_SAMPLES', 'WORKING_FORMAT', 'blendMask', 'colorWgsl', 'createWorkingTexture', 'curveLut',
-    'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture',
+    'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'exportSamples',
     'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
     'lutSamplerWgsl', 'lutTexture', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
     'passShader', 'poolStats', 'renderMask', 'reportGpuError', 'runFused', 'runMultipass', 'runPointwise',

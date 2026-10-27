@@ -6,5 +6,5 @@
   "packages/ml": 6900,
   "playground/main-chunk": 76000,
   "playground/ort-chunk": 42000,
-  "packages/node": 1200
+  "packages/node": 1600
 }

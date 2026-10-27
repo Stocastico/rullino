@@ -59,11 +59,6 @@ describe('createRenderer', () => {
     expect(pngSize((await r.render(rgba, { version: 2, steps: [] })).bytes).bitDepth).toBe(8);
   });
 
-  it('says that JPEG and WebP need sharp (not yet supported)', async () => {
-    const rgba = { data: new Uint8Array(4 * 4 * 4), width: 4, height: 4 };
-    await expect((await cpu).render(rgba, { version: 2, steps: [], output: { format: 'jpeg' } })).rejects.toThrow(/jpeg.*sharp|sharp.*jpeg/i);
-  });
-
   it('validates the document before anything else', async () => {
     const rgba = { data: new Uint8Array(4 * 4 * 4), width: 4, height: 4 };
     await expect((await cpu).render(rgba, { version: 2, steps: [], output: { format: 'gif' } })).rejects.toThrow(/format must be png, jpeg or webp/);

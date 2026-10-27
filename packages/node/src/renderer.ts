@@ -1,4 +1,5 @@
 import { applyEdit, createGpuContext, decodeSrgb8, encodeImage, parseChain, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut } from '@rullino/core';
+import { exportSamples } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 
@@ -28,7 +29,7 @@ export interface RgbaImage {
 export interface Rendered {
   /** The encoded file. */
   readonly bytes: Uint8Array;
-  readonly format: 'png';
+  readonly format: 'png' | 'jpeg' | 'webp';
   readonly width: number;
   readonly height: number;
 }
@@ -41,10 +42,32 @@ export interface Renderer {
   readonly gpu?: GpuContext;
   /** Renders an edit document on a linear image (see `applyEdit` in `@rullino/core`). */
   apply(image: LinearImage, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
-  /** Renders an edit document on 8-bit RGBA pixels and encodes the result as the document's `output` says. */
-  render(image: RgbaImage, edit: unknown): Promise<Rendered>;
+  /**
+   * Renders an edit document and encodes the result as the document's `output` says. The input is
+   * 8-bit RGBA pixels, or an encoded image file (JPEG, PNG, WebP, AVIF, TIFF... decoded by sharp,
+   * EXIF orientation applied). PNG is written by rullino (8 or 16 bit); JPEG and WebP by sharp.
+   */
+  render(input: RgbaImage | Uint8Array, edit: unknown): Promise<Rendered>;
   /** Releases the GPU device. */
   destroy(): void;
+}
+
+type Sharp = typeof import('sharp').default;
+let sharpModule: Promise<Sharp> | undefined;
+
+/** The optional sharp package, loaded on first use, with an error that says what to install. */
+function loadSharp(why: string): Promise<Sharp> {
+  const loading = (sharpModule ??= import('sharp').then((m) => m.default));
+  return loading.catch((e: Error) => {
+    sharpModule = undefined;
+    throw new Error(`${why} needs the optional sharp package: npm install sharp (${e.message})`);
+  });
+}
+
+async function decodeFile(file: Uint8Array): Promise<RgbaImage> {
+  const sharp = await loadSharp('reading image files');
+  const { data, info } = await sharp(file).rotate().toColourspace('srgb').ensureAlpha().raw({ depth: 'uchar' }).toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height };
 }
 
 /** Loads Dawn from the optional `webgpu` package and defines the WebGPU globals core relies on. */
@@ -78,13 +101,18 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     ...(reason !== undefined ? { reason } : {}),
     ...(ctx ? { gpu: ctx } : {}),
     apply,
-    async render(image, edit) {
+    async render(input, edit) {
       const { output = {} } = parseChain(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
-      if (format !== 'png') throw new Error(`output format ${format} needs an encoder: JPEG and WebP will come through sharp; use png for now`);
+      const image = 'width' in input ? input : await decodeFile(input);
       const out = await apply(decodeSrgb8(image.data, image.width, image.height), edit);
-      const blob = await encodeImage(out, output);
-      return { bytes: new Uint8Array(await blob.arrayBuffer()), format, width: out.width, height: out.height };
+      const done = (bytes: Uint8Array) => ({ bytes, format, width: out.width, height: out.height });
+      if (format === 'png') return done(new Uint8Array(await (await encodeImage(out, output)).arrayBuffer()));
+      const sharp = await loadSharp(`${format.toUpperCase()} output`);
+      const encoder = sharp(exportSamples(out, output) as Uint8ClampedArray, { raw: { width: out.width, height: out.height, channels: 4 } });
+      const quality = output.quality === undefined ? undefined : Math.round(output.quality * 100);
+      const file = format === 'jpeg' ? encoder.jpeg(quality === undefined ? {} : { quality }) : encoder.webp(quality === undefined ? {} : { quality });
+      return done(new Uint8Array(await file.toBuffer()));
     },
     destroy() {
       ctx?.device.destroy();

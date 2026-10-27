@@ -12,6 +12,9 @@
       "@rullino/core": [
         "../core/dist/index.d.ts"
       ],
+      "@rullino/core/internal": [
+        "../core/dist/internal.d.ts"
+      ],
       "@rullino/filters": [
         "../filters/dist/index.d.ts"
       ],

@@ -52,10 +52,19 @@ export async function encodeSamples(samples: Uint8ClampedArray | Uint16Array, wi
   return blob;
 }
 
-/** Encodes a linear premultiplied image as PNG / JPEG / WebP (the CPU path of `exportImage`). */
-export function encodeImage(img: LinearImage, options: ExportOptions = {}): Promise<Blob> {
+/**
+ * The straight-alpha sRGB samples an export writes: flattened onto the background when there is one
+ * (JPEG defaults to white), 16 bits for a 16-bit PNG, else 8. Plumbing for encoders outside the
+ * browser (`@rullino/node` hands them to sharp).
+ */
+export function exportSamples(img: LinearImage, options: ExportOptions = {}): Uint8ClampedArray | Uint16Array {
   const background = exportBackground(options);
   const flat = background ? flatten(img, background) : img;
   const wide = (options.format ?? 'png') === 'png' && options.bitDepth === 16;
-  return encodeSamples(wide ? encodeSrgb16(flat) : encodeSrgb8(flat), img.width, img.height, options);
+  return wide ? encodeSrgb16(flat) : encodeSrgb8(flat);
+}
+
+/** Encodes a linear premultiplied image as PNG / JPEG / WebP (the CPU path of `exportImage`). */
+export function encodeImage(img: LinearImage, options: ExportOptions = {}): Promise<Blob> {
+  return encodeSamples(exportSamples(img, options), img.width, img.height, options);
 }
