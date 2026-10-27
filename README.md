@@ -51,7 +51,7 @@ const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0
 const result = await applyEdit(image, JSON.parse(edit), { filters }); // CPU; pass { gpu: ctx } to render with WebGPU
 ```
 
-GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). On a server, [`@rullino/node`](./packages/node/README.md) renders the same documents with the same shaders through Dawn (falling back to the CPU reference). The CPU path is the readable reference today (seconds for a 12 MP photo); a fast CPU path and an automatic fallback in browsers without WebGPU are in progress ([roadmap](./PLAN.md#6b-reach-and-adoption-from-26-oct-2026-16-weeks)).
+GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). On a server, [`@rullino/node`](./packages/node/README.md) renders the same documents with the same shaders through Dawn (falling back to the CPU reference); CI renders every look and mixed edits on Chromium's WebGPU and on Dawn in Node and checks they agree. The CPU path is the readable reference today (seconds for a 12 MP photo); a fast CPU path and an automatic fallback in browsers without WebGPU are in progress ([roadmap](./PLAN.md#6b-reach-and-adoption-from-26-oct-2026-16-weeks)).
 
 > **Status:** 0.x, the API may still change between minor versions. What exists:
 > - **Core**: schema-driven parameters, `defineFilter()`, filter chains with pointwise fusion and incremental recompute, masks, geometry (crop, perspective, straighten), 3D LUTs, export to PNG (8/16-bit), JPEG and WebP, edits as JSON.
