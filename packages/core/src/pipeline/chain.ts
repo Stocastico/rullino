@@ -19,6 +19,8 @@ export interface ChainOptions {
    * Pixel-unit params ('px') are multiplied by it so a preview looks like the full image.
    */
   readonly scale?: number;
+  /** Use each filter's `fast` implementation where it has one (the reference otherwise). */
+  readonly fast?: boolean;
 }
 
 export const activeSteps = (steps: readonly Step[]) => steps.filter((s) => s.enabled !== false);
@@ -29,18 +31,22 @@ export function effectiveParams(step: Step, scale = 1): Record<string, unknown> 
   return scaleParams(params, resolveParams(params, (step.params ?? {}) as never), scale);
 }
 
-/** CPU reference for a chain: each enabled step applied in order. Never returns `src` itself. */
+/**
+ * CPU reference for a chain: each enabled step applied in order (with `fast`, through the filters'
+ * fast implementations). Never returns `src` itself.
+ */
 export function runChainCpu(steps: readonly Step[], src: LinearImage, options: ChainOptions = {}): LinearImage {
   let img = createImage(src.width, src.height, src.data.slice());
   for (const s of activeSteps(steps)) {
     if (s.mask) validateMask(s.mask);
     const params = effectiveParams(s, options.scale) as never;
+    const run: (src: LinearImage, p: never, mask?: Float32Array) => LinearImage = (options.fast && s.filter.fast) || s.filter.cpu;
     let out: LinearImage;
     if (s.filter.kind === 'multipass' && s.filter.usesMask) {
       if (!s.mask) throw new Error(`filter "${s.filter.id}" needs a mask`);
-      out = s.filter.cpu(img, params, maskImage(s.mask, img.width, img.height));
+      out = run(img, params, maskImage(s.mask, img.width, img.height));
     } else {
-      out = s.filter.cpu(img, params);
+      out = run(img, params);
     }
     img = s.mask ? blendMasked(img, out, s.mask) : out;
   }

@@ -11,7 +11,7 @@ import { downscaleCpu, fitWithin } from './resize';
 import { parseChain, type ParseOptions } from './serialize';
 
 export interface ApplyEditOptions extends ParseOptions {
-  /** Render on this GPU context; without one the CPU reference renders. */
+  /** Render on this GPU context; without one the CPU renders (filters' fast paths where they have one). */
   readonly gpu?: GpuContext | undefined;
   /**
    * Resolution of `source` relative to the original the edit was made on (e.g. 0.25 for a preview
@@ -33,7 +33,7 @@ export async function applyEdit(source: LinearImage, edit: unknown, options: App
 
   if (!ctx) {
     const framed = geometry && !isIdentityGeometry(geometry) ? applyGeometryCpu(source, geometry) : source;
-    const out = runChainCpu(steps, framed, { scale });
+    const out = runChainCpu(steps, framed, { scale, fast: true });
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
     return w === out.width && h === out.height ? out : downscaleCpu(out, w, h);
   }

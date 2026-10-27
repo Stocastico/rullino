@@ -18,6 +18,7 @@
     "test:ml": "node scripts/fetch-models.mjs && vitest run --project ml",
     "test:e2e:ml": "node scripts/fetch-models.mjs && pnpm --filter @rullino/playground smoke:ml",
     "bench": "vitest run --project bench && cat packages/filters/bench/results.txt",
+    "bench:cpu": "vitest run --project bench-cpu && cat packages/filters/bench/cpu-results.txt",
     "test:pack": "node scripts/pack-smoke.mjs",
     "size": "node scripts/size-budget.mjs",
     "test:e2e:base": "pnpm --filter @rullino/playground smoke:base",

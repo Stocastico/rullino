@@ -38,6 +38,15 @@ export default defineConfig({
         },
       },
       {
+        // CPU reference timings (`pnpm bench:cpu`), in Node.
+        test: {
+          name: 'bench-cpu',
+          environment: 'node',
+          include: ['packages/*/bench/**/*.bench.ts'],
+          testTimeout: 1_200_000,
+        },
+      },
+      {
         test: {
           name: 'bench',
           include: ['packages/*/bench/**/*.bench.browser.ts'],
