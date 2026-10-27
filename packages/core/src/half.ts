@@ -49,8 +49,18 @@ export function toFloat16Array(src: Float32Array): Uint16Array {
   return out;
 }
 
+// The way back is the hot path of every readback (48 M values for a 12 MP image): a lookup in a
+// table of all 65 536 halves, built on first use, is ~20x faster than converting each value
+// (V8 already inlines float32ToFloat16 above, so a hand-inlined version gained only ~15%).
+let halfTable: Float32Array | undefined;
+
 export function fromFloat16Array(src: Uint16Array): Float32Array {
+  if (!halfTable) {
+    halfTable = new Float32Array(65536);
+    for (let h = 0; h < 65536; h++) halfTable[h] = float16ToFloat32(h);
+  }
+  const table = halfTable;
   const out = new Float32Array(src.length);
-  for (let i = 0; i < src.length; i++) out[i] = float16ToFloat32(src[i]!);
+  for (let i = 0; i < src.length; i++) out[i] = table[src[i]!]!;
   return out;
 }
