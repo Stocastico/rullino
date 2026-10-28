@@ -5,10 +5,11 @@
 // Chromium and writes the report; with --strict it fails if a library errored (the CI smoke run:
 // SwiftShader timings mean nothing, the point is that every adapter still runs).
 import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: Windows paths
 const args = process.argv.slice(2);
 const arg = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
 
