@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>rullino benchmark</title>
+    <style>
+      body { font: 14px/1.4 system-ui, sans-serif; margin: 1.5rem; max-width: 1100px; color: #222; }
+      fieldset { border: 1px solid #ccc; margin: 0 0 1rem; }
+      label { margin-right: 1rem; white-space: nowrap; }
+      table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 13px; }
+      th, td { border-bottom: 1px solid #ddd; padding: 4px 6px; text-align: right; }
+      th:nth-child(-n+3), td:nth-child(-n+3) { text-align: left; }
+      td.err { color: #b00; text-align: left; }
+      pre { background: #f6f6f6; padding: 0.5rem; max-height: 14rem; overflow: auto; }
+      .warn { color: #a60; }
+    </style>
+  </head>
+  <body>
+    <h1>rullino benchmark</h1>
+    <p>The three PLAN chains on the same RGBA8 image in every library, result read back to memory. rullino runs them exactly; the others run their closest equivalent (see the notes). Close other tabs, plug in the laptop, then press Run.</p>
+    <p id="env"></p>
+    <fieldset>
+      <legend>Libraries</legend>
+      <div id="libs"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Run</legend>
+      <label>Sizes <input id="sizes" value="4000x3000,6000x4000" size="24" /></label>
+      <label>Changes per chain <input id="runs" type="number" value="10" min="1" max="100" /></label>
+      <label>Photo (optional) <input id="photo" type="file" accept="image/*" /></label>
+      <button id="run">Run</button>
+      <button id="download" disabled>Download JSON</button>
+    </fieldset>
+    <pre id="log"></pre>
+    <div id="table"></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

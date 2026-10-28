@@ -1,0 +1,24 @@
+{
+  "name": "@rullino/bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "bench": "node scripts/run.mjs"
+  },
+  "dependencies": {
+    "@rullino/core": "workspace:*",
+    "@rullino/filters": "workspace:*",
+    "@rullino/presets": "workspace:*",
+    "@rullino/web": "workspace:*",
+    "@silvia-odwyer/photon": "0.3.3",
+    "pixi-filters": "6.1.5",
+    "pixi.js": "8.22.0",
+    "wasm-vips": "0.0.19"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "vite": "8.3.5"
+  }
+}

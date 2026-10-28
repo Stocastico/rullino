@@ -63,6 +63,9 @@ jobs:
       - run: pnpm bench
       # The CPU benchmark is bundled before it runs: check the bundle builds and runs (one filter).
       - run: pnpm bench:cpu filters --only gaussianBlur
+      # The comparison page (#77) on a small image: every library still loads and runs (SwiftShader
+      # timings mean nothing; real numbers come from real machines).
+      - run: pnpm bench:web --headless --strict --sizes 320x240 --runs 1
 
   # The ML models themselves (SlimSAM, MI-GAN, Depth Anything on ONNX Runtime's WASM backend) and the
   # playground's Object, Remove object and Lens blur tools. A separate job: it downloads 69 MB from Hugging Face (cached by
