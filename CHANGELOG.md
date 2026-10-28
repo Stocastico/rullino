@@ -11,6 +11,13 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+### Added
+- **core**: `uploadSrgb8(ctx, rgba, width, height)` uploads 8-bit RGBA pixels and decodes them on the GPU (also on Dawn, unlike `importImage`); `applyEdit` takes 8-bit pixels (`Rgba8Image`) as well as linear images and decodes them where it renders. On an RTX 40-class GPU loading a 12 MP image took 473 ms through `decodeSrgb8` + `uploadImage`; in a cloud container the new path took 25 ms instead of 605.
+
+### Changed
+- **core**: `readSrgb8` and `readImage` reuse their staging buffer and encode target from one read to the next (they allocated 48 MB per 12 MP read).
+- **web**, **node**: `render()` hands the pixels to `applyEdit` undecoded: decoded on the GPU, or in the worker, which now receives 8-bit pixels (a quarter of the data). `apply()` accepts 8-bit pixels too.
+
 ## [0.3.0]
 
 The CPU path becomes usable: filters can carry a fast CPU implementation held to the reference within each filter's tolerance (about 4–5× faster on typical chains), and a new `@rullino/web` package renders edit documents in the browser on WebGPU or, without it, on that CPU path in a Web Worker.

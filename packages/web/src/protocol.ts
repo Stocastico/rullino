@@ -1,11 +1,7 @@
-import type { Lut } from '@rullino/core';
+import type { LinearImage, Lut, Rgba8Image } from '@rullino/core';
 
-/** A linear image as it crosses the worker boundary (its buffer is transferred). */
-export interface ImageMessage {
-  readonly width: number;
-  readonly height: number;
-  readonly data: Float32Array;
-}
+/** An image as it crosses the worker boundary (its buffer is transferred): linear, or 8-bit pixels. */
+export type ImageMessage = LinearImage | Rgba8Image;
 
 /** Main thread -> worker: render `edit` on `image`. LUT names are resolved on the main thread. */
 export interface RenderRequest {
@@ -17,4 +13,4 @@ export interface RenderRequest {
 }
 
 /** Worker -> main thread: the result, or the error's message. */
-export type RenderResponse = { readonly id: number; readonly image: ImageMessage } | { readonly id: number; readonly error: string };
+export type RenderResponse = { readonly id: number; readonly image: LinearImage } | { readonly id: number; readonly error: string };

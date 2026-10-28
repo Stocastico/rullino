@@ -1,6 +1,10 @@
 import { reportGpuError, type GpuContext } from './context';
 import { ShaderCompileError, toGpuError } from './errors';
 
+// One idle staging buffer per device, reused when the next read has the same size: a 12 MP readback
+// allocated (and zero-filled) 48 MB per frame. Reads in flight take their own buffer.
+const idleBuffers = new WeakMap<GPUDevice, GPUBuffer>();
+
 /**
  * Copies a whole 2D texture into CPU memory, tightly packed.
  * copyTextureToBuffer needs bytesPerRow to be a multiple of 256, so rows are padded and then un-padded.
@@ -9,10 +13,10 @@ export async function readTextureBytes(ctx: GpuContext, tex: GPUTexture, bytesPe
   const { width, height } = tex;
   const rowBytes = width * bytesPerPixel;
   const paddedRowBytes = Math.ceil(rowBytes / 256) * 256;
-  const buffer = ctx.device.createBuffer({
-    size: paddedRowBytes * height,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-  });
+  const size = paddedRowBytes * height;
+  let buffer = idleBuffers.get(ctx.device);
+  if (buffer && buffer.size === size) idleBuffers.delete(ctx.device);
+  else buffer = ctx.device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
   const enc = ctx.device.createCommandEncoder();
   enc.copyTextureToBuffer({ texture: tex }, { buffer, bytesPerRow: paddedRowBytes }, { width, height });
   ctx.device.queue.submit([enc.finish()]);
@@ -20,11 +24,12 @@ export async function readTextureBytes(ctx: GpuContext, tex: GPUTexture, bytesPe
   await buffer.mapAsync(GPUMapMode.READ);
   const padded = new Uint8Array(buffer.getMappedRange());
   const out = new Uint8Array(rowBytes * height);
-  for (let y = 0; y < height; y++) {
-    out.set(padded.subarray(y * paddedRowBytes, y * paddedRowBytes + rowBytes), y * rowBytes);
-  }
+  if (paddedRowBytes === rowBytes) out.set(padded);
+  else for (let y = 0; y < height; y++) out.set(padded.subarray(y * paddedRowBytes, y * paddedRowBytes + rowBytes), y * rowBytes);
   buffer.unmap();
-  buffer.destroy();
+  const previous = idleBuffers.get(ctx.device);
+  if (previous) previous.destroy();
+  idleBuffers.set(ctx.device, buffer);
   return out.buffer;
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defineFilter } from './define';
+import { decodeSrgb8 } from './color';
 import { applyEdit } from './edit';
 import { applyGeometryCpu, IDENTITY_GEOMETRY, type Geometry } from './geometry';
 import { createImage } from './image';
@@ -38,6 +39,15 @@ function ramp(w: number, h: number) {
 }
 
 describe('applyEdit (CPU)', () => {
+  it('takes 8-bit RGBA pixels too, decoded like decodeSrgb8', async () => {
+    const bytes = new Uint8ClampedArray(5 * 3 * 4).map((_, i) => (i % 4 === 3 ? [255, 128, 0][i % 3]! : (i * 29) % 256));
+    const doc = serializeChain([{ filter: gain, params: { amount: 1.5 } }]);
+    const fromPixels = await applyEdit({ data: bytes, width: 5, height: 3 }, doc, { filters });
+    const fromLinear = await applyEdit(decodeSrgb8(bytes, 5, 3), doc, { filters });
+    expect(Array.from(fromPixels.data)).toEqual(Array.from(fromLinear.data));
+    await expect(applyEdit({ data: new Uint8Array(7), width: 5, height: 3 }, doc, { filters })).rejects.toThrow(RangeError);
+  });
+
   it('uses the filters\' fast implementations', async () => {
     // A fast path that differs from the reference, so the result shows which one ran.
     const marked = defineFilter({ ...gain, fast: (src) => createImage(src.width, src.height, new Float32Array(src.data.length).fill(0.5)) });

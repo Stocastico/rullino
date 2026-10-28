@@ -1,4 +1,4 @@
-import { applyEdit, createGpuContext, createImage, fromFloat16Array, IDENTITY_GEOMETRY, serializeChain, toFloat16Array } from '@rullino/core';
+import { applyEdit, createGpuContext, createImage, decodeSrgb8, fromFloat16Array, IDENTITY_GEOMETRY, serializeChain, toFloat16Array } from '@rullino/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { contrast, exposure, filters, gaussianBlur, vignette } from './index';
 
@@ -38,6 +38,18 @@ describe('applyEdit on the GPU', () => {
     expect(worst).toBeLessThan(4e-3);
     await gpu.device.queue.onSubmittedWorkDone();
     expect(errors).toEqual([]);
+  });
+
+  it('takes 8-bit RGBA pixels, decoded on the GPU (uploadSrgb8) like decodeSrgb8 on the CPU', async () => {
+    const bytes = new Uint8ClampedArray(31 * 17 * 4).map((_, i) => (i % 4 === 3 ? [255, 200, 64][i % 3]! : (i * 37) % 256));
+    const doc = { version: 2, steps: [{ filter: 'exposure', params: { ev: 0.3 } }, { filter: 'gaussianBlur', params: { sigma: 1 } }] };
+    const [fromPixels, fromLinear] = await Promise.all([
+      applyEdit({ data: bytes, width: 31, height: 17 }, doc, { filters, gpu }),
+      applyEdit(decodeSrgb8(bytes, 31, 17), doc, { filters, gpu }),
+    ]);
+    let worst = 0;
+    for (let i = 0; i < fromLinear.data.length; i++) worst = Math.max(worst, Math.abs(fromPixels.data[i]! - fromLinear.data[i]!) / Math.max(1, Math.abs(fromLinear.data[i]!)));
+    expect(worst).toBeLessThan(2e-3); // hardware sRGB decode vs the CPU's, through f16
   });
 
   it('an empty edit returns the image', async () => {

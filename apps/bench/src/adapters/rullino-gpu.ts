@@ -1,6 +1,6 @@
 // rullino on WebGPU through the core Pipeline: the source texture stays on the GPU, a change
 // re-runs the chain from the changed step (here the first) and reads the result back.
-import { createGpuContext, decodeSrgb8, Pipeline, readSrgb8, uploadImage, type GpuContext } from '@rullino/core';
+import { createGpuContext, Pipeline, readSrgb8, uploadSrgb8, type GpuContext } from '@rullino/core';
 import type { Adapter } from '../adapter';
 import { rullinoSteps } from '../rullino-chains';
 import { versions } from '../versions';
@@ -25,7 +25,7 @@ export const adapter: Adapter = {
   async load(rgba, width, height) {
     source?.destroy();
     pipeline?.destroy();
-    source = uploadImage(ctx!, decodeSrgb8(rgba, width, height));
+    source = uploadSrgb8(ctx!, rgba, width, height);
     pipeline = new Pipeline(ctx!);
     pipeline.setSource(source);
   },
