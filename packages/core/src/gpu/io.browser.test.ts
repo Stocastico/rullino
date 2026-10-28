@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { decodeSrgb8, encodeSrgb8 } from '../color';
 import { compareImages } from '../compare';
 import { createGpuContext } from './context';
-import { encodeToTexture, importImage, readSrgb8 } from './io';
+import { encodeToTexture, importImage, readSrgb8, uploadSrgb8 } from './io';
 import { readImage, uploadImage } from './texture';
 
 const ctx = await createGpuContext();
@@ -39,6 +39,28 @@ describe('GPU image I/O', () => {
     const out = await readImage(ctx, tex);
     const res = compareImages(out, decodeSrgb8(src.data, src.width, src.height), { abs: 1e-4, rel: 2 ** -9 });
     expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+  });
+
+  it('uploads raw 8-bit RGBA bytes (no browser image types: works on Dawn too) like decodeSrgb8', async () => {
+    for (const bytes of [new Uint8Array(src.data), src.data]) {
+      const out = await readImage(ctx, uploadSrgb8(ctx, bytes, src.width, src.height));
+      expect([out.width, out.height]).toEqual([src.width, src.height]);
+      const res = compareImages(out, decodeSrgb8(src.data, src.width, src.height), { abs: 1e-4, rel: 2 ** -9 });
+      expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
+    }
+    expect(() => uploadSrgb8(ctx, new Uint8Array(12), 2, 2)).toThrow(RangeError);
+  });
+
+  it('reads back many times, concurrently too, without mixing results', async () => {
+    const a = importImage(ctx, src);
+    const flipped = new ImageData(new Uint8ClampedArray(src.data).reverse(), src.width, src.height);
+    const b = importImage(ctx, flipped);
+    const first = await readSrgb8(ctx, a);
+    for (let i = 0; i < 3; i++) {
+      const [ra, rb] = await Promise.all([readSrgb8(ctx, a), readSrgb8(ctx, b)]);
+      expect(Array.from(ra)).toEqual(Array.from(first));
+      expect(Array.from(rb)).not.toEqual(Array.from(first));
+    }
   });
 
   it('imports an ImageBitmap', async () => {
