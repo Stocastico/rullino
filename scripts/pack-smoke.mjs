@@ -12,7 +12,7 @@ import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 
 const repo = new URL('..', import.meta.url).pathname;
-const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web'];
+const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva'];
 const version = JSON.parse(readFileSync(join(repo, 'packages/core/package.json'), 'utf8')).version;
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
@@ -54,7 +54,7 @@ try {
   // 2. Install and run under Node.
   writeFileSync(
     join(project, 'package.json'),
-    JSON.stringify({ name: 'pack-smoke', private: true, type: 'module', dependencies: Object.fromEntries(PACKAGES.map((n) => [`@rullino/${n}`, `file:../tarballs/rullino-${n}-${version}.tgz`])) }),
+    JSON.stringify({ name: 'pack-smoke', private: true, type: 'module', dependencies: { ...Object.fromEntries(PACKAGES.map((n) => [`@rullino/${n}`, `file:../tarballs/rullino-${n}-${version}.tgz`])), konva: '10.9.0' } }),
   );
   run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], project);
 
@@ -109,6 +109,8 @@ console.log(JSON.stringify(out));
     `import { createGpuContext, createImage, fromFloat16Array, importImage, Pipeline, readImage, readSrgb8, runFilter, toFloat16Array, uploadImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { createRenderer } from '@rullino/web';
+import { attachEdit } from '@rullino/konva';
+import Konva from 'konva';
 const ctx = await createGpuContext();
 const w = 17, h = 9; // odd sizes: workgroup bounds, row padding
 const data = new Float32Array(w * h * 4);
@@ -146,6 +148,16 @@ const [a, b] = [await onGpu.apply(src, doc), await onCpu.apply(src, doc)];
 let webWorst = onGpu.backend === 'gpu' && onCpu.backend === 'cpu' ? 0 : 1;
 for (let i = 0; i < a.data.length; i++) webWorst = Math.max(webWorst, Math.abs(a.data[i] - b.data[i]));
 result.webCpuWorkerVsGpu = workers === 1 ? webWorst : 1;
+// @rullino/konva: a preview at the node's size swapped into a Konva.Image (0 = ok).
+const stage = new Konva.Stage({ container: document.body.appendChild(document.createElement('div')), width: 40, height: 30 });
+const layer = new Konva.Layer();
+stage.add(layer);
+const picture = Object.assign(document.createElement('canvas'), { width: 40, height: 30 });
+const node = new Konva.Image({ image: picture, width: 20, height: 15 });
+layer.add(node);
+const editor = await attachEdit(node, { renderer: onGpu, pixelRatio: 1 });
+await editor.set({ version: 2, steps: [{ filter: 'exposure', params: { ev: 1 } }] });
+result.konvaPreview = node.image() !== picture && node.image().width === 20 && node.image().height === 15 ? 0 : 1;
 window.__result = result;
 `,
   );
