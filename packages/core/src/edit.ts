@@ -1,8 +1,8 @@
-import { decodeSrgb8 } from './color';
+import { decodeSrgb8, encodeSrgb8 } from './color';
 import { applyGeometryCpu, isIdentityGeometry } from './geometry';
 import type { GpuContext } from './gpu/context';
 import { applyGeometry } from './gpu/geometry';
-import { uploadSrgb8 } from './gpu/io';
+import { readSrgb8, uploadSrgb8 } from './gpu/io';
 import { downscale } from './gpu/resize';
 import { releaseTexture } from './gpu/pool';
 import { readImage, uploadImage } from './gpu/texture';
@@ -29,6 +29,29 @@ export interface ApplyEditOptions extends ParseOptions {
  * decoder produces them: on the GPU they are decoded there (much faster than `decodeSrgb8` first).
  */
 export async function applyEdit(source: LinearImage | Rgba8Image, edit: unknown, options: ApplyEditOptions): Promise<LinearImage> {
+  return renderEdit(source, edit, options, readImage, (img) => img);
+}
+
+/**
+ * {@link applyEdit} returning 8-bit straight-alpha sRGB pixels (ImageData layout): on the GPU the
+ * result is encoded there (`readSrgb8`), which is what an interactive preview needs.
+ */
+export async function applyEditPixels(source: LinearImage | Rgba8Image, edit: unknown, options: ApplyEditOptions): Promise<Rgba8Image> {
+  const out = await renderEdit(source, edit, options, async (ctx, tex) => ({ data: await readSrgb8(ctx, tex), width: tex.width, height: tex.height }), (img) => ({
+    data: encodeSrgb8(img),
+    width: img.width,
+    height: img.height,
+  }));
+  return out;
+}
+
+async function renderEdit<T>(
+  source: LinearImage | Rgba8Image,
+  edit: unknown,
+  options: ApplyEditOptions,
+  readGpu: (ctx: GpuContext, tex: GPUTexture) => Promise<T>,
+  readCpu: (img: LinearImage) => T,
+): Promise<T> {
   const { steps, geometry, output } = parseChain(edit, options);
   const scale = options.scale ?? 1;
   const longSide = output?.longSide;
@@ -40,7 +63,7 @@ export async function applyEdit(source: LinearImage | Rgba8Image, edit: unknown,
     const framed = geometry && !isIdentityGeometry(geometry) ? applyGeometryCpu(image, geometry) : image;
     const out = runChainCpu(steps, framed, { scale, fast: true });
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
-    return w === out.width && h === out.height ? out : downscaleCpu(out, w, h);
+    return readCpu(w === out.width && h === out.height ? out : downscaleCpu(out, w, h));
   }
 
   // GPU: every texture made here is released before returning; the Pipeline owns its stages.
@@ -53,7 +76,7 @@ export async function applyEdit(source: LinearImage | Rgba8Image, edit: unknown,
     pipeline.setSource(framed, { scale });
     const out = pipeline.run(steps);
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
-    return await readImage(ctx, w === out.width && h === out.height ? out : own(downscale(ctx, out, w, h)));
+    return await readGpu(ctx, w === out.width && h === out.height ? out : own(downscale(ctx, out, w, h)));
   } finally {
     pipeline.destroy();
     for (const t of owned) releaseTexture(ctx, t);

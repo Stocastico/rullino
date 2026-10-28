@@ -22,7 +22,7 @@ describe('@rullino/core public API', () => {
   it('keeps the plumbing under the unstable "./internal" subpath', async () => {
     const internal = await import('./internal');
     expect(Object.keys(internal).sort()).toEqual([
-    'CURVE_SAMPLES', 'WORKING_FORMAT', 'blendMask', 'colorWgsl', 'createWorkingTexture', 'curveLut',
+    'CURVE_SAMPLES', 'WORKING_FORMAT', 'applyEditPixels', 'blendMask', 'colorWgsl', 'createWorkingTexture', 'curveLut',
     'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'exportSamples',
     'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
     'lutSamplerWgsl', 'lutTexture', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',

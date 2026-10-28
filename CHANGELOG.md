@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node, web). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
+All notable changes to the `@rullino/*` packages (core, filters, presets, ml, node, web, konva). They share one version number. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/), with the usual 0.x caveat: minor versions may change the API. `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without any stability promise.
 
 ## Releasing (maintainer checklist)
 
@@ -10,6 +10,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 4. Never `npm publish` from a package directory (`prepublishOnly` refuses): the dist exports exist only in the packed tarball.
 
 ## [Unreleased]
+
+### Added
+- **konva** (new package): `attachEdit(node)` edits a `Konva.Image` with edit documents: `set(doc)` renders a preview at the node's size on screen (WebGPU or the CPU worker, through `@rullino/web`), coalescing quick successive calls, `export(doc)` renders the full-resolution original, `detach()` restores it.
+- **web**: `renderer.pixels(image, doc, { scale })` returns 8-bit `ImageData` ready for a canvas, encoded on the GPU or in the worker (an eighth of the data a linear image would send back).
 
 ## [0.4.0]
 

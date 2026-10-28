@@ -1,0 +1,55 @@
+{
+  "name": "@rullino/konva",
+  "version": "0.4.0",
+  "description": "Edit a Konva.Image with a rullino edit document: WebGPU previews at the size on screen, full-resolution export.",
+  "keywords": [
+    "konva",
+    "canvas",
+    "webgpu",
+    "image-processing",
+    "photo-editing",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/konva"
+  },
+  "homepage": "https://stefanomasneri.com/rullino/",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rullino/core": "workspace:*",
+    "@rullino/web": "workspace:*"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "konva": ">=9"
+  },
+  "devDependencies": {
+    "konva": "10.9.0"
+  }
+}

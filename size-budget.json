@@ -7,5 +7,6 @@
   "playground/main-chunk": 76000,
   "playground/ort-chunk": 42000,
   "packages/node": 1600,
-  "packages/web": 2000
+  "packages/web": 2200,
+  "packages/konva": 1650
 }

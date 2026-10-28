@@ -1,4 +1,4 @@
-import { applyEdit, createImage, fromFloat16Array, toFloat16Array, WebGpuUnavailableError, type LinearImage } from '@rullino/core';
+import { applyEdit, createImage, encodeSrgb8, fromFloat16Array, toFloat16Array, WebGpuUnavailableError, type LinearImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { lookEdit, looks, resolveLookLut } from '@rullino/presets';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -105,6 +105,23 @@ describe('createRenderer (browser)', () => {
     const out = await cpu.apply(chart(9, 5), edit);
     expect(out.width).toBe(9);
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('pixels() returns 8-bit ImageData: what apply() gives, encoded (on the GPU, or in the worker)', async () => {
+    const src = chart(37, 21);
+    for (const backend of ['gpu', 'cpu'] as const) {
+      const spawn = vi.spyOn(globalThis, 'Worker');
+      const r = await make({ backend });
+      const px = await r.pixels(src, edit, { scale: 0.5 });
+      expect(px).toBeInstanceOf(ImageData);
+      expect([px.width, px.height]).toEqual([37, 21]);
+      const expected = encodeSrgb8(await r.apply(src, edit, { scale: 0.5 }));
+      let worst = 0;
+      for (let i = 0; i < expected.length; i++) worst = Math.max(worst, Math.abs(px.data[i]! - expected[i]!));
+      expect(worst, backend).toBeLessThanOrEqual(1);
+      expect(spawn).toHaveBeenCalledTimes(backend === 'cpu' ? 1 : 0);
+      spawn.mockRestore();
+    }
   });
 
   it('render() takes ImageData or an encoded file and encodes as the document says', async () => {

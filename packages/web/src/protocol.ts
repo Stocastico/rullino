@@ -10,7 +10,9 @@ export interface RenderRequest {
   readonly edit: unknown;
   readonly luts: Readonly<Record<string, Lut>>;
   readonly scale: number | undefined;
+  /** Answer with 8-bit pixels (encoded in the worker) instead of a linear image. */
+  readonly pixels: boolean;
 }
 
 /** Worker -> main thread: the result, or the error's message. */
-export type RenderResponse = { readonly id: number; readonly image: LinearImage } | { readonly id: number; readonly error: string };
+export type RenderResponse = { readonly id: number; readonly image: ImageMessage } | { readonly id: number; readonly error: string };
