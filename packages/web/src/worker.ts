@@ -1,5 +1,5 @@
 // The CPU backend's Web Worker: renders edit documents with the built-in filters' fast paths.
-import { applyEdit, createImage } from '@rullino/core';
+import { applyEdit } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import type { RenderRequest, RenderResponse } from './protocol';
 
@@ -11,7 +11,7 @@ const scope = self as unknown as {
 
 scope.onmessage = async ({ data: { id, image, edit, luts, scale } }) => {
   try {
-    const out = await applyEdit(createImage(image.width, image.height, image.data), edit, { filters, resolveLut: (ref) => luts[ref], scale });
+    const out = await applyEdit(image, edit, { filters, resolveLut: (ref) => luts[ref], scale });
     scope.postMessage({ id, image: { width: out.width, height: out.height, data: out.data } }, [out.data.buffer]);
   } catch (e) {
     scope.postMessage({ id, error: e instanceof Error ? e.message : String(e) });

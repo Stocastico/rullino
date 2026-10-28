@@ -19,13 +19,13 @@ export { createGpuContext, WebGpuUnavailableError, type GpuContext, type GpuCont
 export { GpuError, ShaderCompileError, type GpuErrorKind, type ShaderMessage } from './gpu/errors';
 export { releaseTexture } from './gpu/pool';
 export { runFilter } from './gpu/run';
-export { importImage, readSrgb8 } from './gpu/io';
+export { importImage, readSrgb8, uploadSrgb8 } from './gpu/io';
 export { encodeImage, type ExportOptions } from './encode';
 export { exportImage } from './gpu/export';
 export { encodePng } from './png';
 export { readImage, uploadImage } from './gpu/texture';
 export { fromFloat16Array, toFloat16Array } from './half';
-export { createImage, MAX_IMAGE_SIDE, sampleImage, type LinearImage } from './image';
+export { createImage, MAX_IMAGE_SIDE, sampleImage, type LinearImage, type Rgba8Image } from './image';
 export { applyLutCpu, createLut, identityLut, lutFromFunction, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { applyGeometry } from './gpu/geometry';
 export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';

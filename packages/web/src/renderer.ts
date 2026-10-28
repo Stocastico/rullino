@@ -2,7 +2,6 @@ import {
   applyEdit,
   createGpuContext,
   createImage,
-  decodeSrgb8,
   encodeImage,
   parseChain,
   WebGpuUnavailableError,
@@ -11,6 +10,7 @@ import {
   type GpuError,
   type LinearImage,
   type Lut,
+  type Rgba8Image,
 } from '@rullino/core';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
@@ -47,7 +47,7 @@ export interface Renderer {
    * Renders an edit document on a linear image (see `applyEdit` in `@rullino/core`). `scale` is the
    * image's size relative to the original the edit was made on, e.g. 0.25 for a quick preview.
    */
-  apply(image: LinearImage, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
+  apply(image: LinearImage | Rgba8Image, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
   /**
    * Renders an edit document on 8-bit pixels (`ImageData`) or an image file the browser can decode
    * (a `Blob`), and encodes the result as the document's `output` says (PNG by default).
@@ -78,12 +78,12 @@ function workerBackend() {
     return w;
   };
   return {
-    run(image: LinearImage, edit: unknown, luts: Record<string, Lut>, scale: number | undefined): Promise<LinearImage> {
+    run(image: LinearImage | Rgba8Image, edit: unknown, luts: Record<string, Lut>, scale: number | undefined): Promise<LinearImage> {
       worker ??= start();
       const id = nextId++;
-      // A copy, transferred: the caller keeps its image.
+      // A copy, transferred: the caller keeps its image. 8-bit pixels are a quarter of a linear image.
       const data = image.data.slice();
-      const request: RenderRequest = { id, image: { width: image.width, height: image.height, data }, edit, luts, scale };
+      const request: RenderRequest = { id, image: { width: image.width, height: image.height, data } as LinearImage | Rgba8Image, edit, luts, scale };
       return new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
         worker!.postMessage(request, [data.buffer]);
@@ -123,7 +123,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
   }
   const worker = !ctx && options.worker !== false && !options.filters ? workerBackend() : undefined;
 
-  const apply = async (image: LinearImage, edit: unknown, o: { readonly scale?: number } = {}): Promise<LinearImage> => {
+  const apply = async (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}): Promise<LinearImage> => {
     if (!worker) return applyEdit(image, edit, { filters, resolveLut, gpu: ctx, scale: o.scale });
     // Parsed here first: a bad document fails with its own message, and the LUTs it names are
     // resolved on this thread (the resolver is a function, which cannot go to the worker).
@@ -147,7 +147,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     async render(input, edit) {
       const { output = {} } = parseChain(edit, { filters, resolveLut });
       const pixels = input instanceof Blob ? await decodeFile(input) : input;
-      const out = await apply(decodeSrgb8(pixels.data, pixels.width, pixels.height), edit);
+      const out = await apply(pixels, edit); // decoded where it renders: on the GPU, or in the worker
       return encodeImage(out, output);
     },
     destroy() {

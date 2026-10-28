@@ -15,7 +15,7 @@ describe('@rullino/core public API', () => {
     'maskImage', 'maskValue', 'migrateChain', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseHald',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',
     'runChainCpu', 'runFilter', 'sampleCurve', 'sampleImage', 'serializeChain', 'srgbToLinear',
-    'toFloat16Array', 'turnGeometry', 'uploadImage', 'validateGeometry', 'validateMask',
+    'toFloat16Array', 'turnGeometry', 'uploadImage', 'uploadSrgb8', 'validateGeometry', 'validateMask',
     ]);
   });
 

@@ -8,6 +8,13 @@ export interface LinearImage {
   readonly data: Float32Array;
 }
 
+/** 8-bit straight-alpha sRGB pixels, row by row (ImageData layout): what image decoders produce. */
+export interface Rgba8Image {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array | Uint8ClampedArray;
+}
+
 export function createImage(width: number, height: number, data?: Float32Array): LinearImage {
   const size = width * height * 4;
   if (data && data.length !== size) {

@@ -1,4 +1,4 @@
-import { applyEdit, createGpuContext, decodeSrgb8, encodeImage, parseChain, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut } from '@rullino/core';
+import { applyEdit, createGpuContext, encodeImage, parseChain, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
 import { exportSamples } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
@@ -20,11 +20,7 @@ export interface RendererOptions {
 }
 
 /** 8-bit straight-alpha sRGB pixels, row by row: what image decoders produce. */
-export interface RgbaImage {
-  readonly data: Uint8Array | Uint8ClampedArray;
-  readonly width: number;
-  readonly height: number;
-}
+export type RgbaImage = Rgba8Image;
 
 export interface Rendered {
   /** The encoded file. */
@@ -41,7 +37,7 @@ export interface Renderer {
   /** The GPU context, when the backend is 'gpu'. */
   readonly gpu?: GpuContext;
   /** Renders an edit document on a linear image (see `applyEdit` in `@rullino/core`). */
-  apply(image: LinearImage, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
+  apply(image: LinearImage | Rgba8Image, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
   /**
    * Renders an edit document and encodes the result as the document's `output` says. The input is
    * 8-bit RGBA pixels, or an encoded image file (JPEG, PNG, WebP, AVIF, TIFF... decoded by sharp,
@@ -94,7 +90,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     }
   }
 
-  const apply = (image: LinearImage, edit: unknown, o: { readonly scale?: number } = {}) => applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale });
+  const apply = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}) => applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale });
 
   return {
     backend: ctx ? 'gpu' : 'cpu',
@@ -105,7 +101,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       const { output = {} } = parseChain(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
       const image = 'width' in input ? input : await decodeFile(input);
-      const out = await apply(decodeSrgb8(image.data, image.width, image.height), edit);
+      const out = await apply(image, edit); // decoded where it renders (on Dawn: on the GPU)
       const done = (bytes: Uint8Array) => ({ bytes, format, width: out.width, height: out.height });
       if (format === 'png') return done(new Uint8Array(await (await encodeImage(out, output)).arrayBuffer()));
       const sharp = await loadSharp(`${format.toUpperCase()} output`);
