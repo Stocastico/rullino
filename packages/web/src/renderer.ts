@@ -12,6 +12,7 @@ import {
   type Lut,
   type Rgba8Image,
 } from '@rullino/core';
+import { applyEditPixels } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import type { RenderRequest, RenderResponse } from './protocol';
@@ -53,6 +54,11 @@ export interface Renderer {
    * (a `Blob`), and encodes the result as the document's `output` says (PNG by default).
    */
   render(input: ImageData | Blob, edit: unknown): Promise<Blob>;
+  /**
+   * Like {@link apply}, but answers with 8-bit sRGB pixels ready for a canvas, encoded where the
+   * render ran (on the GPU, or in the worker): the fast path for interactive previews.
+   */
+  pixels(image: LinearImage | Rgba8Image, edit: unknown, options?: { readonly scale?: number }): Promise<ImageData>;
   /** Releases the GPU device and stops the worker. Pending renders are rejected. */
   destroy(): void;
 }
@@ -61,7 +67,7 @@ export interface Renderer {
 function workerBackend() {
   let worker: Worker | undefined;
   let nextId = 0;
-  const pending = new Map<number, { resolve: (image: LinearImage) => void; reject: (error: Error) => void }>();
+  const pending = new Map<number, { resolve: (image: LinearImage | Rgba8Image) => void; reject: (error: Error) => void }>();
   const failAll = (error: Error) => {
     for (const p of pending.values()) p.reject(error);
     pending.clear();
@@ -72,18 +78,18 @@ function workerBackend() {
       const p = pending.get(data.id);
       pending.delete(data.id);
       if ('error' in data) p?.reject(new Error(data.error));
-      else p?.resolve(createImage(data.image.width, data.image.height, data.image.data));
+      else p?.resolve(data.image);
     };
     w.onerror = (event) => failAll(new Error(`rullino's CPU worker failed: ${event.message}`));
     return w;
   };
   return {
-    run(image: LinearImage | Rgba8Image, edit: unknown, luts: Record<string, Lut>, scale: number | undefined): Promise<LinearImage> {
+    run(image: LinearImage | Rgba8Image, edit: unknown, luts: Record<string, Lut>, scale: number | undefined, pixels: boolean): Promise<LinearImage | Rgba8Image> {
       worker ??= start();
       const id = nextId++;
       // A copy, transferred: the caller keeps its image. 8-bit pixels are a quarter of a linear image.
       const data = image.data.slice();
-      const request: RenderRequest = { id, image: { width: image.width, height: image.height, data } as LinearImage | Rgba8Image, edit, luts, scale };
+      const request: RenderRequest = { id, image: { width: image.width, height: image.height, data } as LinearImage | Rgba8Image, edit, luts, scale, pixels };
       return new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
         worker!.postMessage(request, [data.buffer]);
@@ -123,8 +129,8 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
   }
   const worker = !ctx && options.worker !== false && !options.filters ? workerBackend() : undefined;
 
-  const apply = async (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}): Promise<LinearImage> => {
-    if (!worker) return applyEdit(image, edit, { filters, resolveLut, gpu: ctx, scale: o.scale });
+  const run = async (image: LinearImage | Rgba8Image, edit: unknown, scale: number | undefined, pixels: boolean): Promise<LinearImage | Rgba8Image> => {
+    if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale });
     // Parsed here first: a bad document fails with its own message, and the LUTs it names are
     // resolved on this thread (the resolver is a function, which cannot go to the worker).
     const luts: Record<string, Lut> = {};
@@ -136,7 +142,11 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
         return lut;
       },
     });
-    return worker.run(image, edit, luts, o.scale);
+    return worker.run(image, edit, luts, scale, pixels);
+  };
+  const apply = async (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}): Promise<LinearImage> => {
+    const out = await run(image, edit, o.scale, false);
+    return createImage(out.width, out.height, out.data as Float32Array);
   };
 
   return {
@@ -144,6 +154,10 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     ...(reason !== undefined ? { reason } : {}),
     ...(ctx ? { gpu: ctx } : {}),
     apply,
+    async pixels(image, edit, o = {}) {
+      const out = await run(image, edit, o.scale, true);
+      return new ImageData(new Uint8ClampedArray(out.data.buffer as ArrayBuffer, out.data.byteOffset, out.data.length), out.width, out.height);
+    },
     async render(input, edit) {
       const { output = {} } = parseChain(edit, { filters, resolveLut });
       const pixels = input instanceof Blob ? await decodeFile(input) : input;
