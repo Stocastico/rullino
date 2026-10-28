@@ -185,7 +185,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 5. **Benchmarks** (weeks 5–6, [#77](https://github.com/Stocastico/rullino/issues/77); harness done 28 Oct: `apps/bench`, `pnpm bench:web`, results as JSON attached to #77; waiting for runs on the maintainer's machines): 3 chains (exposure + curves + LUT; blur + unsharp; levels + vignette + grain) at 12 and 24 MP vs pixi-filters, Photon, wasm-vips: first preview, per-change latency, memory, gzip size. **Run on real hardware** (SwiftShader numbers are meaningless here); publish the losses too; drop the fusion claim if it shows no win.
 
 ### Phase 2 — distribution (weeks 6–10) — [#66](https://github.com/Stocastico/rullino/issues/66)
-- [ ] `@rullino/konva` (Konva.Image source swapped after an async render) — first, it is where GPU speed shows most.
+- [x] `@rullino/konva` (Konva.Image source swapped after an async render, #102) — first, it is where GPU speed shows most.
 - [ ] `@rullino/fabric` — after Konva, only if Konva gets interest; Fabric already has WebGL filters and two GPU contexts cannot share textures (one readback per render).
 - [ ] Each adapter: < 200 lines, README, StackBlitz demo.
 - [ ] Docs by job: preview + export, LUT looks in your editor, same edit on the server, remove an object on-device. Five one-file examples: Konva editor, Fabric editor, Next.js server render, Node batch, Worker fallback.
