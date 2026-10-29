@@ -58,7 +58,8 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 > - **Filters**: adjustments (exposure, curves, levels, white balance, colour mixer, grading...), convolutions, edges (Canny, Sobel / Scharr / Prewitt, Laplacian), thresholds, morphology, median, bilateral, histogram equalisation / CLAHE, inpainting, stylize (halftone, dither, Kuwahara, bloom...), lens blur.
 > - **Presets**: ten looks built from a LUT recipe, vignette and grain.
 > - **ML (optional, `@rullino/ml`)**: click-to-select objects (SlimSAM), object removal (MI-GAN) and depth for lens blur (Depth Anything V2 Small), with ONNX Runtime passed in by the caller.
-> - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links.
+> - **Renderers**: `@rullino/web` (WebGPU, else the CPU in a Web Worker), `@rullino/node` (Dawn, else the CPU), `@rullino/konva` (a `Konva.Image` edited in place).
+> - **Playground**: chain editor, masks (brush, wand, Object), zoom, undo / redo, share links, **Code** (the edit as JSON and as code for the browser, Konva or Node).
 >
 > Input is 8-bit sRGB (what the browser decodes); not done yet: Hough and other analysis filters, video input. See [PLAN.md](./PLAN.md).
 
@@ -97,8 +98,12 @@ packages/
   ml/          optional ML tools (select, remove, depth); ONNX Runtime is passed in, never imported
   node/        Node renderer: edit documents on Dawn (the webgpu package), CPU fallback
   web/         Browser renderer: WebGPU, else the CPU in a Web Worker
+  konva/       Konva adapter: a Konva.Image edited with edit documents
 apps/
   playground/  Vite demo site
+  bench/       comparison page against PixiJS, Photon, wasm-vips (#77)
+  docs/        TypeDoc API reference
+examples/      one-file examples on the published packages (StackBlitz links)
 ```
 
 ## Documentation
