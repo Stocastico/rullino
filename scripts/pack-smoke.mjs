@@ -3,10 +3,11 @@
 //   1. checks what the tarballs contain (dist only, exports pointing at dist, no workspace: ranges),
 //   2. imports them under plain Node ESM and runs the CPU path,
 //   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one,
-//   4. builds examples/konva-editor against them and moves its exposure slider.
+//   4. builds examples/konva-editor against them and moves its exposure slider,
+//   5. runs examples/node-batch on a folder of photos and checks the files it writes.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, statSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { chromium } from 'playwright';
@@ -55,7 +56,7 @@ try {
   // 2. Install and run under Node.
   writeFileSync(
     join(project, 'package.json'),
-    JSON.stringify({ name: 'pack-smoke', private: true, type: 'module', dependencies: { ...Object.fromEntries(PACKAGES.map((n) => [`@rullino/${n}`, `file:../tarballs/rullino-${n}-${version}.tgz`])), konva: '10.9.0' } }),
+    JSON.stringify({ name: 'pack-smoke', private: true, type: 'module', dependencies: { ...Object.fromEntries(PACKAGES.map((n) => [`@rullino/${n}`, `file:../tarballs/rullino-${n}-${version}.tgz`])), konva: '10.9.0', sharp: '0.35.5' } }),
   );
   run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], project);
 
@@ -102,6 +103,27 @@ console.log(JSON.stringify(out));
   );
   const node = JSON.parse(run('node', ['check-node.mjs'], project));
   for (const [key, ok] of Object.entries(node)) check(ok, `node check failed: ${key}`);
+
+  // 5. examples/node-batch on the tarballs (CPU: the project has no webgpu), run the way its README says.
+  const batch = join(project, 'node-batch');
+  const photos = join(batch, 'photos');
+  mkdirSync(photos, { recursive: true });
+  for (const f of ['batch.mjs', 'edit.json']) copyFileSync(join(repo, 'examples/node-batch', f), join(batch, f));
+  copyFileSync(join(repo, 'examples/konva-editor/photo.jpg'), join(photos, 'one.jpg'));
+  copyFileSync(join(repo, 'examples/konva-editor/photo.jpg'), join(photos, 'two.JPEG'));
+  writeFileSync(join(photos, 'notes.txt'), 'not a photo');
+  const batchLog = run('node', ['batch.mjs', 'edit.json', 'photos', 'out'], batch);
+  const written = existsSync(join(batch, 'out')) ? readdirSync(join(batch, 'out')).sort() : [];
+  check(written.join() === 'one.jpg,two.jpg', `node-batch example wrote ${written.join() || 'nothing'}`);
+  for (const f of written) {
+    const bytes = readFileSync(join(batch, 'out', f));
+    check(bytes[0] === 0xff && bytes[1] === 0xd8 && statSync(join(batch, 'out', f)).size > 5000, `node-batch example: ${f} is not a JPEG`);
+  }
+  // The document's output.longSide (1600) is applied to the 2048 x 1536 source.
+  const sizes = run('node', ['-e', `import('sharp').then(async ({ default: sharp }) => console.log((await Promise.all(process.argv.slice(1).map((f) => sharp(f).metadata()))).map((m) => m.width + 'x' + m.height).join()))`, ...written.map((f) => join('out', f))], batch).trim();
+  check(sizes === '1600x1200,1600x1200', `node-batch example output sizes: ${sizes}`);
+  check(/2 photos/.test(batchLog), `node-batch example log: ${batchLog.trim()}`);
+  console.log(`pack-smoke: node-batch example ${batchLog.trim().split('\n').pop()}`);
 
   // 3. Bundle with Vite and run a GPU filter in Chromium.
   writeFileSync(join(project, 'index.html'), '<!doctype html><html><body><script type="module" src="./main.js"></script></body></html>');

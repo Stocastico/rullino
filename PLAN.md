@@ -188,12 +188,12 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 - [x] `@rullino/konva` (Konva.Image source swapped after an async render, #102) — first, it is where GPU speed shows most.
 - [ ] `@rullino/fabric` — after Konva, only if Konva gets interest; Fabric already has WebGL filters and two GPU contexts cannot share textures (one readback per render).
 - [ ] Each adapter: < 200 lines, README, StackBlitz demo. Konva done (`examples/konva-editor`, 0.5.0; checked on StackBlitz 29 Oct: WebGPU in Chrome, CPU worker in Firefox on Linux).
-- [ ] Docs by job: preview + export, LUT looks in your editor, same edit on the server, remove an object on-device. Five one-file examples: ~~Konva editor~~ (done), Fabric editor, Next.js server render, Node batch, Worker fallback.
+- [ ] Docs by job: preview + export, LUT looks in your editor, same edit on the server, remove an object on-device. Five one-file examples: ~~Konva editor~~ (done), ~~Node batch~~ (done 29 Oct), Fabric editor, Next.js server render, Worker fallback.
 - [ ] Migration notes from glfx and tui.image-editor (filter mapping).
 - [ ] Playground: ~~**Copy as code**~~ (done 29 Oct, #108: the Code button, edit JSON + browser / Konva / Node snippets), backend + render time in plain words (the status line already shows both, in technical form). The film strip (UX review step 4) is done; the examples gallery (step 5) waits: the playground is a developer demo, not an editor.
 
 **Where we are (29 Oct, end of day; published: 0.5.0 of all seven packages).** Next, in this order:
-1. **Node batch example** (`examples/node-batch`): one file that renders an edit document onto a folder of photos with `@rullino/node`; tested by `pnpm test:pack` like the Konva example (run it against the tarballs, check the files it writes). It shows the server half, the part competitors lack.
+1. ~~**Node batch example**~~ (`examples/node-batch`, done 29 Oct): one file that renders an edit document onto a folder of photos with `@rullino/node`; `pnpm test:pack` runs it against the tarballs and checks the files and their size.
 2. **Status line in plain words** in the playground ("On the GPU (WebGPU) · 0.37 s", the reason when on the CPU): small, closes the last playground item above.
 3. **Worker fallback example** and **Next.js server render example** (the remaining one-file examples except Fabric).
 4. Docs by job (the four pages above), then the migration notes.

@@ -57,6 +57,10 @@ createServer(async (req, res) => {
 }).listen(3000);
 ```
 
+### A folder of photos
+
+[`examples/node-batch`](https://github.com/Stocastico/rullino/tree/main/examples/node-batch) renders one edit document onto every photo in a folder (`node batch.mjs edit.json photos out`).
+
 ## License
 
 MIT.
