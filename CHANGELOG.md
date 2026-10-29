@@ -11,9 +11,16 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.5.0]
+
+A first editor adapter: `@rullino/konva` edits a `Konva.Image` with the same edit documents the browser, the CPU worker and the Node renderer already share.
+
 ### Added
 - **konva** (new package): `attachEdit(node)` edits a `Konva.Image` with edit documents: `set(doc)` renders a preview at the node's size on screen (WebGPU or the CPU worker, through `@rullino/web`), coalescing quick successive calls, `export(doc)` renders the full-resolution original, `detach()` restores it.
 - **web**: `renderer.pixels(image, doc, { scale })` returns 8-bit `ImageData` ready for a canvas, encoded on the GPU or in the worker (an eighth of the data a linear image would send back).
+
+### Fixed
+- Release and CI: the Dawn tests no longer time out on a fresh runner, where the first render compiles every shader from scratch (#100).
 
 ## [0.4.0]
 
