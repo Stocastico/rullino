@@ -43,3 +43,4 @@ Thumbs.db
 
 # Copied from the repo root by each package build (so the npm tarballs carry it)
 packages/*/LICENSE
+apps/playground/.snippet-*/

@@ -83,6 +83,7 @@ const ui = {
   undo: $<HTMLButtonElement>('undo'),
   redo: $<HTMLButtonElement>('redo'),
   share: $<HTMLButtonElement>('share'),
+  code: $<HTMLButtonElement>('code'),
   auto: $<HTMLButtonElement>('auto'),
   looks: $<HTMLDivElement>('looks'),
   viewport: $<HTMLElement>('viewport'),
@@ -1057,6 +1058,25 @@ ui.share.addEventListener('click', async () => {
     announce(`Cannot share: ${(e as Error).message}`);
   }
 });
+
+// "Copy as code": the same document as a share link, plus the export panel's settings, so a server
+// render of it gives what Export gives here.
+// Loaded on first use: it is not part of the main chunk.
+let codeDialog: Promise<{ open(): void }> | undefined;
+const loadCodeDialog = () => import('./code-dialog').then(({ createCodeDialog }) => createCodeDialog({
+  document: () => {
+    const { options } = EXPORTS[ui.exportFormat.value]!;
+    const longSide = Number(ui.exportSize.value) || undefined;
+    const quality = options.format === 'png' ? undefined : Number(ui.exportQuality.value);
+    const output = { ...options, ...(quality !== undefined ? { quality } : {}), ...(longSide ? { longSide } : {}) };
+    return serializeChain(toSteps(chain), { ...(isIdentityGeometry(geometry) ? {} : { geometry }), lutRef, output });
+  },
+  copy: async (text) => {
+    await navigator.clipboard?.writeText(text);
+    announce('Code copied');
+  },
+}));
+ui.code.addEventListener('click', () => void (codeDialog ??= loadCodeDialog()).then((d) => d.open()));
 
 /** The edits and sample image in the URL fragment, if any. */
 async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } | undefined> {
