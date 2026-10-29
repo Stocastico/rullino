@@ -4,7 +4,8 @@
 //   2. imports them under plain Node ESM and runs the CPU path,
 //   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one,
 //   4. builds examples/konva-editor against them and moves its exposure slider,
-//   5. runs examples/node-batch on a folder of photos and checks the files it writes.
+//   5. runs examples/node-batch on a folder of photos and checks the files it writes,
+//   6. builds examples/worker-fallback and drives it on the CPU worker backend.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, statSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -223,6 +224,33 @@ window.__result = result;
       console.log(`pack-smoke: konva-editor example ${JSON.stringify(shown)}`);
     } finally {
       await exampleServer.close();
+    }
+
+    // 6. examples/worker-fallback: forced onto the CPU worker, the slider changes the picture and the page stays responsive.
+    const fallback = join(project, 'worker-fallback');
+    mkdirSync(fallback);
+    for (const f of ['index.html', 'main.js']) copyFileSync(join(repo, 'examples/worker-fallback', f), join(fallback, f));
+    copyFileSync(join(repo, 'examples/konva-editor/photo.jpg'), join(fallback, 'photo.jpg'));
+    await build({ root: fallback, configFile: false, logLevel: 'error', build: { outDir: 'out', target: 'esnext' } });
+    const fallbackServer = await preview({ root: fallback, configFile: false, build: { outDir: 'out' }, preview: { port: 0 } });
+    try {
+      await page.goto(`${fallbackServer.resolvedUrls.local[0]}?backend=cpu`);
+      await page.waitForFunction(() => window.example, null, { timeout: 60000 });
+      const shown = await page.evaluate(async () => {
+        const red = () => document.querySelector('canvas').getContext('2d').getImageData(320, 240, 1, 1).data[0];
+        const wait = async (ok) => { for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 100)); };
+        await wait(() => window.example.renders > 0);
+        const before = red();
+        const ev = document.querySelector('[name=ev]');
+        ev.value = '1.5';
+        ev.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(() => red() > before + 20);
+        return { backend: window.example.renderer.backend, before, after: red(), status: document.querySelector('#status').value };
+      });
+      check(shown.backend === 'cpu' && shown.before >= 0 && shown.after > shown.before + 20 && /CPU/.test(shown.status), `worker-fallback example: ${JSON.stringify(shown)}`);
+      console.log(`pack-smoke: worker-fallback example ${JSON.stringify(shown)}`);
+    } finally {
+      await fallbackServer.close();
     }
   } finally {
     await browser.close();
