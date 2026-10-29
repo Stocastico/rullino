@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>rullino + Konva</title>
+    <style>
+      body { margin: 0; font: 14px system-ui, sans-serif; display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; }
+      #stage { border: 1px solid #ccc; }
+      form { display: grid; gap: 10px; min-width: 220px; align-content: start; }
+      label { display: grid; gap: 2px; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <form id="controls">
+      <label>Exposure <input name="ev" type="range" min="-2" max="2" step="0.05" value="0" /></label>
+      <label>Contrast <input name="contrast" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+      <label>Saturation <input name="saturation" type="range" min="-1" max="1" step="0.01" value="0" /></label>
+      <label>Look <select name="look"><option value="">none</option></select></label>
+      <button type="button" id="export">Export full-size JPEG</button>
+      <output id="status"></output>
+    </form>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+`photo.jpg` is `still-life.jpg` from the playground's samples: public domain, from [PickPik](https://www.pickpik.com/still-life-bouquet-colorful-autumn-pumpkin-gourd-61746). It is not covered by the repository's MIT licence.
