@@ -95,6 +95,21 @@ try {
     await other.close();
   }
 
+  // Copy as code: the dialog shows the current chain (+1.5 EV) as a document and as @rullino/web code.
+  await page.click('#code');
+  await page.waitForSelector('dialog.code-dialog[open]', { timeout: 10000 }).catch(() => {}); // its module loads on first use
+  {
+    const shown = await page.$eval('dialog.code-dialog', (d) => ({ open: d.open, code: d.querySelector('pre code')?.textContent ?? '' }));
+    check(shown.open && shown.code.includes("from '@rullino/web'") && shown.code.includes('"ev": 1.5'), `Code dialog should show the +1.5 EV edit as @rullino/web code: ${JSON.stringify(shown).slice(0, 200)}`);
+    await page.click('dialog.code-dialog [role=tab]:text("Edit document")');
+    const json = await page.$eval('dialog.code-dialog pre code', (c) => c.textContent);
+    let doc;
+    try { doc = JSON.parse(json); } catch {}
+    check(doc?.version === 2 && doc.steps?.[0]?.filter === 'exposure' && doc.output?.format === 'png', `Code dialog's edit document: ${json.slice(0, 200)}`);
+    await page.keyboard.press('Escape');
+    check(!(await page.$eval('dialog.code-dialog', (d) => d.open)), 'Escape should close the Code dialog');
+  }
+
   // Look gallery: one thumbnail per look, rendered and different from each other; a click adds the look.
   await page.waitForFunction(() => [...document.querySelectorAll('.look-card canvas')].every((c) => 'ready' in c.dataset), null, { timeout: 30000 }).catch(() => {});
   const thumbs = await page.$$eval('.look-card canvas', (cs) =>
