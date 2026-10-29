@@ -100,6 +100,9 @@ importers:
         specifier: 1.30.0
         version: 1.30.0
     devDependencies:
+      '@rullino/node':
+        specifier: workspace:*
+        version: link:../../packages/node
       playwright:
         specifier: 1.56.1
         version: 1.56.1
