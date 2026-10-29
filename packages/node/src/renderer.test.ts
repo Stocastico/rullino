@@ -27,7 +27,11 @@ const edit = () =>
     { lutRef: lookLutRef, geometry: { ...IDENTITY_GEOMETRY, rotate: 90, crop: { x: 0, y: 0.1, width: 1, height: 0.8 } }, output: { longSide: 40 } },
   )));
 
-describe('createRenderer', () => {
+// Dawn on lavapipe compiles every shader with LLVM. On a fresh CI runner (empty Mesa shader cache)
+// the first render took 3.8 s against Vitest's 5 s default, and one release run went over (#100).
+const DAWN = { timeout: 60_000 };
+
+describe('createRenderer', DAWN, () => {
   const gpu = createRenderer({ backend: 'gpu' });
   const cpu = createRenderer({ backend: 'cpu' });
   afterAll(async () => {
@@ -69,7 +73,7 @@ describe('createRenderer', () => {
   });
 });
 
-describe('backend choice', () => {
+describe('backend choice', DAWN, () => {
   const noAdapter = { requestAdapter: async () => null } as unknown as GPU;
 
   it("'auto' falls back to the CPU and says why", async () => {
