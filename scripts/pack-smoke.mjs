@@ -2,10 +2,11 @@
 // the tarballs into a throwaway project outside the repo, then
 //   1. checks what the tarballs contain (dist only, exports pointing at dist, no workspace: ranges),
 //   2. imports them under plain Node ESM and runs the CPU path,
-//   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one.
+//   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one,
+//   4. builds examples/konva-editor against them and moves its exposure slider.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { chromium } from 'playwright';
@@ -173,6 +174,34 @@ window.__result = result;
     const result = await page.evaluate(() => window.__result);
     for (const [id, worst] of Object.entries(result)) check(id === 'quickstartPixel' ? worst <= 1 : worst < 5e-3, `${id}: GPU and CPU differ by ${worst} through the packed packages`);
     console.log(`pack-smoke: GPU vs CPU max difference ${JSON.stringify(result)}`);
+
+    // 4. examples/konva-editor, built against the tarballs: the slider changes the shown preview.
+    const example = join(project, 'konva-editor');
+    mkdirSync(example);
+    for (const f of ['index.html', 'main.js', 'photo.jpg']) copyFileSync(join(repo, 'examples/konva-editor', f), join(example, f));
+    await build({ root: example, configFile: false, logLevel: 'error', build: { outDir: 'out', target: 'esnext' } });
+    const exampleServer = await preview({ root: example, configFile: false, build: { outDir: 'out' }, preview: { port: 0 } });
+    try {
+      await page.goto(exampleServer.resolvedUrls.local[0]);
+      await page.waitForFunction(() => window.example, null, { timeout: 60000 });
+      const shown = await page.evaluate(async () => {
+        const red = () => {
+          const img = window.example.node.image();
+          return img instanceof HTMLCanvasElement ? img.getContext('2d').getImageData(img.width >> 1, img.height >> 1, 1, 1).data[0] : -1;
+        };
+        const before = red();
+        const ev = document.querySelector('[name=ev]');
+        ev.value = '1.5';
+        ev.dispatchEvent(new Event('input', { bubbles: true }));
+        // The page's own input listener must render it: poll, do not call set() here.
+        for (let i = 0; i < 300 && red() <= before + 20; i++) await new Promise((r) => setTimeout(r, 100));
+        return { width: window.example.node.image().width, before, after: red() };
+      });
+      check(shown.width === 640 && shown.before >= 0 && shown.after > shown.before + 20, `konva-editor example: ${JSON.stringify(shown)}`);
+      console.log(`pack-smoke: konva-editor example ${JSON.stringify(shown)}`);
+    } finally {
+      await exampleServer.close();
+    }
   } finally {
     await browser.close();
     await server.close();

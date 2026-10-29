@@ -10,6 +10,8 @@ Edit a [Konva](https://konvajs.org) `Konva.Image` with a [rullino](https://githu
 npm install @rullino/konva konva
 ```
 
+A complete editor (sliders, a look picker, export) is in [`examples/konva-editor`](https://github.com/Stocastico/rullino/tree/main/examples/konva-editor): [open it in StackBlitz](https://stackblitz.com/github/Stocastico/rullino/tree/main/examples/konva-editor?file=main.js).
+
 ## Edit an image node
 
 ```ts

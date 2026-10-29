@@ -105,7 +105,7 @@ apps/
 
 - [Filter reference](./docs/filters.md): every filter with its parameters, ranges and defaults, generated from the schemas.
 - [Parity table](./docs/parity.md): how far GPU and CPU output may differ, per filter.
-- Per package: [core](./packages/core/README.md), [filters](./packages/filters/README.md), [presets](./packages/presets/README.md), [ml](./packages/ml/README.md), [node](./packages/node/README.md), [web](./packages/web/README.md). Their `ts` examples are type-checked against the sources.
+- Per package: [core](./packages/core/README.md), [filters](./packages/filters/README.md), [presets](./packages/presets/README.md), [ml](./packages/ml/README.md), [node](./packages/node/README.md), [web](./packages/web/README.md), [konva](./packages/konva/README.md). Examples: [Konva photo editor](https://github.com/Stocastico/rullino/tree/main/examples/konva-editor) ([StackBlitz](https://stackblitz.com/github/Stocastico/rullino/tree/main/examples/konva-editor?file=main.js)). Their `ts` examples are type-checked against the sources.
 - [PLAN.md](./PLAN.md) for the design and roadmap, [CLAUDE.md](./CLAUDE.md) for conventions and the reasoning behind decisions.
 
 ## Development

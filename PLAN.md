@@ -187,7 +187,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 ### Phase 2 — distribution (weeks 6–10) — [#66](https://github.com/Stocastico/rullino/issues/66)
 - [x] `@rullino/konva` (Konva.Image source swapped after an async render, #102) — first, it is where GPU speed shows most.
 - [ ] `@rullino/fabric` — after Konva, only if Konva gets interest; Fabric already has WebGL filters and two GPU contexts cannot share textures (one readback per render).
-- [ ] Each adapter: < 200 lines, README, StackBlitz demo.
+- [ ] Each adapter: < 200 lines, README, StackBlitz demo. Konva done (`examples/konva-editor`).
 - [ ] Docs by job: preview + export, LUT looks in your editor, same edit on the server, remove an object on-device. Five one-file examples: Konva editor, Fabric editor, Next.js server render, Node batch, Worker fallback.
 - [ ] Migration notes from glfx and tui.image-editor (filter mapping).
 - [ ] Playground: **Copy as code** (edit JSON + snippet; was UX review step 6), backend + render time in plain words. The film strip (UX review step 4) is done; the examples gallery (step 5) waits: the playground is a developer demo, not an editor.
