@@ -51,7 +51,8 @@ const documents: [string, unknown][] = [
   ], { lutRef: lookLutRef }))],
 ];
 
-describe('browser (Chromium WebGPU) vs Node (Dawn)', async () => {
+// Cold shader compilation on Dawn / lavapipe and SwiftShader: one image took 7.2 s of the 15 s default in CI (#100).
+describe('browser (Chromium WebGPU) vs Node (Dawn)', { timeout: 60_000 }, async () => {
   const images: [string, LinearImage][] = [['river', await sample('river.jpg', 120)], ['still life', await sample('still-life.jpg', 120)], ['chart', chart()]];
 
   it.each(images)('%s: every document agrees within 4e-3 + 4e-3·|v|', async (_, image) => {

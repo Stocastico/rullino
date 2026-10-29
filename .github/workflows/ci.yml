@@ -30,8 +30,10 @@ jobs:
       # @rullino/node's tests run Dawn (the webgpu package): without a GPU it needs a software
       # Vulkan driver, Mesa's lavapipe.
       - run: sudo apt-get update -q && sudo apt-get install -y -q mesa-vulkan-drivers
-      # Unit tests first: the fastest feedback.
+      # Unit tests first: the fastest feedback. Step timeouts (~10x the usual run) make a stuck
+      # Dawn / lavapipe process fail in minutes instead of using up the job (#100).
       - run: pnpm test
+        timeout-minutes: 5
       # No GPU on hosted runners: Chromium runs WebGPU on SwiftShader.
       - run: pnpm exec playwright install --with-deps chromium
       # Fail fast, with a clear message, if Chromium cannot get a WebGPU adapter.
@@ -39,6 +41,7 @@ jobs:
         run: pnpm exec vitest run --project browser packages/core/src/gpu/adapter.browser.test.ts
       # Unit + GPU tests with coverage; fails below the thresholds in vitest.config.ts.
       - run: pnpm test:coverage
+        timeout-minutes: 12
       - name: Coverage report
         if: always()
         uses: actions/upload-artifact@v7
