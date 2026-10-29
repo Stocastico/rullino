@@ -48,7 +48,7 @@ try {
   // Pinned to a generated test image: the checks below rely on its layout.
   await page.goto(`${url}?sample=ramps`);
   await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
-  check((await status()).startsWith('WebGPU'), `expected the WebGPU renderer, status was: ${await status()}`);
+  check((await status()).startsWith('On the GPU (WebGPU)'), `expected the WebGPU renderer, status was: ${await status()}`);
 
   // Project header: the version being demoed, what to install, where the code and docs are.
   const version = JSON.parse(readFileSync(new URL('../../../packages/core/package.json', import.meta.url), 'utf8')).version;

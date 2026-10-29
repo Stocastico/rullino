@@ -50,6 +50,7 @@ import { History } from './history';
 import { decodeState, encodeState } from './share';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
 import { createDepthMapper } from './depth-estimate';
+import { statusText } from './status-text';
 import { createObjectRemover, REMOVE_GROW } from './object-remove';
 import { createObjectSelector, isSoftwareAdapter } from './object-select';
 
@@ -384,6 +385,8 @@ let gpuContext: GpuContext | undefined;
 /** The current image's source, to upload it again after a device loss. */
 let lastSource: ImageBitmapSource | undefined;
 let imageInfo = '';
+/** Why the CPU renders, for the status line. */
+let cpuReason: string | undefined;
 let imageName = 'image';
 /** The sample shown, or undefined for the user's own image (share links name samples only). */
 let imageSample: string | undefined;
@@ -406,7 +409,7 @@ async function render() {
       const steps = toSteps(chain, soloUid);
       await busyWhile(renderer.render(steps, preview));
       const n = activeSteps(steps).length;
-      ui.status.textContent = `${renderer.name} · ${imageInfo} · ${n} step${n === 1 ? '' : 's'}${soloUid ? ' · up to one step' : ''}${preview ? ' · preview' : ''} · ${(performance.now() - t0).toFixed(1)} ms`;
+      ui.status.textContent = statusText({ backend: gpuContext ? 'gpu' : 'cpu', reason: cpuReason, image: imageInfo, steps: n, solo: !!soloUid, preview, ms: performance.now() - t0 });
     } catch (e) {
       announce(`Render failed: ${(e as Error).message}`);
       console.error(e);
@@ -1115,6 +1118,7 @@ async function startRenderer(): Promise<void> {
       },
     });
     gpuContext = gpu;
+    cpuReason = undefined;
     renderer = gpuRenderer(gpu);
     void gpu.lost.then((info) => {
       if (gpu === gpuContext) void recoverFromDeviceLoss(info);
@@ -1123,6 +1127,7 @@ async function startRenderer(): Promise<void> {
     console.warn(e);
     gpuContext = undefined;
     renderer = cpuRenderer();
+    cpuReason = `WebGPU unavailable: ${(e as Error).message}`;
     announce(`WebGPU unavailable (${(e as Error).message}); using the CPU reference.`);
   }
 }
