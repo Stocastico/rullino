@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "steps": [
+    { "filter": "exposure", "params": { "ev": 0.25 } },
+    { "filter": "contrast", "params": { "amount": 0.15 } },
+    { "filter": "saturation", "params": { "amount": 0.1 } },
+    { "filter": "vignette", "params": { "amount": 0.3 } }
+  ],
+  "output": { "format": "jpeg", "quality": 0.85, "longSide": 1600 }
+}
