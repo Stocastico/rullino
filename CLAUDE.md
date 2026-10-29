@@ -6,7 +6,7 @@ Guidance for working in this repo. Design and roadmap: [PLAN.md](./PLAN.md). Kee
 
 ```sh
 pnpm install
-pnpm typecheck        # tsc over all packages and apps, then the ```ts examples of the root and package READMEs (scripts/check-readmes.mjs)
+pnpm typecheck        # tsc over all packages and apps, then the ```ts examples of the root and package READMEs and of docs/guides (scripts/check-readmes.mjs)
 pnpm test             # unit tests (Node): CPU references, color, float16, compare, playground logic, @rullino/node on Dawn (needs a Vulkan driver: `apt install mesa-vulkan-drivers` without a GPU)
 pnpm test:browser     # GPU tests in headless Chromium (WebGPU), incl. GPU<->CPU parity
 pnpm test:all         # both
@@ -55,6 +55,8 @@ npx vitest run packages/filters -u    # rewrite docs/filters.md (filter referenc
 - `apps/bench` — the comparison page (#77): `harness.ts` `runBench` (init / first run / change latency / memory / |Δ| vs the first adapter, unit-tested with fake adapters), `adapters/*` one per library (each its own chunk), `chains.ts` the chains as data, `rullino-chains.ts` as rullino steps, `tables.ts` the curve table and colour map rullino computes for the libraries that lack curves / 3D LUTs, `vite.config.ts` cross-origin isolation, library versions and `sizes.json` (gzip per adapter); `scripts/run.mjs` builds, serves and optionally runs it headless.
 
 - `examples/` — one-file examples on the published packages (`^x.y.z` ranges, not workspace links, so StackBlitz can open them from GitHub): `konva-editor` (Konva stage + sliders + look picker + export), `node-batch` (an edit document rendered onto a folder of photos with `@rullino/node`), `worker-fallback` (`@rullino/web` with a backend menu: WebGPU, or the CPU in a worker). Not workspace members and not type-checked; `pnpm test:pack` copies each one's files next to the installed tarballs, builds it with Vite and drives it in Chromium (`node-batch`: runs the script and checks the files and sizes it writes; `worker-fallback`: forced onto the CPU backend with `?backend=cpu`).
+
+- `docs/guides/` — docs by job (preview and export, the same edit on the server, looks in your editor); every `ts` block is a module of its own, compiled by `pnpm typecheck`. `docs/filters.md` and `docs/parity.md` are generated.
 
 - `.claude/skills/` — repo skills: `add-filter` (the recipe for a new filter, tests to mutation check) and `finish-step` (verification, CLAUDE.md upkeep, PR and CI). `.claude/settings.json` enables two official plugins: `claude-md-management` and `skill-creator`.
 
