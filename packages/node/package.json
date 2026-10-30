@@ -1,6 +1,6 @@
 {
   "name": "@rullino/node",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Render rullino edit documents in Node: the same WebGPU shaders as the browser through Dawn, with a CPU fallback.",
   "keywords": [
     "webgpu",
