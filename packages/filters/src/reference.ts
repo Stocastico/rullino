@@ -112,5 +112,21 @@ export function parityTable(filters: readonly Filter<any>[]): string {
     }
     out.push('');
   }
+  const looser = filters.filter((f) => f.hardwareTolerance);
+  if (looser.length > 0) {
+    out.push(
+      '## On real GPUs',
+      '',
+      'CI runs on a software GPU (SwiftShader), and the tolerances above are calibrated on it. Real GPUs round float16 and evaluate `pow`, `exp` and division differently, and filters that iterate or amplify (diffusion, divisions, exponents) or decide on a threshold show it: these filters declare a looser tolerance, used by the parity tests only when the adapter is not a software one. Measured with `pnpm report:parity` on one machine (NVIDIA RTX 40, Chrome, 30 Oct 2026) plus a margin; other GPUs may differ, and a report from yours is welcome.',
+      '',
+      '| Filter | abs | rel | Outliers |',
+      '|---|---|---|---|',
+    );
+    for (const f of looser) {
+      const { abs, rel, outliers = 0 } = f.hardwareTolerance as { abs: number; rel: number; outliers?: number };
+      out.push(`| ${cell(f.label)} (\`${f.id}\`) | ${short(abs)} | ${short(rel)} | ${outliers ? `${short(outliers * 100)}%` : 0} |`);
+    }
+    out.push('');
+  }
   return out.join('\n');
 }

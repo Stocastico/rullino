@@ -80,3 +80,14 @@ For scale: one 8-bit step of sRGB output is about 0.0003 in linear light near bl
 | Chromatic aberration (`chromaticAberration`) | multipass | 0.001 | 0.002 | 0.003 | 0 |
 | Kuwahara (painterly) (`kuwahara`) | multipass | 0.002 | 0.002 | 0.004 | 0 |
 | Lens blur (depth) (`lensBlur`) | multipass | 0.0003 | 0.001 | 0.0013 | 0 |
+
+## On real GPUs
+
+CI runs on a software GPU (SwiftShader), and the tolerances above are calibrated on it. Real GPUs round float16 and evaluate `pow`, `exp` and division differently, and filters that iterate or amplify (diffusion, divisions, exponents) or decide on a threshold show it: these filters declare a looser tolerance, used by the parity tests only when the adapter is not a software one. Measured with `pnpm report:parity` on one machine (NVIDIA RTX 40, Chrome, 30 Oct 2026) plus a margin; other GPUs may differ, and a report from yours is welcome.
+
+| Filter | abs | rel | Outliers |
+|---|---|---|---|
+| Canny edges (`canny`) | 0 | 0 | 0.4% |
+| Remove (inpaint) (`inpaint`) | 0.015 | 0.004 | 0 |
+| Sketch (`sketch`) | 0.012 | 0.004 | 0 |
+| Kuwahara (painterly) (`kuwahara`) | 0.0045 | 0.002 | 0 |

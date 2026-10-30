@@ -8,6 +8,8 @@ import { parityCases as cases, parityImages as images, parityMask } from './test
 // this for free.
 
 const ctx = await createGpuContext();
+// Looser tolerances (where a filter declares one) only on real GPUs: CI's software adapter keeps the tight ones.
+const software = (await navigator.gpu.requestAdapter())?.info.isFallbackAdapter ?? true;
 afterAll(() => ctx.device.destroy());
 
 describe.each(filters.map((f) => [f.id, f as Filter] as const))('%s GPU <-> CPU parity', (_, f) => {
@@ -16,7 +18,7 @@ describe.each(filters.map((f) => [f.id, f as Filter] as const))('%s GPU <-> CPU 
     const full = { ...defaultParams(f.params), ...params } as never;
     const mask = f.kind === 'multipass' && f.usesMask ? parityMask : undefined;
     const out = await readImage(ctx, runFilter(ctx, f, uploadImage(ctx, src), full, mask));
-    const result = compareImages(out, mask ? f.cpu(src, full, maskImage(mask, src.width, src.height)) : f.cpu(src, full), f.tolerance);
+    const result = compareImages(out, mask ? f.cpu(src, full, maskImage(mask, src.width, src.height)) : f.cpu(src, full), (!software && f.hardwareTolerance) || f.tolerance);
     expect(result.pass, `${result.outliers} channels out of tolerance, worst ${JSON.stringify(result.worst)}`).toBe(true);
   });
 });

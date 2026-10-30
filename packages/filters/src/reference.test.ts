@@ -79,6 +79,17 @@ describe('parityTable', () => {
     expect(md).not.toContain('## Look');
   });
 
+  it('lists the looser tolerances for real GPUs in a section of their own, only for filters that declare one', () => {
+    const md = parityTable([
+      fake({ id: 'a', label: 'A', category: 'adjust', tolerance: { abs: 1e-3, rel: 1e-3 } }),
+      fake({ id: 'b', label: 'B', category: 'stylize', tolerance: { abs: 2e-3, rel: 4e-3 }, hardwareTolerance: { abs: 1.5e-2, rel: 4e-3 } }),
+    ]);
+    const hw = md.slice(md.indexOf('## On real GPUs'));
+    expect(hw).toContain('| B (`b`) | 0.015 | 0.004 | 0 |');
+    expect(hw).not.toContain('(`a`)');
+    expect(parityTable([fake({ id: 'a', label: 'A', category: 'adjust', tolerance: { abs: 1e-3, rel: 1e-3 } })])).not.toContain('On real GPUs');
+  });
+
   it('the committed table matches the registry (run `npx vitest run packages/filters -u` after changing a tolerance)', async () => {
     await expect(parityTable(filters)).toMatchFileSnapshot('../../../docs/parity.md');
   });

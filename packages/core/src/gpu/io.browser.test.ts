@@ -6,6 +6,8 @@ import { encodeToTexture, importImage, readSrgb8, uploadSrgb8 } from './io';
 import { readImage, uploadImage } from './texture';
 
 const ctx = await createGpuContext();
+// Hardware sRGB texture decoding is a bit coarser than the CPU's pow(): ~0.4 of an 8-bit step on an RTX 40.
+const software = (await navigator.gpu.requestAdapter())?.info.isFallbackAdapter ?? true;
 afterAll(() => ctx.device.destroy());
 
 /** Every 8-bit value on every channel, with a spread of alpha values (incl. 0 and 255). */
@@ -45,7 +47,7 @@ describe('GPU image I/O', () => {
     for (const bytes of [new Uint8Array(src.data), src.data]) {
       const out = await readImage(ctx, uploadSrgb8(ctx, bytes, src.width, src.height));
       expect([out.width, out.height]).toEqual([src.width, src.height]);
-      const res = compareImages(out, decodeSrgb8(src.data, src.width, src.height), { abs: 1e-4, rel: 2 ** -9 });
+      const res = compareImages(out, decodeSrgb8(src.data, src.width, src.height), { abs: software ? 1e-4 : 2.5e-3, rel: 2 ** -9 });
       expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
     }
     expect(() => uploadSrgb8(ctx, new Uint8Array(12), 2, 2)).toThrow(RangeError);

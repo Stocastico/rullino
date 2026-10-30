@@ -94,4 +94,6 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     return cur;
   },
   tolerance: { abs: 2e-3, rel: 4e-3 },
+  // RTX 40: 0.0142 at 400 iterations, 0.0064 at the defaults (f16 rounding of the ping-pong textures differs).
+  hardwareTolerance: { abs: 1.5e-2, rel: 4e-3 },
 });
