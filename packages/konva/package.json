@@ -1,6 +1,6 @@
 {
   "name": "@rullino/konva",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Edit a Konva.Image with a rullino edit document: WebGPU previews at the size on screen, full-resolution export.",
   "keywords": [
     "konva",

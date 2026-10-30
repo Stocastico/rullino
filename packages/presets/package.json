@@ -1,6 +1,6 @@
 {
   "name": "@rullino/presets",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Photo looks for rullino: LUT recipes plus vignette and grain.",
   "keywords": [
     "webgpu",

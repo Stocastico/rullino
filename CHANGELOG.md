@@ -11,6 +11,14 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.5.1]
+
+Documentation only: no code of any package changed since 0.5.0. The npm pages of two packages now point at the new examples; the guides, the new examples and the playground's plain-words status line live in the repository and the playground, not in the packages.
+
+### Changed
+- **konva**: the README links the complete editor in `examples/konva-editor` (with a StackBlitz link).
+- **node**: the README links `examples/node-batch`, which renders one edit document onto a folder of photos.
+
 ## [0.5.0]
 
 A first editor adapter: `@rullino/konva` edits a `Konva.Image` with the same edit documents the browser, the CPU worker and the Node renderer already share.
