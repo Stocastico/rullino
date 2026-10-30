@@ -175,3 +175,43 @@ export function mapStraight(src: LinearImage, f: (r: number, g: number, b: numbe
   }
   return out;
 }
+
+/**
+ * A straight-alpha filter that changes OKLab lightness / chroma only: `f` receives (L, a, b) of the
+ * un-premultiplied colour of each pixel with alpha > 0 and writes the new ones to `o[0..2]`.
+ * The conversions are `linearToOklab` / `oklabToLinear` without their per-call arrays. Colour of a
+ * transparent pixel is 0, alpha is kept.
+ */
+export function mapOklab(src: LinearImage, f: (L: number, a: number, b: number, o: Float64Array) => void): LinearImage {
+  const s = src.data;
+  const out = createImage(src.width, src.height);
+  const d = out.data;
+  const o = new Float64Array(3);
+  for (let i = 0; i < s.length; i += 4) {
+    const alpha = s[i + 3]!;
+    d[i + 3] = alpha;
+    if (alpha <= 0) continue;
+    const r = s[i]! / alpha;
+    const g = s[i + 1]! / alpha;
+    const b = s[i + 2]! / alpha;
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const sc = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    f(
+      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * sc,
+      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * sc,
+      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * sc,
+      o,
+    );
+    const l_ = o[0]! + 0.3963377774 * o[1]! + 0.2158037573 * o[2]!;
+    const m_ = o[0]! - 0.1055613458 * o[1]! - 0.0638541728 * o[2]!;
+    const s_ = o[0]! - 0.0894841775 * o[1]! - 1.291485548 * o[2]!;
+    const l3 = l_ * l_ * l_;
+    const m3 = m_ * m_ * m_;
+    const s3 = s_ * s_ * s_;
+    d[i] = (4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3) * alpha;
+    d[i + 1] = (-1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3) * alpha;
+    d[i + 2] = (-0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3) * alpha;
+  }
+  return out;
+}

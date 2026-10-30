@@ -1,4 +1,5 @@
 import { defineFilter, linearToOklab, oklabToLinear } from '@rullino/core';
+import { mapOklab } from '../fast';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /** OKLab chroma above which vibrance has no effect. sRGB primaries reach ~0.32. */
@@ -31,6 +32,15 @@ fn apply(c: vec4f, p: Params) -> vec4f {
     const w = Math.min(1, Math.max(0, 1 - Math.hypot(A, B) / FULL_CHROMA));
     const k = 1 + amount * w;
     return [...oklabToLinear(L, A * k, B * k), a];
+  },
+  fast: (src, { amount }) => {
+    return mapOklab(src, (L, a, b, o) => {
+      const w = Math.min(1, Math.max(0, 1 - Math.hypot(a, b) / FULL_CHROMA));
+      const k = 1 + amount * w;
+      o[0] = L;
+      o[1] = a * k;
+      o[2] = b * k;
+    });
   },
   tolerance: OKLAB_TOLERANCE,
 });

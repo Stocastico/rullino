@@ -1,4 +1,5 @@
 import { defineFilter, linearToOklab, oklabToLinear } from '@rullino/core';
+import { mapOklab } from '../fast';
 import { OKLAB_TOLERANCE } from '../shared';
 
 const tone = (L: number, s: number, h: number) => {
@@ -35,6 +36,13 @@ fn apply(c: vec4f, p: Params) -> vec4f {
   pixel: ([r, g, b, a], { shadows, highlights }) => {
     const [L, A, B] = linearToOklab(r, g, b);
     return [...oklabToLinear(tone(L, shadows, highlights), A, B), a];
+  },
+  fast: (src, { shadows, highlights }) => {
+    return mapOklab(src, (L, a, b, o) => {
+      o[0] = tone(L, shadows, highlights);
+      o[1] = a;
+      o[2] = b;
+    });
   },
   tolerance: OKLAB_TOLERANCE,
 });

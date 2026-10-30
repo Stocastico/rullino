@@ -1,4 +1,5 @@
 import { defineFilter, linearToOklab, oklabToLinear } from '@rullino/core';
+import { mapOklab } from '../fast';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /** Scales OKLab chroma by (1 + amount): -1 is fully desaturated, lightness is preserved. */
@@ -23,6 +24,14 @@ fn apply(c: vec4f, p: Params) -> vec4f {
     const [L, A, B] = linearToOklab(r, g, b);
     const k = 1 + amount;
     return [...oklabToLinear(L, A * k, B * k), a];
+  },
+  fast: (src, { amount }) => {
+    const k = 1 + amount;
+    return mapOklab(src, (L, a, b, o) => {
+      o[0] = L;
+      o[1] = a * k;
+      o[2] = b * k;
+    });
   },
   tolerance: OKLAB_TOLERANCE,
 });
