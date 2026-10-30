@@ -189,14 +189,14 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 - [ ] `@rullino/fabric` — after Konva, only if Konva gets interest; Fabric already has WebGL filters and two GPU contexts cannot share textures (one readback per render).
 - [ ] Each adapter: < 200 lines, README, StackBlitz demo. Konva done (`examples/konva-editor`, 0.5.0; checked on StackBlitz 29 Oct: WebGPU in Chrome, CPU worker in Firefox on Linux).
 - [ ] Docs by job (`docs/guides/`, `ts` blocks type-checked by `pnpm typecheck`): ~~preview + export~~, ~~LUT looks in your editor~~, ~~same edit on the server~~, ~~remove an object on-device~~ (all four done 29 Oct). Five one-file examples: ~~Konva editor~~ (done), ~~Node batch~~ (done 29 Oct), ~~Worker fallback~~ (done 29 Oct), Fabric editor, Next.js server render.
-- [ ] Migration notes from glfx and tui.image-editor (filter mapping).
+- [x] Migration notes from glfx and tui.image-editor (filter mapping): `docs/guides/migrating-from-glfx-and-tui.md`, done 30 Oct; written against glfx's documentation and tui's filter-menu source, with the gaps (sepia, warps, tint / multiply / blend, remove colour) listed.
 - [ ] Playground: ~~**Copy as code**~~ (done 29 Oct, #108: the Code button, edit JSON + browser / Konva / Node snippets), ~~backend + render time in plain words~~ (done 29 Oct). The film strip (UX review step 4) is done; the examples gallery (step 5) waits: the playground is a developer demo, not an editor.
 
 **Where we are (29 Oct, end of day; published: 0.5.0 of all seven packages).** Next, in this order:
 1. ~~**Node batch example**~~ (`examples/node-batch`, done 29 Oct): one file that renders an edit document onto a folder of photos with `@rullino/node`; `pnpm test:pack` runs it against the tarballs and checks the files and their size.
 2. ~~**Status line in plain words**~~ (done 29 Oct): the playground says "On the GPU (WebGPU) · River 2048×1365 · 3 steps · 370 ms", or "On the CPU (WebGPU unavailable: …)" (`status-text.ts`).
 3. ~~**Worker fallback example**~~ (`examples/worker-fallback`, done 29 Oct) and **Next.js server render example** (the remaining one-file example except Fabric).
-4. ~~Docs by job~~ (four guides, done 29 Oct), then the migration notes (glfx, tui.image-editor).
+4. ~~Docs by job~~ (four guides, done 29 Oct) and ~~the migration notes~~ (30 Oct). Phase 2 is then only the optional adapters and examples below.
 5. Fabric only if Konva gets interest (watch npm downloads / issues of `@rullino/konva`).
 
 Open issues to keep in view: [#95](https://github.com/Stocastico/rullino/issues/95) CPU fast paths round 2 (fallback speed), [#96](https://github.com/Stocastico/rullino/issues/96) playground without WebGPU, [#100](https://github.com/Stocastico/rullino/issues/100) the unexplained 28-minute CI stall (timeouts now make it fail fast; the 3.8 s cold-shader cause of the release failures is fixed). Release routine: `node scripts/set-version.mjs X.Y.Z` + CHANGELOG section in a PR, merge, the maintainer pushes the tag (checklist at the top of CHANGELOG.md); npm can take minutes to show a package the workflow already published.
