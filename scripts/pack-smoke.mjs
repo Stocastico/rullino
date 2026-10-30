@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
+import { launchOptions } from './browser-launch.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: it breaks Windows paths
 const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva'];
@@ -189,7 +190,7 @@ window.__result = result;
   );
   await build({ root: project, logLevel: 'error', build: { outDir: 'out', target: 'esnext' } });
   const server = await preview({ root: project, build: { outDir: 'out' }, preview: { port: 0 } });
-  const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
+  const browser = await chromium.launch(launchOptions());
   try {
     const page = await browser.newPage();
     page.on('pageerror', (e) => { failures.push(`page error: ${e.message}`); console.error('page error:', e.message); });

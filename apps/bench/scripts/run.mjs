@@ -8,6 +8,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
+import { launchOptions } from '../../../scripts/browser-launch.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: Windows paths
 const args = process.argv.slice(2);
@@ -20,7 +21,7 @@ const url = server.resolvedUrls.local[0];
 if (!args.includes('--headless')) {
   console.log(`\nBenchmark page: ${url}\nOpen it in Chrome or Edge (WebGPU), close other tabs, press Run, then Download JSON. Ctrl+C to stop.\n`);
 } else {
-  const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'] });
+  const browser = await chromium.launch(launchOptions({ vulkan: true }));
   let failed = false;
   try {
     const page = await browser.newPage();

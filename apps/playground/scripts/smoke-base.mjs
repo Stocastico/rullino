@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { chromium } from 'playwright';
+import { launchOptions } from '../../../scripts/browser-launch.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const PREFIX = '/sites/rullino/';
@@ -37,7 +38,7 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const url = `http://localhost:${server.address().port}${PREFIX}`;
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
+const browser = await chromium.launch(launchOptions());
 try {
   const page = await browser.newPage();
   page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));

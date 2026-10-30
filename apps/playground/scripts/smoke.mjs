@@ -5,10 +5,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
+import { launchOptions } from '../../../scripts/browser-launch.mjs';
 
 const server = await preview({ root: fileURLToPath(new URL('..', import.meta.url)), preview: { port: 0, strictPort: false } });
 const url = server.resolvedUrls.local[0];
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
+const browser = await chromium.launch(launchOptions());
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
 
