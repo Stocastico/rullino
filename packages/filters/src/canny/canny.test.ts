@@ -70,3 +70,30 @@ describe('canny', () => {
   });
 });
 
+
+// The fast path must follow the reference round by round, not only once hysteresis has converged:
+// long weak edges (vertical, horizontal and a diagonal chain that only an 8-connected rule follows)
+// grow out of short strong segments. Contrast fades gradually: a hard switch would make a
+// T-junction, which non-maximum suppression breaks. Exact, no outliers.
+describe('canny fast path, hysteresis round by round', () => {
+  const fade = (t: number) => 0.75 * Math.min(1, Math.max(0, (t - 5) / 20));
+  const raw = imageOf(200, 150, (x, y) => {
+    if (y >= 90) return enc(x - (y - 90) < 40 ? fade(y - 90) : 1);
+    if (x < 100) return enc(x < 37 ? fade(y) : 1);
+    return enc(y < 61 ? fade(x - 100) : 1);
+  });
+  const img = createImage(raw.width, raw.height, Float32Array.from(raw.data, (v) => Math.fround(v)));
+  it.each([0, 1, 2, 7, 20, 64])('equals the reference after %i iterations', (iterations) => {
+    const p = { sigma: 1, low: 0.08, high: 0.3, iterations };
+    const want = canny.cpu(img, p);
+    const got = canny.fast!(img, p);
+    let differing = 0;
+    for (let i = 0; i < want.data.length; i++) if (want.data[i] !== got.data[i]) differing++;
+    expect(differing).toBe(0);
+  });
+  it('really propagates (the image is not trivial)', () => {
+    const count = (n: number) => Array.from(canny.fast!(img, { sigma: 1, low: 0.08, high: 0.3, iterations: n }).data).filter((v, i) => i % 4 === 0 && v > 0.5).length;
+    expect(count(1)).toBeGreaterThan(count(0));
+    expect(count(20)).toBeGreaterThan(count(1));
+  });
+});

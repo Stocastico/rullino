@@ -1,5 +1,6 @@
 import { createImage, defineFilter, luminance, type LinearImage } from '@rullino/core';
 import { convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { convolve1dFast } from '../fast';
 
 /** Half-width of the soft knee around the threshold (in linear luminance). */
 const KNEE = 0.1;
@@ -61,6 +62,27 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     for (let i = 0; i < src.data.length; i += 4) {
       for (let c = 0; c < 3; c++) out.data[i + c] = src.data[i + c]! + intensity * glow.data[i + c]!;
       out.data[i + 3] = Math.min(1, src.data[i + 3]! + intensity * glow.data[i + 3]!);
+    }
+    return out;
+  },
+  fast: (src, { threshold, sigma, intensity }) => {
+    const { data: s } = src;
+    const bright = createImage(src.width, src.height);
+    for (let i = 0; i < s.length; i += 4) {
+      const w = smoothstep(threshold - KNEE, threshold + KNEE, luminance(s[i]!, s[i + 1]!, s[i + 2]!));
+      bright.data[i] = s[i]! * w;
+      bright.data[i + 1] = s[i + 1]! * w;
+      bright.data[i + 2] = s[i + 2]! * w;
+      bright.data[i + 3] = s[i + 3]! * w;
+    }
+    const k = gaussianWeights(sigma);
+    const glow = q16(convolve1dFast(q16(convolve1dFast(q16(bright), k, 'x')), k, 'y')).data;
+    const out = createImage(src.width, src.height);
+    for (let i = 0; i < s.length; i += 4) {
+      out.data[i] = s[i]! + intensity * glow[i]!;
+      out.data[i + 1] = s[i + 1]! + intensity * glow[i + 1]!;
+      out.data[i + 2] = s[i + 2]! + intensity * glow[i + 2]!;
+      out.data[i + 3] = Math.min(1, s[i + 3]! + intensity * glow[i + 3]!);
     }
     return out;
   },
