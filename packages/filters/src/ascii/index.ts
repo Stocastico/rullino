@@ -1,5 +1,6 @@
 import { createImage, defineFilter, linearToSrgb, luminance, srgbToLinear } from '@rullino/core';
 import { clampLoad } from '../convolution';
+import { toLinear } from '../fast';
 
 /**
  * The glyph ramp, from empty to solid: 5 × 7 bitmaps, one 5-bit row per line (most significant bit
@@ -121,6 +122,72 @@ fn run(xy: vec2i, p: Params) -> vec4f {
         const a = src.data[(y * src.width + x) * 4 + 3]!;
         out.data.set([...e.map((v) => srgbToLinear(v) * a), a], (y * src.width + x) * 4);
       }
+    return out;
+  },
+  fast: (src, { cell, color, ink, paper, invert }) => {
+    const { width: w, height: h, data: s } = src;
+    const out = createImage(w, h);
+    const cw = Math.ceil(w / cell);
+    const ch = Math.ceil(h / cell);
+    // The reference samples a cell's taps again for each of its pixels: do it once per cell, with
+    // the exact transfer functions (the glyph index is a hard decision).
+    const offs = Array.from({ length: TAPS }, (_, i) => Math.floor(((2 * i + 1) * cell) / (2 * TAPS)));
+    const glyph = new Uint8Array(cw * ch);
+    const mean = new Float64Array(cw * ch * 3);
+    for (let cy = 0; cy < ch; cy++)
+      for (let cx = 0; cx < cw; cx++) {
+        let tone = 0;
+        let m0 = 0, m1 = 0, m2 = 0;
+        for (let j = 0; j < TAPS; j++)
+          for (let i = 0; i < TAPS; i++) {
+            const x = Math.min(w - 1, cx * cell + offs[i]!);
+            const y = Math.min(h - 1, cy * cell + offs[j]!);
+            const k = (y * w + x) * 4;
+            const a = s[k + 3]!;
+            if (a <= 0) continue; // transparent counts as black: adds 0 to the mean and the tone
+            const e0 = Math.min(1, Math.max(0, linearToSrgb(s[k]! / a)));
+            const e1 = Math.min(1, Math.max(0, linearToSrgb(s[k + 1]! / a)));
+            const e2 = Math.min(1, Math.max(0, linearToSrgb(s[k + 2]! / a)));
+            m0 += e0;
+            m1 += e1;
+            m2 += e2;
+            tone += luminance(srgbToLinear(e0), srgbToLinear(e1), srgbToLinear(e2));
+          }
+        let idx = Math.min(N - 1, Math.max(0, Math.floor(linearToSrgb(tone / (TAPS * TAPS)) * (N - 1) + 0.5)));
+        if (invert) idx = N - 1 - idx;
+        const c = cy * cw + cx;
+        glyph[c] = idx;
+        mean[c * 3] = m0 / (TAPS * TAPS);
+        mean[c * 3 + 1] = m1 / (TAPS * TAPS);
+        mean[c * 3 + 2] = m2 / (TAPS * TAPS);
+      }
+    const gx = Array.from({ length: cell }, (_, l) => Math.floor(((2 * l + 1) * GLYPH_W) / (2 * cell)));
+    const gy = Array.from({ length: cell }, (_, l) => Math.floor(((2 * l + 1) * GLYPH_H) / (2 * cell)));
+    const inkLin = ink.map((v) => srgbToLinear(v));
+    const paperLin = paper.map((v) => srgbToLinear(v));
+    const source = color === 'source';
+    for (let y = 0; y < h; y++) {
+      const cy = Math.floor(y / cell);
+      const row = gy[y - cy * cell]!;
+      for (let x = 0; x < w; x++) {
+        const cx = Math.floor(x / cell);
+        const c = cy * cw + cx;
+        const on = ((GLYPHS[glyph[c]!]![row]! >> (GLYPH_W - 1 - gx[x - cx * cell]!)) & 1) === 1;
+        const o = (y * w + x) * 4;
+        const a = s[o + 3]!;
+        if (on && source) {
+          out.data[o] = toLinear(mean[c * 3]!) * a;
+          out.data[o + 1] = toLinear(mean[c * 3 + 1]!) * a;
+          out.data[o + 2] = toLinear(mean[c * 3 + 2]!) * a;
+        } else {
+          const e = on ? inkLin : paperLin;
+          out.data[o] = e[0]! * a;
+          out.data[o + 1] = e[1]! * a;
+          out.data[o + 2] = e[2]! * a;
+        }
+        out.data[o + 3] = a;
+      }
+    }
     return out;
   },
   // Hard decisions twice: the glyph index (a threshold on the cell's tone) and the glyph bits. The
