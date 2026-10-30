@@ -4,6 +4,10 @@ import { imageOf } from '../test-utils';
 import { canny } from './index';
 
 const ctx = await createGpuContext();
+// Real GPUs differ from the CPU in a few borderline non-maximum-suppression decisions (RTX 40: 384 of
+// 120000 channels, already at 0 iterations), so there the pixel-exact check becomes the declared
+// hardware outlier share plus a check that propagation really grows with the iteration count.
+const software = (await navigator.gpu.requestAdapter())?.info.isFallbackAdapter ?? true;
 afterAll(() => ctx.device.destroy());
 
 // Long weak edges growing out of short strong segments, vertical and horizontal: hysteresis must
@@ -31,8 +35,20 @@ it('the test image actually exercises propagation', () => {
   expect(edges(20)).toBeGreaterThan(edges(1));
 });
 
+const edgeCount = (data: Float32Array) => Array.from(data).filter((v, i) => i % 4 === 0 && v > 0.5).length;
+
 it.each([0, 1, 2, 7, 20, 64])('hysteresis matches the CPU exactly after %i iterations', async (n) => {
   const out = await readImage(ctx, runFilter(ctx, canny, uploadImage(ctx, src), params(n)));
-  const res = compareImages(out, canny.cpu(src, params(n)), { abs: 0, rel: 0 });
-  expect(res.outliers, JSON.stringify(res.worst)).toBe(0);
+  const want = canny.cpu(src, params(n));
+  const res = compareImages(out, want, { abs: 0, rel: 0, outliers: software ? 0 : (canny.hardwareTolerance?.outliers ?? 0) });
+  expect(res.pass, `${res.outliers} channels differ, worst ${JSON.stringify(res.worst)}`).toBe(true);
+  // Even with outliers allowed, the edge pixel count must follow the CPU's closely.
+  if (!software) expect(Math.abs(edgeCount(out.data) - edgeCount(want.data))).toBeLessThanOrEqual(120);
+});
+
+it.runIf(!software)('on real GPUs propagation still grows with the iteration count', async () => {
+  const count = async (n: number) => edgeCount((await readImage(ctx, runFilter(ctx, canny, uploadImage(ctx, src), params(n)))).data);
+  const [a, b, c] = [await count(0), await count(1), await count(20)];
+  expect(b).toBeGreaterThan(a);
+  expect(c).toBeGreaterThan(b);
 });

@@ -72,4 +72,6 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     return out;
   },
   tolerance: { abs: 2e-3, rel: 4e-3 },
+  // RTX 40: 0.0134 at darkness 4 (the exponent amplifies the division's error).
+  hardwareTolerance: { abs: 1.2e-2, rel: 4e-3 },
 });

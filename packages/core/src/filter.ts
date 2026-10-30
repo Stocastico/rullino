@@ -40,6 +40,8 @@ export interface PointwiseFilterDef<S extends ParamSchema = ParamSchema> {
   readonly fast?: (src: LinearImage, p: ParamValues<S>) => LinearImage;
   /** Allowed GPU <-> CPU difference, on top of rgba16float quantisation of the input. */
   readonly tolerance: Tolerance;
+  /** Looser tolerance for real (non-software) GPUs, measured with `pnpm report:parity`; see docs/parity.md. */
+  readonly hardwareTolerance?: Tolerance;
 }
 
 export interface PointwiseFilter<S extends ParamSchema = ParamSchema> extends PointwiseFilterDef<S> {
@@ -96,6 +98,8 @@ interface FilterBase<S extends ParamSchema> {
   readonly category: FilterCategory;
   readonly params: S;
   readonly tolerance: Tolerance;
+  /** Looser tolerance for real (non-software) GPUs, measured with `pnpm report:parity`; see docs/parity.md. */
+  readonly hardwareTolerance?: Tolerance;
 }
 
 /**

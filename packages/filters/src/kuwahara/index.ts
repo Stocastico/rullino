@@ -122,4 +122,6 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     return out;
   },
   tolerance: { abs: 2e-3, rel: 2e-3 },
+  // RTX 40: 0.0044 at radius 1.
+  hardwareTolerance: { abs: 4.5e-3, rel: 2e-3 },
 });

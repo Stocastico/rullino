@@ -152,4 +152,6 @@ fn run(xy: vec2i, p: Params) -> vec4f {
   },
   // Hard decisions: f32 (GPU) vs f64 (CPU) arithmetic can flip a few borderline pixels.
   tolerance: { abs: 0, rel: 0, outliers: 0.002 },
+  // RTX 40: 0.3% of channels at high = 0 (every gradient pixel is a strong edge: more borderline decisions).
+  hardwareTolerance: { abs: 0, rel: 0, outliers: 0.004 },
 });
