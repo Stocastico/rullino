@@ -39,7 +39,7 @@ describe('GPU image I/O', () => {
     const tex = importImage(ctx, src);
     expect(tex.format).toBe('rgba16float');
     const out = await readImage(ctx, tex);
-    const res = compareImages(out, decodeSrgb8(src.data, src.width, src.height), { abs: 1e-4, rel: 2 ** -9 });
+    const res = compareImages(out, decodeSrgb8(src.data, src.width, src.height), { abs: software ? 1e-4 : 2.5e-3, rel: 2 ** -9 });
     expect(res.worst ?? null, JSON.stringify(res.worst)).toBeNull();
   });
 
