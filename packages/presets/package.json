@@ -45,7 +45,7 @@
     "@rullino/filters": "workspace:*"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && cp ../../LICENSE LICENSE",
+    "build": "node ../../scripts/fs.mjs rm dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && node ../../scripts/fs.mjs cp ../../LICENSE LICENSE",
     "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
   },
   "files": [
