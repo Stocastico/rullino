@@ -1,5 +1,6 @@
 import { createImage, defineFilter, linearToOklab, type LinearImage } from '@rullino/core';
 import { clampLoad, q16 } from '../convolution';
+import { expNegFast, padEdge } from '../fast';
 
 /** Window radius for a spatial sigma: 2σ (weights beyond are below 2%), capped. */
 const MAX_RADIUS = 40;
@@ -87,6 +88,44 @@ fn run(xy: vec2i, p: Params) -> vec4f {
             total += w;
           }
         out.data.set(acc.map((v) => v / total), (y * src.width + x) * 4);
+      }
+    return out;
+  },
+  fast: (src, { sigmaSpace, sigmaRange }) => {
+    const { width: w, height: h } = src;
+    const r = radiusFor(sigmaSpace);
+    const ks = -0.5 / (sigmaSpace * sigmaSpace);
+    const kr = -0.5 / (sigmaRange * sigmaRange);
+    const side = 2 * r + 1;
+    const spatial = new Float64Array(side * side);
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) spatial[(dy + r) * side + dx + r] = Math.exp((dx * dx + dy * dy) * ks);
+    // Edge-replicated copies: the window needs no clamping in the inner loop.
+    const lab = padEdge(q16(labImage(src)), r);
+    const img = padEdge(src, r);
+    const pw = w + 2 * r;
+    const out = createImage(w, h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const c = ((y + r) * pw + x + r) * 4;
+        const l0 = lab[c]!, l1 = lab[c + 1]!, l2 = lab[c + 2]!, l3 = lab[c + 3]!;
+        let a0 = 0, a1 = 0, a2 = 0, a3 = 0, total = 0;
+        for (let dy = 0; dy < side; dy++) {
+          let j = ((y + dy) * pw + x) * 4;
+          for (let dx = 0; dx < side; dx++, j += 4) {
+            const e0 = lab[j]! - l0, e1 = lab[j + 1]! - l1, e2 = lab[j + 2]! - l2, e3 = lab[j + 3]! - l3;
+            const wt = spatial[dy * side + dx]! * expNegFast((e0 * e0 + e1 * e1 + e2 * e2 + e3 * e3) * kr);
+            a0 += wt * img[j]!;
+            a1 += wt * img[j + 1]!;
+            a2 += wt * img[j + 2]!;
+            a3 += wt * img[j + 3]!;
+            total += wt;
+          }
+        }
+        const o = (y * w + x) * 4;
+        out.data[o] = a0 / total;
+        out.data[o + 1] = a1 / total;
+        out.data[o + 2] = a2 / total;
+        out.data[o + 3] = a3 / total;
       }
     return out;
   },

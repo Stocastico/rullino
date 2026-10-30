@@ -39,5 +39,5 @@ describe.each(fast.map((f) => [f.id, f as Filter] as const))('%s fast <-> refere
     expect(src.data, 'fast must not mutate its input').toEqual(before);
     const result = compareImages(out, f.cpu(src, full, mask), f.tolerance);
     expect(result.pass, `${result.outliers} channels out of tolerance, worst ${JSON.stringify(result.worst)}`).toBe(true);
-  });
+  }, 30_000); // the references of the slow filters (bilateral at sigma 20: 4 s) run here too
 });

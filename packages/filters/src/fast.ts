@@ -215,3 +215,35 @@ export function mapOklab(src: LinearImage, f: (L: number, a: number, b: number, 
   }
   return out;
 }
+
+/** `image` with its edge pixels replicated `r` times on every side (width + 2r, height + 2r), as a flat array. */
+export function padEdge(image: LinearImage, r: number): Float32Array {
+  const { width: w, height: h, data } = image;
+  const pw = w + 2 * r;
+  const out = new Float32Array(pw * (h + 2 * r) * 4);
+  for (let py = 0; py < h + 2 * r; py++) {
+    const row = Math.min(h - 1, Math.max(0, py - r)) * w * 4;
+    const o = py * pw * 4;
+    out.set(data.subarray(row, row + w * 4), o + r * 4);
+    for (let i = 0; i < r; i++) {
+      for (let c = 0; c < 4; c++) {
+        out[o + i * 4 + c] = data[row + c]!;
+        out[o + (r + w + i) * 4 + c] = data[row + (w - 1) * 4 + c]!;
+      }
+    }
+  }
+  return out;
+}
+
+const EXP_RANGE = 20;
+const EXP_STEPS = 4096;
+const EXP_TABLE = Float64Array.from({ length: EXP_STEPS + 2 }, (_, i) => Math.exp((-i * EXP_RANGE) / EXP_STEPS));
+
+/** exp(x) for x <= 0 by linear interpolation in a table: relative error < 1e-5; 0 below -20 (e^-20 = 2e-9). */
+export function expNegFast(x: number): number {
+  if (x < -EXP_RANGE) return 0;
+  const u = -x * (EXP_STEPS / EXP_RANGE);
+  const i = u | 0;
+  const a = EXP_TABLE[i]!;
+  return a + (EXP_TABLE[i + 1]! - a) * (u - i);
+}

@@ -1,5 +1,6 @@
 import { createImage, defineFilter, linearToSrgb, luminance, type LinearImage } from '@rullino/core';
 import { clampLoad, q16 } from '../convolution';
+import { padEdge } from '../fast';
 
 /** Added to every standard deviation: flat quadrants get a finite weight. */
 const EPS = 0.005;
@@ -10,6 +11,17 @@ const QUADRANTS = [
   [-1, 1],
   [1, 1],
 ] as const;
+
+/** Encoded luminance of the straight colour in all four channels, as the GPU stores it: a half-float intermediate texture. */
+function lumImage(src: LinearImage): LinearImage {
+  const L: LinearImage = createImage(src.width, src.height);
+  for (let i = 0; i < src.data.length; i += 4) {
+    const a = src.data[i + 3]!;
+    const l = a > 0 ? linearToSrgb(luminance(src.data[i]! / a, src.data[i + 1]! / a, src.data[i + 2]! / a)) : 0;
+    L.data.fill(l, i, i + 4);
+  }
+  return q16(L);
+}
 
 /**
  * Smoothed Kuwahara: the four (r + 1)² quadrants around a pixel each give a mean colour and the
@@ -90,14 +102,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     },
   ],
   cpu: (src, { radius: r, sharpness }) => {
-    // Luminance as the GPU stores it: a half-float intermediate texture.
-    const L: LinearImage = createImage(src.width, src.height);
-    for (let i = 0; i < src.data.length; i += 4) {
-      const a = src.data[i + 3]!;
-      const l = a > 0 ? linearToSrgb(luminance(src.data[i]! / a, src.data[i + 1]! / a, src.data[i + 2]! / a)) : 0;
-      L.data.fill(l, i, i + 4);
-    }
-    const lum = q16(L);
+    const lum = lumImage(src);
     const out = createImage(src.width, src.height);
     const n = (r + 1) * (r + 1);
     for (let y = 0; y < src.height; y++)
@@ -118,6 +123,58 @@ fn run(xy: vec2i, p: Params) -> vec4f {
         const ws = stats.map((s) => ((smin + EPS) / (s.sigma + EPS)) ** sharpness);
         const total = ws.reduce((a, b) => a + b, 0);
         for (let c = 0; c < 4; c++) out.data[(y * src.width + x) * 4 + c] = stats.reduce((a, s, k) => a + ws[k]! * s.mean[c]!, 0) / total;
+      }
+    return out;
+  },
+  fast: (src, { radius: r, sharpness }) => {
+    const { width: w, height: h } = src;
+    const pw = w + 2 * r;
+    const img = padEdge(src, r);
+    const lum = padEdge(lumImage(src), r);
+    const out = createImage(w, h);
+    const n = (r + 1) * (r + 1);
+    const mean = new Float64Array(16);
+    const sigma = new Float64Array(4);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let smin = Infinity;
+        for (let q = 0; q < 4; q++) {
+          const [dx, dy] = QUADRANTS[q]!;
+          let c0 = 0, c1 = 0, c2 = 0, c3 = 0, sl = 0, sl2 = 0;
+          for (let j = 0; j <= r; j++) {
+            let k = (((y + r + dy * j) * pw) + x + r) * 4;
+            for (let i = 0; i <= r; i++, k += dx * 4) {
+              c0 += img[k]!;
+              c1 += img[k + 1]!;
+              c2 += img[k + 2]!;
+              c3 += img[k + 3]!;
+              const l = lum[k]!;
+              sl += l;
+              sl2 += l * l;
+            }
+          }
+          const mu = sl / n;
+          sigma[q] = Math.sqrt(Math.max(0, sl2 / n - mu * mu));
+          mean[q * 4] = c0 / n;
+          mean[q * 4 + 1] = c1 / n;
+          mean[q * 4 + 2] = c2 / n;
+          mean[q * 4 + 3] = c3 / n;
+          smin = Math.min(smin, sigma[q]!);
+        }
+        let a0 = 0, a1 = 0, a2 = 0, a3 = 0, total = 0;
+        for (let q = 0; q < 4; q++) {
+          const wt = ((smin + EPS) / (sigma[q]! + EPS)) ** sharpness;
+          a0 += wt * mean[q * 4]!;
+          a1 += wt * mean[q * 4 + 1]!;
+          a2 += wt * mean[q * 4 + 2]!;
+          a3 += wt * mean[q * 4 + 3]!;
+          total += wt;
+        }
+        const o = (y * w + x) * 4;
+        out.data[o] = a0 / total;
+        out.data[o + 1] = a1 / total;
+        out.data[o + 2] = a2 / total;
+        out.data[o + 3] = a3 / total;
       }
     return out;
   },
