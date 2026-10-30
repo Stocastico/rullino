@@ -1,5 +1,7 @@
 import { createImage, defineFilter, linearToSrgb, luminance, type LinearImage } from '@rullino/core';
+import { float16ToFloat32, float32ToFloat16 } from '@rullino/core/internal';
 import { clampLoad, convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { convolve1dFast } from '../fast';
 
 /** tan(22.5°): boundary between the four quantised gradient directions. */
 const TAN_22_5 = 0.41421356;
@@ -149,6 +151,85 @@ fn run(xy: vec2i, p: Params) -> vec4f {
       const v = clampLoad(cls, x, y, 0) > 0.75 ? a : 0;
       return [v, v, v, a];
     });
+  },
+  fast: (src, { sigma, low, high, iterations }) => {
+    const { width: w, height: h } = src;
+    // Same stages and the same f16 roundings as the reference, on plain planes.
+    const lum = createImage(w, h);
+    for (let i = 0; i < w * h; i++) {
+      const o = i * 4;
+      const v = linearToSrgb(luminance(src.data[o]!, src.data[o + 1]!, src.data[o + 2]!));
+      lum.data[o] = lum.data[o + 1] = lum.data[o + 2] = v;
+      lum.data[o + 3] = 1;
+    }
+    const wts = gaussianWeights(sigma);
+    const b = q16(convolve1dFast(q16(convolve1dFast(q16(lum), wts, 'x')), wts, 'y')).data;
+    const mag = new Float32Array(w * h);
+    const dir = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const up = Math.max(0, y - 1) * w;
+      const mid = y * w;
+      const dn = Math.min(h - 1, y + 1) * w;
+      for (let x = 0; x < w; x++) {
+        const l = Math.max(0, x - 1);
+        const r = Math.min(w - 1, x + 1);
+        const gx = b[(up + r) * 4]! + 2 * b[(mid + r) * 4]! + b[(dn + r) * 4]! - (b[(up + l) * 4]! + 2 * b[(mid + l) * 4]! + b[(dn + l) * 4]!);
+        const gy = b[(dn + l) * 4]! + 2 * b[(dn + x) * 4]! + b[(dn + r) * 4]! - (b[(up + l) * 4]! + 2 * b[(up + x) * 4]! + b[(up + r) * 4]!);
+        const ax = Math.abs(gx);
+        const ay = Math.abs(gy);
+        dir[mid + x] = ay <= ax * TAN_22_5 ? 0 : ax <= ay * TAN_22_5 ? 2 : gx * gy > 0 ? 1 : 3;
+        mag[mid + x] = float16ToFloat32(float32ToFloat16(Math.sqrt(gx * gx + gy * gy) * 0.25));
+      }
+    }
+    // 0: no edge, 1: weak, 2: strong.
+    const state = new Uint8Array(w * h);
+    let weak: number[] = [];
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        const m = mag[i]!;
+        const [dx, dy] = DIRS[dir[i]!]!;
+        const fx = Math.min(w - 1, Math.max(0, x + dx));
+        const fy = Math.min(h - 1, Math.max(0, y + dy));
+        const bx = Math.min(w - 1, Math.max(0, x - dx));
+        const by = Math.min(h - 1, Math.max(0, y - dy));
+        if (m >= mag[fy * w + fx]! && m > mag[by * w + bx]!) {
+          if (m >= high) state[i] = 2;
+          else if (m >= low) {
+            state[i] = 1;
+            weak.push(i);
+          }
+        }
+      }
+    // One round promotes the weak pixels that touch a strong one in the previous state; stop when
+    // a round changes nothing (later rounds could not either).
+    for (let it = 0; it < iterations && weak.length > 0; it++) {
+      const promoted: number[] = [];
+      const rest: number[] = [];
+      for (const i of weak) {
+        const x = i % w;
+        const y = (i - x) / w;
+        let hit = false;
+        for (let j = Math.max(0, y - 1); j <= Math.min(h - 1, y + 1) && !hit; j++)
+          for (let k = Math.max(0, x - 1); k <= Math.min(w - 1, x + 1); k++)
+            if (state[j * w + k] === 2) {
+              hit = true;
+              break;
+            }
+        (hit ? promoted : rest).push(i);
+      }
+      if (promoted.length === 0) break;
+      for (const i of promoted) state[i] = 2;
+      weak = rest;
+    }
+    const out = createImage(w, h);
+    for (let i = 0; i < w * h; i++) {
+      const a = src.data[i * 4 + 3]!;
+      const v = state[i] === 2 ? a : 0;
+      out.data[i * 4] = out.data[i * 4 + 1] = out.data[i * 4 + 2] = v;
+      out.data[i * 4 + 3] = a;
+    }
+    return out;
   },
   // Hard decisions: f32 (GPU) vs f64 (CPU) arithmetic can flip a few borderline pixels.
   tolerance: { abs: 0, rel: 0, outliers: 0.002 },

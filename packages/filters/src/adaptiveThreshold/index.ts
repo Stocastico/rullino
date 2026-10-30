@@ -1,5 +1,6 @@
 import { createImage, defineFilter, linearToSrgb, luminance } from '@rullino/core';
 import { convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { convolve1dFast } from '../fast';
 
 /**
  * Adaptive (local) threshold, as OpenCV's ADAPTIVE_THRESH_GAUSSIAN_C: a pixel is white when its
@@ -59,6 +60,27 @@ fn run(xy: vec2i, p: Params) -> vec4f {
       const a = src.data[i + 3]!;
       const v = l.data[i]! > mean.data[i]! - offset !== invert ? a : 0;
       out.data.set([v, v, v, a], i);
+    }
+    return out;
+  },
+  fast: (src, { sigma, offset, invert }) => {
+    const { data: s } = src;
+    const lum = createImage(src.width, src.height);
+    for (let i = 0; i < s.length; i += 4) {
+      const a = s[i + 3]!;
+      const k = a > 0 ? 1 / a : 0;
+      lum.data[i] = lum.data[i + 1] = lum.data[i + 2] = linearToSrgb(luminance(s[i]! * k, s[i + 1]! * k, s[i + 2]! * k));
+      lum.data[i + 3] = 1;
+    }
+    const l = q16(lum).data;
+    const w = gaussianWeights(sigma);
+    const mean = q16(convolve1dFast(q16(convolve1dFast(q16(lum), w, 'x')), w, 'y')).data;
+    const out = createImage(src.width, src.height);
+    for (let i = 0; i < s.length; i += 4) {
+      const a = s[i + 3]!;
+      const v = l[i]! > mean[i]! - offset !== invert ? a : 0;
+      out.data[i] = out.data[i + 1] = out.data[i + 2] = v;
+      out.data[i + 3] = a;
     }
     return out;
   },

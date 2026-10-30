@@ -1,5 +1,32 @@
 import { createImage, defineFilter } from '@rullino/core';
 import { clampLoad } from '../convolution';
+import { padEdge } from '../fast';
+
+/** The k-th smallest of a[0..n) (Hoare's quickselect); reorders a. */
+function kth(a: Float32Array, n: number, k: number): number {
+  let lo = 0;
+  let hi = n - 1;
+  while (lo < hi) {
+    const pivot = a[(lo + hi) >> 1]!;
+    let i = lo;
+    let j = hi;
+    while (i <= j) {
+      while (a[i]! < pivot) i++;
+      while (a[j]! > pivot) j--;
+      if (i <= j) {
+        const t = a[i]!;
+        a[i] = a[j]!;
+        a[j] = t;
+        i++;
+        j--;
+      }
+    }
+    if (k <= j) hi = j;
+    else if (k >= i) lo = i;
+    else break;
+  }
+  return a[k]!;
+}
 
 const MAX_RADIUS = 3;
 const MAX_TAPS = (2 * MAX_RADIUS + 1) ** 2;
@@ -76,6 +103,26 @@ fn run(xy: vec2i, p: Params) -> vec4f {
           for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) values.push(clampLoad(src, x + dx, y + dy, c));
           values.sort((a, b) => a - b);
           out.data[(y * src.width + x) * 4 + c] = values[values.length >> 1]!;
+        }
+    return out;
+  },
+  fast: (src, { radius: r }) => {
+    const { width: w, height: h } = src;
+    const side = 2 * r + 1;
+    const n = side * side;
+    const pad = padEdge(src, r);
+    const pw = w + 2 * r;
+    const out = createImage(w, h);
+    const win = new Float32Array(n);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        for (let c = 0; c < 4; c++) {
+          let m = 0;
+          for (let dy = 0; dy < side; dy++) {
+            let j = ((y + dy) * pw + x) * 4 + c;
+            for (let dx = 0; dx < side; dx++, j += 4) win[m++] = pad[j]!;
+          }
+          out.data[(y * w + x) * 4 + c] = kth(win, n, n >> 1);
         }
     return out;
   },
