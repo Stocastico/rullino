@@ -1,6 +1,7 @@
 import { playwright } from '@vitest/browser-playwright';
 import { renderOnDawn } from './packages/node/test/dawn-command';
 import { defineConfig } from 'vitest/config';
+import { launchOptions } from './scripts/browser-launch.mjs';
 
 export default defineConfig({
   test: {
@@ -45,7 +46,7 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({ launchOptions: { args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'] } }),
+            provider: playwright({ launchOptions: launchOptions({ vulkan: true }) }),
             instances: [{ browser: 'chromium' }],
           },
         },
@@ -60,9 +61,9 @@ export default defineConfig({
             commands: { renderOnDawn },
             headless: true,
             provider: playwright({
-              // Headless Chromium only exposes navigator.gpu behind this flag.
-              // Without a GPU (CI) it falls back to SwiftShader.
-              launchOptions: { args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'] },
+              // Headless Chromium only exposes navigator.gpu behind --enable-unsafe-webgpu.
+              // Without a GPU (CI) it falls back to SwiftShader. On Windows: the installed Chrome.
+              launchOptions: launchOptions({ vulkan: true }),
             }),
             instances: [{ browser: 'chromium' }],
           },
