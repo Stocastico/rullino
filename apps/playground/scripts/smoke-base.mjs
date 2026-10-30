@@ -4,11 +4,12 @@
 // outside answers 404), opens it in headless Chromium and fails on a missing file, a failed request,
 // a page error, or if no frame is rendered.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { chromium } from 'playwright';
 
-const dist = new URL('../dist/', import.meta.url).pathname;
+const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const PREFIX = '/sites/rullino/';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const failures = [];

@@ -8,18 +8,20 @@
 //   6. builds examples/worker-fallback and drives it on the CPU worker backend.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { copyFileSync, existsSync, mkdirSync, statSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { chromium } from 'playwright';
 import { build, preview } from 'vite';
 
-const repo = new URL('..', import.meta.url).pathname;
+const repo = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: it breaks Windows paths
 const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva'];
 const version = JSON.parse(readFileSync(join(repo, 'packages/core/package.json'), 'utf8')).version;
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
-const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+// shell on Windows: pnpm and npm are .cmd shims there
+const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32' && cmd !== 'node' });
 
 const work = mkdtempSync(join(tmpdir(), 'rullino-pack-'));
 const tarballs = join(work, 'tarballs');

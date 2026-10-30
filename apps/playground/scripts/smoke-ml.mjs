@@ -7,11 +7,12 @@
 //     the background loses its fine detail, the flowers keep theirs.
 // Slow on SwiftShader (the app picks WASM there): about a minute of inference in all.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 
 const models = new URL('../../../.cache/models/', import.meta.url);
-const server = await preview({ root: new URL('..', import.meta.url).pathname, preview: { port: 0, strictPort: false } });
+const server = await preview({ root: fileURLToPath(new URL('..', import.meta.url)), preview: { port: 0, strictPort: false } });
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
 const failures = [];
