@@ -1,4 +1,5 @@
 import { defineFilter, linearToOklab, oklabToLinear } from '@rullino/core';
+import { mapOklab } from '../fast';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /** Rotates the OKLab hue (the a/b plane) by `degrees`; lightness and chroma stay put. */
@@ -25,6 +26,16 @@ fn apply(c: vec4f, p: Params) -> vec4f {
     const [L, A, B] = linearToOklab(r, g, b);
     const t = (degrees * Math.PI) / 180;
     return [...oklabToLinear(L, A * Math.cos(t) - B * Math.sin(t), A * Math.sin(t) + B * Math.cos(t)), a];
+  },
+  fast: (src, { degrees }) => {
+    const t = (degrees * Math.PI) / 180;
+    const cos = Math.cos(t);
+    const sin = Math.sin(t);
+    return mapOklab(src, (L, a, b, o) => {
+      o[0] = L;
+      o[1] = a * cos - b * sin;
+      o[2] = a * sin + b * cos;
+    });
   },
   tolerance: OKLAB_TOLERANCE,
 });

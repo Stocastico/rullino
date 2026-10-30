@@ -1,4 +1,5 @@
 import { defineFilter, linearToOklab, oklabToLinear } from '@rullino/core';
+import { mapOklab } from '../fast';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /**
@@ -27,6 +28,13 @@ fn apply(c: vec4f, p: Params) -> vec4f {
   pixel: ([r, g, b, a], { amount }) => {
     const [L, A, B] = linearToOklab(r, g, b);
     return [...oklabToLinear(Math.max(L, 0) ** (2 ** -amount), A, B), a];
+  },
+  fast: (src, { amount }) => {
+    return mapOklab(src, (L, a, b, o) => {
+      o[0] = Math.max(L, 0) ** (2 ** -amount);
+      o[1] = a;
+      o[2] = b;
+    });
   },
   tolerance: OKLAB_TOLERANCE,
 });
