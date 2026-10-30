@@ -12,6 +12,11 @@ import { commands } from 'vitest/browser';
 const gpu = await createGpuContext();
 afterAll(() => gpu.device.destroy());
 
+// Between two software renderers (SwiftShader here, lavapipe in Node) the results must differ somewhere, which
+// shows that the test does not compare an implementation with itself. On a real GPU both sides run on the
+// same device and driver and may agree to the bit: that is the promise holding, not a broken test.
+const software = (await navigator.gpu.requestAdapter())?.info.isFallbackAdapter ?? true;
+
 async function sample(name: string, width: number): Promise<LinearImage> {
   const blob = await (await fetch(`/apps/playground/public/samples/${name}`)).blob();
   const bitmap = await createImageBitmap(blob, { resizeWidth: width, resizeQuality: 'high' });
@@ -73,7 +78,7 @@ describe('browser (Chromium WebGPU) vs Node (Dawn)', { timeout: 60_000 }, async 
       expect(worst, `${name}: worst pixel channel ${at}: ${here.data[at]} (browser) vs ${there.data[at]} (node)`).toBeLessThanOrEqual(0);
       differs ||= here.data.some((v, k) => v !== there.data[k]);
     }
-    expect(differs, 'two different WebGPU implementations should not agree bit for bit everywhere').toBe(true);
+    if (software) expect(differs, 'two different software WebGPU implementations should not agree bit for bit everywhere').toBe(true);
   });
 });
 

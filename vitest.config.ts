@@ -52,6 +52,20 @@ export default defineConfig({
         },
       },
       {
+        // How far this machine's GPU is from the CPU references, filter by filter: `pnpm report:parity`.
+        test: {
+          name: 'report',
+          include: ['packages/*/report/**/*.report.browser.ts'],
+          testTimeout: 600_000,
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright({ launchOptions: launchOptions({ vulkan: true }) }),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+      {
         test: {
           name: 'browser',
           include: ['packages/*/src/**/*.browser.test.ts', 'apps/*/src/**/*.browser.test.ts'],
