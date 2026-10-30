@@ -199,6 +199,8 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 4. ~~Docs by job~~ (four guides, done 29 Oct) and ~~the migration notes~~ (30 Oct). Phase 2 is then only the optional adapters and examples below.
 5. Fabric only if Konva gets interest (watch npm downloads / issues of `@rullino/konva`).
 
+**Parity on real GPUs (30 Oct, open).** The published tolerances are verified on software GPUs only. On an RTX 40 (Chrome, Windows) 25 of 936 browser tests failed (`canny`, `inpaint`, `sketch`, `kuwahara`, the 8-bit sRGB decode; see the Trap in CLAUDE.md). `pnpm report:parity` measures every case on the machine's own GPU; next: run it on the RTX, decide per filter (wider tolerance with a note in `docs/parity.md`, change of the reference, or outliers for hard decisions) and rerun on a second GPU if one is at hand. Until then "within the published tolerance" is a claim about software adapters.
+
 Open issues to keep in view: [#95](https://github.com/Stocastico/rullino/issues/95) CPU fast paths round 2 (fallback speed), [#96](https://github.com/Stocastico/rullino/issues/96) playground without WebGPU, [#100](https://github.com/Stocastico/rullino/issues/100) the unexplained 28-minute CI stall (timeouts now make it fail fast; the 3.8 s cold-shader cause of the release failures is fixed). Release routine: `node scripts/set-version.mjs X.Y.Z` + CHANGELOG section in a PR, merge, the maintainer pushes the tag (checklist at the top of CHANGELOG.md); npm can take minutes to show a package the workflow already published.
 
 ### Phase 3 — launch and first users (weeks 10–16) — [#67](https://github.com/Stocastico/rullino/issues/67)
