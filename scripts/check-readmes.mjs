@@ -2,10 +2,11 @@
 // module of its own, so it must carry its imports), so documented examples cannot rot. Other
 // code fences (js, sh, text...) are not checked. Part of `pnpm typecheck`.
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const repo = new URL('..', import.meta.url).pathname;
+const repo = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: it breaks Windows paths
 // Inside the repo (git-ignored node_modules) so that @webgpu/types and onnxruntime-web resolve.
 const work = join(repo, 'node_modules/.cache/readme-check');
 rmSync(work, { recursive: true, force: true });
@@ -44,7 +45,7 @@ if (blocks === 0) {
   process.exit(0);
 }
 try {
-  execFileSync(join(repo, 'node_modules/.bin/tsc'), ['-p', join(work, 'tsconfig.json')], { stdio: 'inherit' });
+  execFileSync(join(repo, 'node_modules/.bin/tsc'), ['-p', join(work, 'tsconfig.json')], { stdio: 'inherit', shell: process.platform === 'win32' }); // on Windows .bin/tsc is a .cmd shim
 } catch {
   console.error('check-readmes: a README example does not compile (files in node_modules/.cache/readme-check)');
   process.exit(1);

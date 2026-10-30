@@ -1,10 +1,11 @@
 // Fails when a package or the playground grows past size-budget.json (gzip -9 bytes). Run after
 // `pnpm build`. Prints every measurement so a PR shows by how much a limit is used.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-const repo = new URL('..', import.meta.url).pathname;
+const repo = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: it breaks Windows paths
 const budget = JSON.parse(readFileSync(join(repo, 'size-budget.json'), 'utf8'));
 
 const walk = (dir) => readdirSync(dir).sort().flatMap((n) => (statSync(join(dir, n)).isDirectory() ? walk(join(dir, n)) : [join(dir, n)]));

@@ -2,10 +2,11 @@
 // headless Chromium (WebGPU on SwiftShader without a GPU) and fails on any page error, on
 // falling back to the CPU renderer, or if the chain does not change the pixels as expected.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 
-const server = await preview({ root: new URL('..', import.meta.url).pathname, preview: { port: 0, strictPort: false } });
+const server = await preview({ root: fileURLToPath(new URL('..', import.meta.url)), preview: { port: 0, strictPort: false } });
 const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu'] });
 const failures = [];
