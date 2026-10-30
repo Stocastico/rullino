@@ -1,5 +1,7 @@
 import { createImage, defineFilter, type LinearImage } from '@rullino/core';
+import { float16ToFloat32, float32ToFloat16 } from '@rullino/core/internal';
 import { gaussianCpu, gaussianPass, q16 } from '../convolution';
+import { gaussianFast } from '../fast';
 
 /** Below this blurred known-weight a pixel is too far from any known pixel to estimate. */
 const MIN_WEIGHT = 1e-3;
@@ -92,6 +94,43 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     let cur = q16(fillCpu(src, q16(gaussianCpu(num, sigma)), q16(gaussianCpu(den, sigma)), m));
     for (let k = 0; k < iterations; k++) cur = q16(diffuseCpu(cur, src, m));
     return cur;
+  },
+  fast: (src, { sigma, iterations }, mask) => {
+    const m = mask!;
+    const { width: w, height: h } = src;
+    const weighted = (f: (i: number, c: number) => number) => {
+      const img = createImage(w, h);
+      for (let i = 0; i < m.length; i++) for (let c = 0; c < 4; c++) img.data[i * 4 + c] = f(i, c);
+      return q16(img);
+    };
+    const num = weighted((i, c) => src.data[i * 4 + c]! * (1 - m[i]!));
+    const den = weighted((i) => 1 - m[i]!);
+    const first = q16(fillCpu(src, q16(gaussianFast(num, sigma)), q16(gaussianFast(den, sigma)), m));
+    // Outside the hole every diffusion step returns the (rounded) input, so only hole pixels are
+    // visited, ping-ponging between two buffers that start equal.
+    const hole: number[] = [];
+    for (let i = 0; i < m.length; i++) if (m[i]! > 0) hole.push(i);
+    let cur: Float32Array<ArrayBuffer> = first.data.slice();
+    let next = cur.slice();
+    const s = src.data;
+    for (let k = 0; k < iterations; k++) {
+      for (const i of hole) {
+        const x = i % w;
+        const y = (i - x) / w;
+        const l = (y * w + Math.max(0, x - 1)) * 4;
+        const r = (y * w + Math.min(w - 1, x + 1)) * 4;
+        const u = (Math.max(0, y - 1) * w + x) * 4;
+        const d = (Math.min(h - 1, y + 1) * w + x) * 4;
+        const mi = m[i]!;
+        for (let c = 0; c < 4; c++) {
+          const v = 0.25 * (cur[l + c]! + cur[r + c]! + cur[u + c]! + cur[d + c]!);
+          const o = i * 4 + c;
+          next[o] = float16ToFloat32(float32ToFloat16(s[o]! + (v - s[o]!) * mi));
+        }
+      }
+      [cur, next] = [next, cur];
+    }
+    return createImage(w, h, cur);
   },
   tolerance: { abs: 2e-3, rel: 4e-3 },
   // RTX 40: 0.0142 at 400 iterations, 0.0064 at the defaults (f16 rounding of the ping-pong textures differs).
