@@ -31,6 +31,18 @@ export async function renderFile(input: string, editJson: string, output: string
 
 Create the renderer once, at start-up: loading Dawn and compiling shaders costs a second or two, and every later render reuses them.
 
+### Several cores on the CPU
+
+When the renderer runs on the CPU (no `webgpu`, or no Vulkan driver), `threads` spreads big images over worker threads with the same result, bit for bit:
+
+```ts
+import { createRenderer } from '@rullino/node';
+
+export const renderer = await createRenderer({ threads: 4 }); // default 1; 'auto' is the cores, at most 8
+```
+
+On 4 cores a 12 MP blur + unsharp goes from 5.8 s to 1.5 s. Images below about 2 MP and steps that need the whole image (equalize, clahe, otsu) stay on the calling thread. Create the renderer once and call `destroy()` when the process is done with it: it stops the threads and frees the shared buffers it keeps between renders.
+
 ## 3. Serve it
 
 The same call fits an HTTP route, a queue worker or a serverless function. A route that takes the photo as the body and the edit in the query:

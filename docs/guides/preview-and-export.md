@@ -17,6 +17,18 @@ const renderer = await createRenderer();
 console.log(renderer.backend, renderer.reason ?? ''); // 'gpu', or 'cpu' and why
 ```
 
+Large exports on the CPU can use several cores. Ask for band workers and the image is cut into horizontal bands rendered in parallel, with exactly the result of one thread:
+
+```ts
+import { createRenderer } from '@rullino/web';
+
+// Up to 4 band workers; images below about 2 MP stay in the render worker. The default is 1.
+const renderer = await createRenderer({ threads: 4 });
+console.log(renderer.backend); // the threads only apply on the 'cpu' backend
+```
+
+Previews at screen size are small and do not need it; a 12 MP export on four cores is about 3× faster for most chains (equalize, clahe and otsu need the whole image and run alone). `pnpm bench:threads:web` in the repository measures your machine. `threads: 'auto'` (the cores, at most 8) is also accepted, but the default stays 1 until it has been measured on more hardware.
+
 ## 2. Describe the edit as data
 
 A document is plain JSON: filter ids and their parameters (defaults left out). Build it from your sliders, or with `serializeChain` from the filter objects.
