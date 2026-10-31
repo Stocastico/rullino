@@ -1,6 +1,6 @@
 # Tiled CPU execution across workers
 
-Status: **agreed, spike done (go), phase 1 done** (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 is done (the Node worker executor, see "Phase 2 results" below), and so is phase 3 (Web Workers, "Phase 3 results"); phase 4 (docs, the `'auto'` default) is next ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
+Status: **done except the `'auto'` default and two-phase global filters** (spike, phases 1-4) (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 is done (the Node worker executor, see "Phase 2 results" below), and so are phase 3 (Web Workers, "Phase 3 results") and the docs of phase 4; the `'auto'` default waits for measurements on real hardware, and two-phase global filters (histograms per band, merged, then a banded apply) are the next step ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
 
 ## Why, and what would count as success
 
