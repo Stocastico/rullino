@@ -7,18 +7,25 @@ const TAPS = Array.from({ length: TAP_COUNT }, (_, k) => {
   const r = Math.sqrt((k + 0.5) / TAP_COUNT);
   return [Number((r * Math.cos(k * GOLDEN_ANGLE)).toFixed(7)), Number((r * Math.sin(k * GOLDEN_ANGLE)).toFixed(7))] as const;
 });
+/** The furthest a tap lies from the centre along y, in units of the disc radius. */
+const MAX_TAP_Y = Math.max(...TAPS.map(([, ty]) => Math.abs(ty)));
 /** The circle of confusion reaches its full radius this far (in depth units) beyond the sharp range. */
 const FALLOFF = 0.5;
 
 /** The circle of confusion (px) at depth `d` (confidence `a` of the depth map). */
 const coc = (d: number, a: number, focus: number, range: number, radius: number) => radius * Math.min(1, Math.max(0, (Math.abs(d - focus) - range) / FALLOFF)) * a;
 
-/** Bilinear read at pixel-index coordinates (pixel centres on integers), edges clamped, one channel. */
-function bilinear(src: LinearImage, x: number, y: number, c: number): number {
+/**
+ * Bilinear read at pixel-index coordinates (pixel centres on integers), edges clamped, one channel.
+ * `y` is a row of the whole image and `top` the row of the whole image `src` starts at: the base
+ * pixel and the fraction are computed from the whole image's coordinate, as a band must give the
+ * very bits the whole image gives, and only then moved into `src`.
+ */
+function bilinear(src: LinearImage, x: number, y: number, c: number, top = 0): number {
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
   const [fx, fy] = [x - x0, y - y0];
-  const at = (px: number, py: number) => src.data[(Math.min(src.height - 1, Math.max(0, py)) * src.width + Math.min(src.width - 1, Math.max(0, px))) * 4 + c]!;
+  const at = (px: number, py: number) => src.data[(Math.min(src.height - 1, Math.max(0, py - top)) * src.width + Math.min(src.width - 1, Math.max(0, px))) * 4 + c]!;
   return (at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx) * (1 - fy) + (at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx) * fy;
 }
 
@@ -81,17 +88,20 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { depth, focus, range, radius }) => {
+  reach: ({ radius }) => Math.floor(MAX_TAP_Y * radius) + 1, // the furthest tap, and the bilinear read one row beyond it
+  cpu: (src, { depth, focus, range, radius }, _mask, region) => {
     const out = createImage(src.width, src.height);
-    const size = [src.width, src.height] as const;
+    const [top, full] = [region?.y0 ?? 0, region?.fullHeight ?? src.height];
+    const size = [src.width, full] as const;
+    // `y` is a row of the whole image: the depth map is read at normalised coordinates of it.
     const cocAt = (x: number, y: number) => {
       const d = sampleImage(depth, (x + 0.5) / size[0], (y + 0.5) / size[1]);
       return coc(d[0], d[3], focus, range, radius);
     };
-    for (let y = 0; y < src.height; y++)
+    for (let row = 0; row < src.height; row++)
       for (let x = 0; x < src.width; x++) {
-        const i = (y * src.width + x) * 4;
+        const y = top + row;
+        const i = (row * src.width + x) * 4;
         const cp = cocAt(x, y);
         const acc = [0, 0, 0, 0];
         let wsum = 0;
@@ -99,7 +109,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
           for (const [tx, ty] of TAPS) {
             const [ox, oy] = [tx * cp, ty * cp];
             const w = Math.min(1, Math.max(0, cocAt(x + ox, y + oy) - Math.hypot(ox, oy) + 1));
-            for (let c = 0; c < 4; c++) acc[c]! += bilinear(src, x + ox, y + oy, c) * w;
+            for (let c = 0; c < 4; c++) acc[c]! += bilinear(src, x + ox, y + oy, c, top) * w;
             wsum += w;
           }
         for (let c = 0; c < 4; c++) out.data[i + c] = wsum < 1e-4 ? src.data[i + c]! : acc[c]! / wsum;

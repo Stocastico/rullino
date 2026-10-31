@@ -31,14 +31,17 @@ export const pixelate = defineFilter({
     size: { type: 'int', min: 1, max: 128, default: 12, unit: 'px', label: 'Cell size (px)', description: 'Width of each square in pixels.' },
   },
   passes: [pass('h', 'input', 'x'), pass('v', 'h', 'y')],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { size }) => {
+  reach: ({ size }) => size - 1, // a cell is at most `size` rows tall and anchored at row 0
+  cpu: (src, { size }, _mask, region) => {
     const { width: w, height: h } = src;
+    const [top, full] = [region?.y0 ?? 0, region?.fullHeight ?? h]; // cells are anchored at row 0 and cut by the last row of the whole image
     const out = createImage(w, h);
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
-        const [x0, y0] = [Math.floor(x / size) * size, Math.floor(y / size) * size];
-        const [x1, y1] = [Math.min(x0 + size, w), Math.min(y0 + size, h)];
+        const cellTop = Math.floor((top + y) / size) * size;
+        const [x0, x1] = [Math.floor(x / size) * size, Math.min(Math.floor(x / size) * size + size, w)];
+        // Rows of the cell in this image; only rows that are not a band's halo ever lie outside it.
+        const [y0, y1] = [Math.max(0, cellTop - top), Math.min(h, Math.min(cellTop + size, full) - top)];
         const n = (x1 - x0) * (y1 - y0);
         for (let c = 0; c < 4; c++) {
           let acc = 0;

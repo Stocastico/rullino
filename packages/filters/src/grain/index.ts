@@ -81,9 +81,10 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { amount, size, seed }) => {
+  reach: () => 0, // one pixel in, one pixel out; its position comes from the frame
+  cpu: (src, { amount, size, seed }, _mask, region) => {
     const { width: w, height: h } = src;
+    const y0 = region?.y0 ?? 0; // the noise is a function of the position in the whole image
     const out = createImage(w, h);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -92,15 +93,16 @@ fn run(xy: vec2i, p: Params) -> vec4f {
         if (a <= 0) continue; // colour of a transparent pixel is 0
         const e = [0, 1, 2].map((c) => linearToSrgb(src.data[i + c]! / a));
         const lum = 0.2126 * e[0]! + 0.7152 * e[1]! + 0.0722 * e[2]!;
-        const n = valueNoise(x, y, size, seed) * 0.2 * amount * response(lum);
+        const n = valueNoise(x, y0 + y, size, seed) * 0.2 * amount * response(lum);
         for (let c = 0; c < 3; c++) out.data[i + c] = srgbToLinear(Math.max(e[c]! + n, 0)) * a;
         out.data[i + 3] = a;
       }
     }
     return out;
   },
-  fast: (src, { amount, size, seed }) => {
+  fast: (src, { amount, size, seed }, _mask, region) => {
     const { width: w, height: h } = src;
+    const y0 = region?.y0 ?? 0;
     const s = src.data;
     const out = createImage(w, h);
     const d = out.data;
@@ -112,7 +114,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
         const r = toSrgb(s[i]! / a);
         const g = toSrgb(s[i + 1]! / a);
         const b = toSrgb(s[i + 2]! / a);
-        const n = valueNoise(x, y, size, seed) * 0.2 * amount * response(0.2126 * r + 0.7152 * g + 0.0722 * b);
+        const n = valueNoise(x, y0 + y, size, seed) * 0.2 * amount * response(0.2126 * r + 0.7152 * g + 0.0722 * b);
         d[i] = toLinear(Math.max(r + n, 0)) * a;
         d[i + 1] = toLinear(Math.max(g + n, 0)) * a;
         d[i + 2] = toLinear(Math.max(b + n, 0)) * a;

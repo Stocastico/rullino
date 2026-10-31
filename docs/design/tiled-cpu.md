@@ -1,6 +1,6 @@
 # Tiled CPU execution across workers
 
-Status: **agreed, spike done (go), phase 1a done** (reach, planner, sequential executor, tests for the filters that do not depend on position; phase 1b is the frame argument for the others) ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
+Status: **agreed, spike done (go), phase 1 done** (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 (the Node worker executor) is next ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
 
 ## Why, and what would count as success
 

@@ -141,16 +141,26 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { size, angle, mode, shape, grid }) => {
+  // A pixel only depends on the sample at its dot's centre while it is within reach of the biggest
+  // dot (full ink) plus the pixel of antialiasing: radius 0.564 size for a circle, 0.676 size for a
+  // ring (area 1 − 0.55²), the rotated square of half side size / 2 otherwise. That extent, along y,
+  // is how far the centre can be; the pixel's own half pixel and the +0.25 of the sampling add 0.75.
+  reach: ({ size, angle, mode, shape }) => {
+    const angles = mode === 'cmy' ? CMY_OFFSETS.map((o) => angle + o) : [angle];
+    const square = (size / 2 + 0.5) * Math.max(...angles.map((a) => Math.abs(Math.cos((a * Math.PI) / 180)) + Math.abs(Math.sin((a * Math.PI) / 180))));
+    const extent = shape === 'square' ? square : shape === 'ring' ? Math.sqrt(1 / (RING_AREA * Math.PI)) * size + 0.5 : Math.sqrt(1 / Math.PI) * size + 0.5;
+    return Math.floor(extent + 0.75);
+  },
+  cpu: (src, { size, angle, mode, shape, grid }, _mask, region) => {
+    const top = region?.y0 ?? 0; // the grids are anchored at the origin of the whole image; the dot centres are read there
     const out = createImage(src.width, src.height);
     for (let y = 0; y < src.height; y++)
       for (let x = 0; x < src.width; x++) {
         const a = src.data[(y * src.width + x) * 4 + 3]!;
         const e =
           mode === 'cmy'
-            ? CMY_OFFSETS.map((o, c) => 1 - ink(x, y, size, angle + o, shape, grid, (px, py) => 1 - encoded(src, px, py, c)))
-            : Array<number>(3).fill(1 - ink(x, y, size, angle, shape, grid, (px, py) => 1 - encoded(src, px, py, 3)));
+            ? CMY_OFFSETS.map((o, c) => 1 - ink(x, top + y, size, angle + o, shape, grid, (px, py) => 1 - encoded(src, px, py - top, c)))
+            : Array<number>(3).fill(1 - ink(x, top + y, size, angle, shape, grid, (px, py) => 1 - encoded(src, px, py - top, 3)));
         out.data.set([...e.map((v) => srgbToLinear(v) * a), a], (y * src.width + x) * 4);
       }
     return out;

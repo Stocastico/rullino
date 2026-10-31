@@ -80,6 +80,22 @@ const showMask = defineFilter({
   tolerance: { abs: 0, rel: 0 },
 });
 
+/** The value is the row's position in the full image: only right if a band is told where it sits. */
+const rowIndex = defineFilter({
+  id: 'rowIndex',
+  label: 'Row index',
+  category: 'classic',
+  kind: 'multipass',
+  params: {},
+  passes: [pass],
+  reach: () => 0,
+  cpu: (src, _p, _mask, region) => {
+    const [y0, full] = region ? [region.y0, region.fullHeight] : [0, src.height];
+    return createImage(src.width, src.height, src.data.map((v, i) => (i % 4 === 0 ? v + (y0 + Math.floor(i / 4 / src.width)) / full : v)));
+  },
+  tolerance: { abs: 0, rel: 0 },
+});
+
 function image(w: number, h: number): LinearImage {
   const data = new Float32Array(w * h * 4);
   let seed = 7;
@@ -190,6 +206,16 @@ describe('runChainBands', () => {
   it('gives mask-aware filters their own rows of the mask', () => {
     const radial: Mask = { kind: 'radial', center: [0.5, 0.5], radius: [0.4, 0.3], feather: 0.3 };
     for (const bands of [1, 3, 6]) same([step(showMask, {}, { mask: radial })], bands);
+  });
+
+  it('tells a filter where its band sits in the full image (the frame)', () => {
+    for (const bands of [2, 5, h]) same([step(rowIndex)], bands);
+    same([step(columnMean, { r: 2 }), step(rowIndex), step(columnMean, { r: 1 })], 4);
+  });
+
+  it('hands the frame to a filter called through its own wrapper', () => {
+    const out = rowIndex.cpu(createImage(2, 3, new Float32Array(24)), {}, undefined, { y0: 4, fullHeight: 10 });
+    expect([out.data[0]!, out.data[8]!, out.data[16]!].map((v) => Number(v.toFixed(6)))).toEqual([0.4, 0.5, 0.6]);
   });
 
   it('applies disabled steps nowhere and returns a copy when nothing runs', () => {

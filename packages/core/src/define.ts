@@ -54,10 +54,11 @@ function defineMultipass<S extends ParamSchema>(def: MultipassFilterDef<S>, wher
   const cpu = def.cpu;
   return {
     ...def,
-    cpu(src, params, mask) {
+    cpu(src, params, mask, region) {
       if (def.usesMask && !mask) throw new Error(`${where} needs a mask`);
       if (mask && mask.length !== src.width * src.height) throw new RangeError(`${where}: mask has ${mask.length} values for ${src.width}x${src.height}`);
-      return cpu(src, resolveParams(def.params, params), mask);
+      if (region && (region.y0 < 0 || region.y0 + src.height > region.fullHeight)) throw new RangeError(`${where}: rows ${region.y0} to ${region.y0 + src.height} are outside an image ${region.fullHeight} rows tall`);
+      return cpu(src, resolveParams(def.params, params), mask, region);
     },
   };
 }

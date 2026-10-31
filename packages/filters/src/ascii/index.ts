@@ -100,23 +100,24 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { cell, color, ink, paper, invert }) => {
+  reach: ({ cell }) => cell - 1, // the taps lie inside the cell, which is anchored at row 0
+  cpu: (src, { cell, color, ink, paper, invert }, _mask, region) => {
+    const top = region?.y0 ?? 0; // cells are anchored at row 0 of the whole image
     const out = createImage(src.width, src.height);
     for (let y = 0; y < src.height; y++)
       for (let x = 0; x < src.width; x++) {
-        const [ox, oy] = [Math.floor(x / cell) * cell, Math.floor(y / cell) * cell];
+        const [ox, oy] = [Math.floor(x / cell) * cell, Math.floor((top + y) / cell) * cell];
         const mean = [0, 0, 0];
         let tone = 0;
         for (let j = 0; j < TAPS; j++)
           for (let i = 0; i < TAPS; i++) {
-            const e = encodedAt(src, ox + Math.floor(((2 * i + 1) * cell) / (2 * TAPS)), oy + Math.floor(((2 * j + 1) * cell) / (2 * TAPS)));
+            const e = encodedAt(src, ox + Math.floor(((2 * i + 1) * cell) / (2 * TAPS)), oy - top + Math.floor(((2 * j + 1) * cell) / (2 * TAPS)));
             e.forEach((v, c) => (mean[c]! += v));
             tone += luminance(srgbToLinear(e[0]), srgbToLinear(e[1]), srgbToLinear(e[2]));
           }
         let idx = Math.min(N - 1, Math.max(0, Math.floor(linearToSrgb(tone / (TAPS * TAPS)) * (N - 1) + 0.5)));
         if (invert) idx = N - 1 - idx;
-        const [lx, ly] = [x - ox, y - oy];
+        const [lx, ly] = [x - ox, top + y - oy];
         const [gx, gy] = [Math.floor(((2 * lx + 1) * GLYPH_W) / (2 * cell)), Math.floor(((2 * ly + 1) * GLYPH_H) / (2 * cell))];
         const on = ((GLYPHS[idx]![gy]! >> (GLYPH_W - 1 - gx)) & 1) === 1;
         const e = on ? (color === 'source' ? mean.map((v) => v / (TAPS * TAPS)) : ink) : paper;
@@ -125,11 +126,13 @@ fn run(xy: vec2i, p: Params) -> vec4f {
       }
     return out;
   },
-  fast: (src, { cell, color, ink, paper, invert }) => {
+  fast: (src, { cell, color, ink, paper, invert }, _mask, region) => {
     const { width: w, height: h, data: s } = src;
+    const top = region?.y0 ?? 0; // the first row of this image in the whole image; cells are anchored at row 0 there
     const out = createImage(w, h);
     const cw = Math.ceil(w / cell);
-    const ch = Math.ceil(h / cell);
+    const cy0 = Math.floor(top / cell);
+    const ch = Math.floor((top + h - 1) / cell) - cy0 + 1;
     // The reference samples a cell's taps again for each of its pixels: do it once per cell, with
     // the exact transfer functions (the glyph index is a hard decision).
     const offs = Array.from({ length: TAPS }, (_, i) => Math.floor(((2 * i + 1) * cell) / (2 * TAPS)));
@@ -142,7 +145,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
         for (let j = 0; j < TAPS; j++)
           for (let i = 0; i < TAPS; i++) {
             const x = Math.min(w - 1, cx * cell + offs[i]!);
-            const y = Math.min(h - 1, cy * cell + offs[j]!);
+            const y = Math.max(0, Math.min(h - 1, (cy0 + cy) * cell + offs[j]! - top));
             const k = (y * w + x) * 4;
             const a = s[k + 3]!;
             if (a <= 0) continue; // transparent counts as black: adds 0 to the mean and the tone
@@ -168,8 +171,9 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     const paperLin = paper.map((v) => srgbToLinear(v));
     const source = color === 'source';
     for (let y = 0; y < h; y++) {
-      const cy = Math.floor(y / cell);
-      const row = gy[y - cy * cell]!;
+      const cyAbs = Math.floor((top + y) / cell);
+      const row = gy[top + y - cyAbs * cell]!;
+      const cy = cyAbs - cy0;
       for (let x = 0; x < w; x++) {
         const cx = Math.floor(x / cell);
         const c = cy * cw + cx;
