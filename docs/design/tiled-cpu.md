@@ -1,6 +1,6 @@
 # Tiled CPU execution across workers
 
-Status: **proposal, not implemented** ([#128](https://github.com/Stocastico/rullino/issues/128)). Nothing in this document changes behaviour; it exists to be argued with before code is written.
+Status: **agreed, spike done (go), phase 1 next** ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
 
 ## Why, and what would count as success
 
@@ -30,7 +30,7 @@ Why bands and not 2-D tiles:
 
 **Segments.** A step that needs the whole image first (a histogram, a global statistic) cannot be banded. It ends a segment: bands are gathered into the full image, the step runs on the full image (single-threaded, or later two-phase, see "Not in v1"), and the next segment is scattered again. A chain with no global step is one segment.
 
-**Small images are not tiled.** If `total halo > ¼ of the band height`, or the image is below the size threshold, the segment runs whole. Canny at 64 iterations or inpaint at σ = 100 have reaches in the hundreds; on a 1 MP preview that is "do not tile", on 12 MP it is still worth it.
+**When not to tile.** If `total halo > ¼ of the band height`, the segment runs whole: canny at 64 iterations or inpaint at σ = 100 have reaches in the hundreds, which on a 1 MP preview is "do not tile" and on 12 MP is still worth it. For small images the cost is the pool, not the bands (see the spike): an existing pool is used from ~0.5 MP; a pool is created for an image of ~2 MP or more (below that a render takes ≲ 0.7 s and the pool's 80–240 ms start-up is not paid back by one render).
 
 ## What a filter must declare
 
@@ -84,6 +84,25 @@ A worker error rejects the render and tears the pool down (the next render build
 - 2-D tiles.
 - Tiling the GPU: not applicable.
 - Sharing the filters' prose / registry between threads: each worker loads the filters it needs, as the current worker does.
+
+## Spike results (31 Oct, go)
+
+Throw-away harness (not kept; the phase 2 bench replaces it): Node 22 `worker_threads`, a hand-rolled pool of 4 on the 4-core cloud container, the real fast paths bundled with Vite, reach set by hand, bands of full width. Medians of 3 warm runs, the whole-image run measured the same way. "Differing floats" compares the banded output with the whole-image output element by element.
+
+| Chain at 12 MP (4000×3000) | Whole, 1 thread | 4 bands, shared buffers | 8 bands, shared | 8 bands, cloned |
+|---|---|---|---|---|
+| exposure + curves + LUT (reach 0) | 4274 ms | 1303 ms (3.3×) | 985 ms (4.3×) | 1167 ms (3.7×) |
+| gaussian σ3 + unsharp σ2 (reach 15) | 5106 ms | 1510 ms (3.4×) | 1062 ms (4.8×) | 1216 ms (4.2×) |
+| kuwahara r4 + sharpen (reach 5) | 16258 ms | 4549 ms (3.6×) | 3879 ms (4.2×) | 3969 ms (4.1×) |
+
+- **Differing floats: 0** in every cell: bit-identical with a correct reach, which is what the design needs.
+- **More bands than threads helps** (8 on 4 cores beats 4): load balance and, see next point, smaller working sets. Plan for ~2× the threads.
+- **Tiling is faster even on one thread**: the same bands run one after the other on the main thread are 1.1–1.4× faster than the whole image (12 MP: 3264 vs 4274 ms for the pointwise chain with 8 bands). Smaller buffers mean fewer page faults and less GC; the whole-image path pays for a fresh 192 MB array per step. So the 4.8× on 4 cores is part parallelism (~3.4×) and part memory behaviour; the claim "~cores×" is fair, "cores × 1.2" is a ceiling for the best cases.
+- **Cloning bands costs little** (Node, V8 structured clone): 48 MB there and back in 86 ms warm; the cloned path is within 0–25% of the shared one at 8 bands, and in one case faster. The browser should use the clone path by default and not depend on cross-origin isolation. (Not measured in a browser; same engine, to be checked in phase 3.)
+- **Start-up**: 80–235 ms for 4 workers with the filters loaded.
+- **Small images**: 1155×866 (1 MP) pointwise 322 ms whole vs 100 ms banded (3.2×), blur 274 vs 93 ms (2.9×); 1600×1200 and 2400×1600 about 3.3–4.4×. With a warm pool there is no size below which tiling loses (down to 1 MP, the smallest tried).
+
+Success criteria of the proposal (≥ 2.5× at 12 MP, no slowdown on small images, bit-identical): met. Caveats: Node only; three chains with simple reaches (no canny or inpaint, whose halo is large); global steps not measured; a 4-core container, not a user's laptop or phone.
 
 ## Plan
 
