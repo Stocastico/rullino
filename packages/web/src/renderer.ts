@@ -15,7 +15,10 @@ import {
 import { applyEditPixels } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
-import type { RenderRequest, RenderResponse } from './protocol';
+import type { PoolOptions, RenderRequest, RenderResponse } from './protocol';
+import { resolveThreads } from './threads';
+
+export type { PoolOptions };
 
 export interface RendererOptions {
   /**
@@ -36,6 +39,16 @@ export interface RendererOptions {
   readonly resolveLut?: ((ref: string) => Lut | undefined) | undefined;
   /** Run the CPU backend in a Web Worker (default), so rendering never blocks the page. */
   readonly worker?: boolean | undefined;
+  /**
+   * CPU threads for the CPU backend: the image is cut into horizontal bands that a pool of workers
+   * renders at once, with the same result as one thread bit for bit. A number (at least 1), or
+   * `'auto'` for the cores (at most 8). Default 1. Only images of about 2 MP and more start the
+   * pool, and steps that need the whole image (equalize, clahe, otsu) run alone. Needs the worker
+   * (the default); ignored with custom `filters` or `worker: false`.
+   */
+  readonly threads?: number | 'auto' | undefined;
+  /** Advanced options of the band workers: where their script is, when they start, copy or shared memory. */
+  readonly pool?: PoolOptions | undefined;
 }
 
 export interface Renderer {
@@ -64,8 +77,11 @@ export interface Renderer {
 }
 
 /** The CPU backend in a Web Worker: one worker, requests matched to responses by id. */
-function workerBackend() {
+function workerBackend(threads: number, pool: PoolOptions | undefined) {
   let worker: Worker | undefined;
+  // The callback stays here: functions cannot be posted to a worker.
+  const { onRender: _, workerUrl, ...rest } = pool ?? {};
+  const workerPool: PoolOptions = { ...rest, ...(workerUrl !== undefined && { workerUrl: String(workerUrl) }) }; // a URL object cannot be posted
   let nextId = 0;
   const pending = new Map<number, { resolve: (image: LinearImage | Rgba8Image) => void; reject: (error: Error) => void }>();
   const failAll = (error: Error) => {
@@ -78,7 +94,10 @@ function workerBackend() {
       const p = pending.get(data.id);
       pending.delete(data.id);
       if ('error' in data) p?.reject(new Error(data.error));
-      else p?.resolve(data.image);
+      else {
+        pool?.onRender?.({ bands: data.bands, shared: data.shared });
+        p?.resolve(data.image);
+      }
     };
     w.onerror = (event) => failAll(new Error(`rullino's CPU worker failed: ${event.message}`));
     return w;
@@ -89,7 +108,7 @@ function workerBackend() {
       const id = nextId++;
       // A copy, transferred: the caller keeps its image. 8-bit pixels are a quarter of a linear image.
       const data = image.data.slice();
-      const request: RenderRequest = { id, image: { width: image.width, height: image.height, data } as LinearImage | Rgba8Image, edit, luts, scale, pixels };
+      const request: RenderRequest = { id, image: { width: image.width, height: image.height, data } as LinearImage | Rgba8Image, edit, luts, scale, pixels, threads, pool: workerPool };
       return new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
         worker!.postMessage(request, [data.buffer]);
@@ -117,6 +136,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
   const backend = options.backend ?? 'auto';
   const filters = options.filters ?? allFilters;
   const resolveLut = options.resolveLut ?? resolveLookLut;
+  const threads = resolveThreads(options.threads);
   let ctx: GpuContext | undefined;
   let reason: string | undefined;
   if (backend !== 'cpu') {
@@ -127,7 +147,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       reason = (e as Error).message;
     }
   }
-  const worker = !ctx && options.worker !== false && !options.filters ? workerBackend() : undefined;
+  const worker = !ctx && options.worker !== false && !options.filters ? workerBackend(threads, options.pool) : undefined;
 
   const run = async (image: LinearImage | Rgba8Image, edit: unknown, scale: number | undefined, pixels: boolean): Promise<LinearImage | Rgba8Image> => {
     if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale });
