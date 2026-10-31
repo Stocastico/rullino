@@ -81,6 +81,7 @@ describe('every filter, banded, equals the whole image', () => {
 // declared reach is larger than the filter ever reads (wasted work in every banded render). A
 // filter may be exempt only for a reason written here.
 const EXEMPT_FROM_TIGHTNESS: Record<string, string> = {
+  halftone: 'declared from the geometry of a full-ink dot; the test images hardly ever have a full-ink dot sampled at the extreme row, so one row less goes unseen',
   canny: 'the last row only reaches the Gaussian\'s smallest tap (0.4% at sigma 1): too small to flip a non-maximum-suppression decision on the test images',
 };
 
@@ -110,6 +111,27 @@ describe('declared reach is tight', () => {
     }
     if (!observable) return; // reach 0 in every case (applyLut): there is no row to take away
     expect(seen, `${id}: a reach one row shorter gave the same result in every case`).toBe(true);
+  }, SLOW);
+});
+
+// The registry cases vary one parameter at a time (angles 0, 45 and 90 only): the geometry of the
+// halftone reach needs every size, angle, shape, grid and ink together.
+describe('halftone reach holds across sizes and angles', () => {
+  const halftone = filters.find((f) => f.id === 'halftone')! as Filter;
+  it('banded equals whole for 4 sizes × 5 angles × 3 shapes × 2 grids × 2 inks on every image', () => {
+    for (const src of Object.values(images)) {
+      for (const size of [2, 5, 13, 21])
+        for (const angle of [0, 15, 45, 75, 90])
+          for (const shape of ['circle', 'square', 'ring'])
+            for (const grid of ['square', 'hex'])
+              for (const mode of ['mono', 'cmy']) {
+                const steps = [stepOf(halftone, { size, angle, shape, grid, mode })];
+                const reach = stepReach(steps[0]!) as number;
+                const bands = Math.max(2, Math.min(src.height, Math.floor((3.5 * src.height) / Math.max(1, reach))));
+                const diff = firstDifference(runChainBands(steps, src, { fast: true, bands, force: true }), runChainCpu(steps, src, { fast: true }));
+                expect(diff, `${src.width}x${src.height} size ${size} angle ${angle} ${shape} ${grid} ${mode} (reach ${reach}, ${bands} bands): ${diff}`).toBeUndefined();
+              }
+    }
   }, SLOW);
 });
 
@@ -158,6 +180,6 @@ describe('reach declarations', () => {
   it('lists the filters that are still global, so that making one banded changes this test', () => {
     // Position-dependent ones wait for the frame argument; the others need the whole image.
     const global = filters.filter((f) => f.kind === 'multipass' && f.reach === 'global').map((f) => f.id).sort();
-    expect(global).toEqual(['ascii', 'chromaticAberration', 'clahe', 'equalize', 'halftone', 'lensBlur', 'otsu', 'patch', 'pixelate']);
+    expect(global).toEqual(['chromaticAberration', 'clahe', 'equalize', 'lensBlur', 'otsu', 'patch']);
   });
 });
