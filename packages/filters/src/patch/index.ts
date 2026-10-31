@@ -29,12 +29,13 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { patch: img }) => {
+  reach: () => 0, // one pixel in, one pixel out; the patch is read at the position in the whole image
+  cpu: (src, { patch: img }, _mask, region) => {
+    const [top, full] = [region?.y0 ?? 0, region?.fullHeight ?? src.height]; // the patch covers the whole image
     const out = createImage(src.width, src.height);
     for (let y = 0; y < src.height; y++)
       for (let x = 0; x < src.width; x++) {
-        const o = sampleImage(img, (x + 0.5) / src.width, (y + 0.5) / src.height);
+        const o = sampleImage(img, (x + 0.5) / src.width, (top + y + 0.5) / full);
         const i = (y * src.width + x) * 4;
         for (let c = 0; c < 4; c++) out.data[i + c] = o[c]! + src.data[i + c]! * (1 - o[3]);
       }

@@ -1,4 +1,4 @@
-import { defaultParams, runChainCpu, type Filter, type LinearImage, type Mask, type Step } from '@rullino/core';
+import { createImage, defaultParams, runChainCpu, type Filter, type LinearImage, type Mask, type Step } from '@rullino/core';
 import { runChainBands, stepReach } from '@rullino/core/internal';
 import { describe, expect, it } from 'vitest';
 import { filters } from './index';
@@ -81,8 +81,15 @@ describe('every filter, banded, equals the whole image', () => {
 // declared reach is larger than the filter ever reads (wasted work in every banded render). A
 // filter may be exempt only for a reason written here.
 const EXEMPT_FROM_TIGHTNESS: Record<string, string> = {
+  chromaticAberration: 'the reach is |amount| rows, reached only on an image as tall as its diagonal is long (the displacement is amount × height / diagonal); the test images are wider than tall',
   halftone: 'declared from the geometry of a full-ink dot; the test images hardly ever have a full-ink dot sampled at the extreme row, so one row less goes unseen',
   canny: 'the last row only reaches the Gaussian\'s smallest tap (0.4% at sigma 1): too small to flip a non-maximum-suppression decision on the test images',
+};
+
+// Cases the one-at-a-time parameter cases cannot make: lens blur needs a depth map that blurs
+// everywhere at the full radius (a flat, near, opaque map), or its farthest taps never count.
+const EXTRA_TIGHTNESS_CASES: Record<string, Record<string, unknown>[]> = {
+  lensBlur: [{ depth: createImage(1, 1, new Float32Array([1, 1, 1, 1])), focus: 0.5, range: 0, radius: 6 }],
 };
 
 describe('declared reach is tight', () => {
@@ -96,7 +103,8 @@ describe('declared reach is tight', () => {
     for (const src of Object.values(images)) {
       // The one-at-a-time cases, and one with every number at its minimum: small reaches that fit the image.
       const mins = Object.fromEntries(Object.entries(f.params).flatMap(([k, p]) => (p.type === 'float' || p.type === 'int' ? [[k, p.min]] : [])));
-      for (const [, params] of [...parityCases(f.params), ['mins', mins] as const]) {
+      const extra = (EXTRA_TIGHTNESS_CASES[id] ?? []).map((p) => ['extra', p] as const);
+      for (const [, params] of [...parityCases(f.params), ['mins', mins] as const, ...extra]) {
         const mask = needsMask(f) ? parityMask : undefined;
         const steps = [stepOf(f, params, mask)];
         const reach = stepReach(steps[0]!);
@@ -180,6 +188,6 @@ describe('reach declarations', () => {
   it('lists the filters that are still global, so that making one banded changes this test', () => {
     // Position-dependent ones wait for the frame argument; the others need the whole image.
     const global = filters.filter((f) => f.kind === 'multipass' && f.reach === 'global').map((f) => f.id).sort();
-    expect(global).toEqual(['chromaticAberration', 'clahe', 'equalize', 'lensBlur', 'otsu', 'patch']);
+    expect(global).toEqual(['clahe', 'equalize', 'otsu']);
   });
 });

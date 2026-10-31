@@ -1,13 +1,18 @@
 import { createImage, defineFilter, type LinearImage } from '@rullino/core';
 import { clampLoad } from '../convolution';
 
-/** Bilinear sample of channel c at continuous coordinates (pixel centres at i + 0.5), clamped to the edge. */
-function sample(img: LinearImage, x: number, y: number, c: number): number {
+/**
+ * Bilinear sample of channel c at continuous coordinates (pixel centres at i + 0.5), clamped to the
+ * edge. `y` is a row of the whole image and `first` the row of the whole image `img` starts at: the
+ * base pixel and the fraction come from the whole image's coordinate (a band must give the very bits
+ * the whole image gives), and only the row to read is moved into `img`.
+ */
+function sample(img: LinearImage, x: number, y: number, c: number, first = 0): number {
   const [u, v] = [x - 0.5, y - 0.5];
   const [x0, y0] = [Math.floor(u), Math.floor(v)];
   const [fx, fy] = [u - x0, v - y0];
-  const top = clampLoad(img, x0, y0, c) * (1 - fx) + clampLoad(img, x0 + 1, y0, c) * fx;
-  const bottom = clampLoad(img, x0, y0 + 1, c) * (1 - fx) + clampLoad(img, x0 + 1, y0 + 1, c) * fx;
+  const top = clampLoad(img, x0, y0 - first, c) * (1 - fx) + clampLoad(img, x0 + 1, y0 - first, c) * fx;
+  const bottom = clampLoad(img, x0, y0 + 1 - first, c) * (1 - fx) + clampLoad(img, x0 + 1, y0 + 1 - first, c) * fx;
   return top * (1 - fy) + bottom * fy;
 }
 
@@ -50,18 +55,22 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { amount }) => {
+  // The displacement is at most `amount` rows (|dy| ≤ h / 2 and the factor is amount / (hypot(w, h) / 2));
+  // the bilinear sample reads one more row.
+  reach: ({ amount }) => Math.ceil(Math.abs(amount)) + 1,
+  cpu: (src, { amount }, _mask, region) => {
     const { width: w, height: h } = src;
+    const [first, full] = [region?.y0 ?? 0, region?.fullHeight ?? h]; // the centre and the radius are those of the whole image
     const out = createImage(w, h, src.data.slice());
-    const [cx, cy] = [w / 2, h / 2];
-    const s = amount / (0.5 * Math.hypot(w, h));
-    for (let y = 0; y < h; y++)
+    const [cx, cy] = [w / 2, full / 2];
+    const s = amount / (0.5 * Math.hypot(w, full));
+    for (let row = 0; row < h; row++)
       for (let x = 0; x < w; x++) {
+        const y = first + row;
         const [dx, dy] = [x + 0.5 - cx, y + 0.5 - cy];
-        const i = (y * w + x) * 4;
-        out.data[i] = sample(src, cx + dx * (1 + s), cy + dy * (1 + s), 0);
-        out.data[i + 2] = sample(src, cx + dx * (1 - s), cy + dy * (1 - s), 2);
+        const i = (row * w + x) * 4;
+        out.data[i] = sample(src, cx + dx * (1 + s), cy + dy * (1 + s), 0, first);
+        out.data[i + 2] = sample(src, cx + dx * (1 - s), cy + dy * (1 - s), 2, first);
       }
     return out;
   },
