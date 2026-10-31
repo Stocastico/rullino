@@ -25,6 +25,7 @@ export const clahe = defineFilter({
   buffers: equalizeBuffers(MAX_TILES),
   // Read through the global uniform: the shared helpers have no `p` in scope.
   passes: equalizePasses('params.tiles', 'params.clipLimit'),
+  reach: 'global', // needs the histogram of the whole image
   cpu: (src, { tiles, clipLimit, amount }) => equalizeCpu(src, tiles, clipLimit, amount),
   tolerance: OKLAB_TOLERANCE,
 });

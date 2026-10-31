@@ -106,6 +106,8 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  // Open, close, top-hat and black-hat run an erosion and a dilation one after the other.
+  reach: ({ operation, radius }) => (['open', 'close', 'tophat', 'blackhat'].includes(operation) ? 2 * radius : radius),
   cpu: (src, { operation, shape, radius }) => {
     const op = operation as Operation;
     const erode = (img: LinearImage) => morphCpu(img, false, shape as Shape, radius);

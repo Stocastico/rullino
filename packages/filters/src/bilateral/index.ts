@@ -69,6 +69,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ sigmaSpace }) => radiusFor(sigmaSpace),
   cpu: (src, { sigmaSpace, sigmaRange }) => {
     const lab = q16(labImage(src));
     const r = radiusFor(sigmaSpace);

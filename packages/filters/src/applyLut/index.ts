@@ -30,6 +30,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: () => 0, // one pixel in, one pixel out
   cpu: (src, { look, intensity }) => {
     const out = createImage(src.width, src.height);
     const s = src.data;

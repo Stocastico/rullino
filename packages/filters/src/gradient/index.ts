@@ -56,6 +56,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: () => 1, // 3×3 operators
   cpu: (src, { method, output, strength }) => {
     const w = OPERATORS[OPERATOR_IDS.includes(method as keyof typeof OPERATORS) ? (method as keyof typeof OPERATORS) : 'sobel'];
     const norm = 2 * (w[0] + w[1] + w[2]);

@@ -39,6 +39,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: () => 1, // four or eight neighbours
   cpu: (src, { connectivity, output, strength }) =>
     greyLike(src, (x, y) => {
       let sum = lumAt(src, x + 1, y) + lumAt(src, x - 1, y) + lumAt(src, x, y + 1) + lumAt(src, x, y - 1);

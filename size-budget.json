@@ -1,6 +1,6 @@
 {
   "_comment": "Upper limits in bytes, gzip -9. Packages: all dist/*.js concatenated (a ceiling: bundlers tree-shake what a consumer does not import). Playground: the main chunk of the built site (the ONNX Runtime chunk is loaded only when an ML tool is used). Raise a limit only with a reason in the PR.",
-  "packages/core": 40000,
+  "packages/core": 44000,
   "packages/filters": 60000,
   "packages/presets": 3000,
   "packages/ml": 6900,

@@ -101,6 +101,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ radius }) => radius, // the (r + 1)² quadrants reach r pixels away
   cpu: (src, { radius: r, sharpness }) => {
     const lum = lumImage(src);
     const out = createImage(src.width, src.height);

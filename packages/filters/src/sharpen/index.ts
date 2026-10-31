@@ -28,6 +28,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: () => 1, // the four neighbours
   cpu: (src, { amount }) => {
     const out = createImage(src.width, src.height);
     for (let y = 0; y < src.height; y++)

@@ -119,3 +119,18 @@ export const parityMask: Mask = { kind: 'radial', center: [0.45, 0.55], radius: 
 
 // Non-multiple-of-8 sizes exercise the workgroup bounds check.
 export const parityImages = { noise: testImage(67, 45), rings: structuredImage(71, 53) };
+
+/**
+ * Special values the random images never hit: exact greys (zero chroma), black, white, primaries,
+ * HDR, and the same colours at partial alpha (premultiplied), on a 13 x 7 grid.
+ */
+export function specialImage() {
+  const colours = [[0, 0, 0], [1, 1, 1], [0.18, 0.18, 0.18], [0.5, 0.5, 0.5], [1, 0, 0], [0, 1, 0], [0, 0, 1], [2, 2, 2], [3, 0.5, 0.1], [0.001, 0.001, 0.001]];
+  const img = createImage(13, 7);
+  for (let i = 0; i < 13 * 7; i++) {
+    const [r, g, b] = colours[i % colours.length]!;
+    const a = [1, 0.5, 0.25][Math.floor(i / colours.length) % 3]!;
+    img.data.set([r! * a, g! * a, b! * a, a], i * 4);
+  }
+  return img;
+}

@@ -54,6 +54,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ distance }) => distance,
   cpu: (src, { angle, strength, distance: d, mode }) => {
     const out = createImage(src.width, src.height);
     const t = (angle * Math.PI) / 180;

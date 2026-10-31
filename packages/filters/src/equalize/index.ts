@@ -19,6 +19,7 @@ export const equalize = defineFilter({
   },
   buffers: equalizeBuffers(1),
   passes: equalizePasses('1', '1e9'),
+  reach: 'global', // needs the histogram of the whole image
   cpu: (src, { amount }) => equalizeCpu(src, 1, 1e9, amount),
   tolerance: OKLAB_TOLERANCE,
 });

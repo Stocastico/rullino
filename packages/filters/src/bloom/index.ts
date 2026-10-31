@@ -1,5 +1,5 @@
 import { createImage, defineFilter, luminance, type LinearImage } from '@rullino/core';
-import { convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { convolve1d, gaussianPass, gaussianReach, gaussianWeights, q16 } from '../convolution';
 import { convolve1dFast } from '../fast';
 
 /** Half-width of the soft knee around the threshold (in linear luminance). */
@@ -49,6 +49,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ sigma }) => gaussianReach(sigma),
   cpu: (src, { threshold, sigma, intensity }) => {
     // Intermediates rounded to half floats, as the GPU stores them.
     const bright: LinearImage = createImage(src.width, src.height);

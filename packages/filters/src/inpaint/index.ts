@@ -1,6 +1,6 @@
 import { createImage, defineFilter, type LinearImage } from '@rullino/core';
 import { float16ToFloat32, float32ToFloat16 } from '@rullino/core/internal';
-import { gaussianCpu, gaussianPass, q16 } from '../convolution';
+import { gaussianCpu, gaussianPass, gaussianReach, q16 } from '../convolution';
 import { gaussianFast } from '../fast';
 
 /** Below this blurred known-weight a pixel is too far from any known pixel to estimate. */
@@ -81,6 +81,8 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  // The Gaussian of the known pixels, then one pixel per diffusion step.
+  reach: ({ sigma, iterations }) => gaussianReach(sigma) + iterations,
   cpu: (src, { sigma, iterations }, mask) => {
     const m = mask!;
     const weighted = (f: (i: number, c: number) => number) => {
