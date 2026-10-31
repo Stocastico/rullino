@@ -40,6 +40,7 @@ export default defineConfig({
         },
       },
       {
+        server: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } }, // the shared-memory path of @rullino/web's pool
         test: {
           name: 'bench',
           include: ['packages/*/bench/**/*.bench.browser.ts'],
