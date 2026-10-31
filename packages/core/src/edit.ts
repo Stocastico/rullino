@@ -7,7 +7,7 @@ import { downscale } from './gpu/resize';
 import { releaseTexture } from './gpu/pool';
 import { readImage, uploadImage } from './gpu/texture';
 import type { LinearImage, Rgba8Image } from './image';
-import { runChainCpu } from './pipeline/chain';
+import { runChainCpu, type Step } from './pipeline/chain';
 import { Pipeline } from './pipeline/pipeline';
 import { downscaleCpu, fitWithin } from './resize';
 import { parseChain, type ParseOptions } from './serialize';
@@ -20,6 +20,12 @@ export interface ApplyEditOptions extends ParseOptions {
    * copy). Pixel-unit params are multiplied by it. Default 1.
    */
   readonly scale?: number | undefined;
+  /**
+   * Runs the chain on the CPU instead of the calling thread: receives the parsed steps, the framed
+   * image and the scale, returns the result (it must equal `runChainCpu(steps, image, { scale, fast:
+   * true })`). For executors that spread the work over threads, see `@rullino/node`. Ignored on the GPU.
+   */
+  readonly cpu?: ((steps: readonly Step[], image: LinearImage, options: { readonly scale: number }) => LinearImage | Promise<LinearImage>) | undefined;
 }
 
 /**
@@ -61,7 +67,7 @@ async function renderEdit<T>(
   if (!ctx) {
     const image = linear ? (source as LinearImage) : decodeSrgb8(source.data as Uint8Array, source.width, source.height);
     const framed = geometry && !isIdentityGeometry(geometry) ? applyGeometryCpu(image, geometry) : image;
-    const out = runChainCpu(steps, framed, { scale, fast: true });
+    const out = options.cpu ? await options.cpu(steps, framed, { scale }) : runChainCpu(steps, framed, { scale, fast: true });
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
     return readCpu(w === out.width && h === out.height ? out : downscaleCpu(out, w, h));
   }
