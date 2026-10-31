@@ -103,6 +103,14 @@ interface FilterBase<S extends ParamSchema> {
 }
 
 /**
+ * How far from an output pixel a multipass filter reads its input: a number of rows computed from
+ * the effective params (resolved and scaled, as `cpu` receives them), or `'global'` when it needs
+ * the whole image (a histogram, a global statistic). Banded rendering gives each band that many
+ * extra rows on both sides; too small a value is a wrong result, too large only wasted work.
+ */
+export type Reach<S extends ParamSchema = ParamSchema> = 'global' | ((p: ParamValues<S>) => number);
+
+/**
  * A filter made of a fixed sequence of passes (the last one is the output), for anything that
  * reads neighbours: convolutions, edges, morphology. Works on premultiplied linear values.
  */
@@ -120,6 +128,12 @@ export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends
    * The step's usual blend with the mask still follows.
    */
   readonly usesMask?: boolean;
+  /**
+   * Rows of context the CPU implementations read around a pixel, or `'global'`. Pointwise filters
+   * read none. Without it the filter is treated as global (never wrong, never banded); every
+   * built-in filter declares it (the registry test checks).
+   */
+  readonly reach?: Reach<S>;
   readonly passes: readonly PassDef[];
   /** Whole-image CPU reference: obvious, not fast. Must not mutate `src`. */
   readonly cpu: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array) => LinearImage;

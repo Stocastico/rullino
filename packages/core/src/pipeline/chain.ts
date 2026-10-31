@@ -1,6 +1,6 @@
 import type { Filter } from '../filter';
 import { createImage, type LinearImage } from '../image';
-import { blendMasked, maskImage, validateMask, type Mask } from '../mask';
+import { blendMasked, maskImage, validateMask, type Mask, type RowRegion } from '../mask';
 import { resolveParams, scaleParams } from '../params';
 
 /** One step of a filter chain. Params missing from `params` take their defaults. */
@@ -32,6 +32,25 @@ export function effectiveParams(step: Step, scale = 1): Record<string, unknown> 
 }
 
 /**
+ * One step on the CPU: the filter (its fast implementation with `options.fast`, where it has one)
+ * and then the blend with the step's mask. `region` says that `img` is a band of a taller image
+ * (see {@link RowRegion}): masks are then evaluated where the band sits in the full image.
+ */
+export function runStepCpu(step: Step, img: LinearImage, options: ChainOptions = {}, region?: RowRegion): LinearImage {
+  if (step.mask) validateMask(step.mask);
+  const params = effectiveParams(step, options.scale) as never;
+  const run: (src: LinearImage, p: never, mask?: Float32Array) => LinearImage = (options.fast && step.filter.fast) || step.filter.cpu;
+  let out: LinearImage;
+  if (step.filter.kind === 'multipass' && step.filter.usesMask) {
+    if (!step.mask) throw new Error(`filter "${step.filter.id}" needs a mask`);
+    out = run(img, params, maskImage(step.mask, img.width, img.height, region));
+  } else {
+    out = run(img, params);
+  }
+  return step.mask ? blendMasked(img, out, step.mask, region) : out;
+}
+
+/**
  * CPU reference for a chain: each enabled step applied in order (with `fast`, through the filters'
  * fast implementations). Never returns `src` itself.
  */
@@ -39,18 +58,6 @@ export function runChainCpu(steps: readonly Step[], src: LinearImage, options: C
   // No copy up front (192 MB at 12 MP): steps never mutate their input, so only a chain that
   // ends on `src` itself needs one.
   let img = src;
-  for (const s of activeSteps(steps)) {
-    if (s.mask) validateMask(s.mask);
-    const params = effectiveParams(s, options.scale) as never;
-    const run: (src: LinearImage, p: never, mask?: Float32Array) => LinearImage = (options.fast && s.filter.fast) || s.filter.cpu;
-    let out: LinearImage;
-    if (s.filter.kind === 'multipass' && s.filter.usesMask) {
-      if (!s.mask) throw new Error(`filter "${s.filter.id}" needs a mask`);
-      out = run(img, params, maskImage(s.mask, img.width, img.height));
-    } else {
-      out = run(img, params);
-    }
-    img = s.mask ? blendMasked(img, out, s.mask) : out;
-  }
+  for (const s of activeSteps(steps)) img = runStepCpu(s, img, options);
   return img === src ? createImage(src.width, src.height, src.data.slice()) : img;
 }
