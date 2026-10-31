@@ -138,3 +138,110 @@ describe('createRenderer (browser)', () => {
     }
   });
 });
+
+// Threads: the same bytes as one thread, whichever way the bands travel.
+const FORCE = { createAtPixels: 0, useAtPixels: 0, forceBands: true } as const;
+const sameBytes = (a: LinearImage, b: LinearImage) => {
+  expect([a.width, a.height]).toEqual([b.width, b.height]);
+  let i = 0;
+  while (i < a.data.length && Object.is(a.data[i], b.data[i])) i++;
+  expect(i, `first difference at channel ${i}: ${a.data[i]} against ${b.data[i]}`).toBe(a.data.length);
+};
+
+describe('createRenderer({ threads }) (browser)', () => {
+  const documents: Record<string, unknown> = {
+    'look, blur, curves and a mask': edit,
+    'pointwise only': { version: 2, steps: [{ filter: 'exposure', params: { ev: 0.5 } }, { filter: 'vignette', params: {} }] },
+    'positional and neighbourhood': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 3 } }, { filter: 'grain', params: {} }, { filter: 'unsharpMask', params: {} }] },
+    'a global step in the middle': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }, { filter: 'equalize', params: {} }, { filter: 'sharpen', params: {} }] },
+    'geometry and long side': { version: 2, geometry: { rotate: 0, flipH: false, flipV: false, straighten: 5, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } }, steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }], output: { format: 'png', longSide: 40 } },
+  };
+  const src = chart(53, 61);
+
+  for (const shared of [false, true]) {
+    describe(shared ? 'shared memory' : 'copied bands', () => {
+      it.each(Object.entries(documents))('%s: the result is bit-identical to one thread', async (_, doc) => {
+        const seen: { bands: number; shared: boolean }[] = [];
+        const one = await make({ backend: 'cpu' });
+        const many = await make({ backend: 'cpu', threads: 3, pool: { ...FORCE, shared, onRender: (i) => seen.push(i) } });
+        sameBytes(await many.apply(src, doc), await one.apply(src, doc));
+        expect(seen).toHaveLength(1);
+        expect(seen[0]!.shared).toBe(shared);
+        expect(seen[0]!.bands, 'the render was split into bands').toBeGreaterThan(1);
+      });
+    });
+  }
+
+  it('pixels() and 8-bit input give the same bytes too', async () => {
+    const bytes = new ImageData(new Uint8ClampedArray(31 * 23 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 7) % 256)), 31, 23);
+    const one = await make({ backend: 'cpu' });
+    const many = await make({ backend: 'cpu', threads: 2, pool: FORCE });
+    expect(Array.from((await many.pixels(bytes as never, edit)).data)).toEqual(Array.from((await one.pixels(bytes as never, edit)).data));
+    sameBytes(await many.apply(bytes as never, edit), await one.apply(bytes as never, edit));
+  });
+
+  it('does not touch the caller\'s image', async () => {
+    const many = await make({ backend: 'cpu', threads: 2, pool: FORCE });
+    await many.apply(src, edit);
+    expect(Array.from(src.data)).toEqual(Array.from(chart(53, 61).data));
+  });
+
+  it('small images stay in the render worker (below the thresholds), a larger one starts the pool', async () => {
+    const seen: number[] = [];
+    const r = await make({ backend: 'cpu', threads: 2, pool: { createAtPixels: 2000, useAtPixels: 1000, onRender: (i) => seen.push(i.bands) } });
+    const doc = { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 1 } }] };
+    await r.apply(chart(20, 20), doc); // 400 px
+    await r.apply(chart(60, 60), doc); // 3600 px
+    await r.apply(chart(40, 30), doc); // 1200 px: above useAtPixels, the pool exists now
+    expect(seen.map((n) => n > 0)).toEqual([false, true, true]);
+  });
+
+  it('threads 1 never starts band workers', async () => {
+    const seen: number[] = [];
+    const r = await make({ backend: 'cpu', threads: 1, pool: { ...FORCE, onRender: (i) => seen.push(i.bands) } });
+    await r.apply(src, edit);
+    expect(seen).toEqual([0]);
+  });
+
+  it('validates the option, and accepts auto', async () => {
+    await expect(createRenderer({ backend: 'cpu', threads: 0 })).rejects.toThrow(/threads/);
+    await expect(createRenderer({ backend: 'cpu', threads: 1.5 })).rejects.toThrow(/threads/);
+    const r = await make({ backend: 'cpu', threads: 'auto' });
+    expect(r.backend).toBe('cpu');
+  });
+
+  it('keeps renders apart: overlapping ones, and different documents one after the other on the same workers', async () => {
+    const one = await make({ backend: 'cpu' });
+    const many = await make({ backend: 'cpu', threads: 3, pool: FORCE });
+    const jobs = [
+      [chart(40, 33), documents['look, blur, curves and a mask']],
+      [chart(25, 50), documents['positional and neighbourhood']],
+      [chart(61, 17), documents['a global step in the middle']],
+      [chart(33, 33), documents['pointwise only']],
+    ] as const;
+    const results = await Promise.all(jobs.map(([img, doc]) => many.apply(img, doc)));
+    for (const [i, [img, doc]] of jobs.entries()) sameBytes(results[i]!, await one.apply(img, doc));
+    for (const [img, doc] of [...jobs].reverse()) sameBytes(await many.apply(img, doc), await one.apply(img, doc));
+  });
+
+  it('a band worker that cannot start fails the render with a message, and the renderer recovers', async () => {
+    const r = await make({ backend: 'cpu', threads: 2, pool: { ...FORCE, workerUrl: new URL('./does-not-exist.js', import.meta.url) } });
+    await expect(r.apply(src, edit)).rejects.toThrow(/could not start the band workers/);
+    await expect(r.apply(src, edit)).rejects.toThrow(/could not start the band workers/); // tries again
+  });
+
+  it('errors raised in a band surface, and the next render works', async () => {
+    const r = await make({ backend: 'cpu', threads: 2, pool: FORCE });
+    await expect(r.apply(src, { version: 2, steps: [{ filter: 'inpaint', params: {} }] })).rejects.toThrow(/mask/);
+    const one = await make({ backend: 'cpu' });
+    sameBytes(await r.apply(src, edit), await one.apply(src, edit));
+  });
+
+  it('destroy() during a render rejects it', async () => {
+    const r = await make({ backend: 'cpu', threads: 2, pool: FORCE });
+    const pending = r.apply(chart(400, 300), { version: 2, steps: [{ filter: 'kuwahara', params: {} }] });
+    setTimeout(() => r.destroy(), 20);
+    await expect(pending).rejects.toThrow(/destroyed|failed/);
+  });
+});
+
