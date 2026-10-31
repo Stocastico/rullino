@@ -105,8 +105,9 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { levels, matrix, seed, mode, scale }) => {
+  reach: () => 0, // one pixel in, one pixel out; its position comes from the frame
+  cpu: (src, { levels, matrix, seed, mode, scale }, _mask, region) => {
+    const y0 = region?.y0 ?? 0; // cells and noise are anchored at the origin of the whole image
     const out = createImage(src.width, src.height);
     const n = levels - 1;
     for (let y = 0; y < src.height; y++)
@@ -117,7 +118,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
           out.data.set(src.data.subarray(i, i + 4), i);
           continue;
         }
-        const [cx, cy] = [Math.floor(x / scale), Math.floor(y / scale)];
+        const [cx, cy] = [Math.floor(x / scale), Math.floor((y0 + y) / scale)];
         const t = matrix === 'white' ? whiteNoise(cx, cy, seed) : matrix === 'gradient' ? r2(cx, cy) : (bayer(cx, cy, SIZES[matrix]) + 0.5) / (SIZES[matrix] * SIZES[matrix]);
         const [r, g, b] = [0, 1, 2].map((c) => src.data[i + c]! / a) as [number, number, number];
         const clamp01 = (v: number) => Math.min(1, Math.max(0, v));

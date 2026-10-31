@@ -158,6 +158,6 @@ describe('reach declarations', () => {
   it('lists the filters that are still global, so that making one banded changes this test', () => {
     // Position-dependent ones wait for the frame argument; the others need the whole image.
     const global = filters.filter((f) => f.kind === 'multipass' && f.reach === 'global').map((f) => f.id).sort();
-    expect(global).toEqual(['ascii', 'chromaticAberration', 'clahe', 'dither', 'equalize', 'grain', 'halftone', 'lensBlur', 'otsu', 'patch', 'pixelate', 'vignette']);
+    expect(global).toEqual(['ascii', 'chromaticAberration', 'clahe', 'equalize', 'halftone', 'lensBlur', 'otsu', 'patch', 'pixelate']);
   });
 });

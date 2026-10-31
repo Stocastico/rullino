@@ -45,13 +45,14 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
-  cpu: (src, { amount, midpoint, feather, roundness }) => {
+  reach: () => 0, // one pixel in, one pixel out; its position comes from the frame
+  cpu: (src, { amount, midpoint, feather, roundness }, _mask, region) => {
     const { width: w, height: h } = src;
+    const [y0, full] = [region?.y0 ?? 0, region?.fullHeight ?? h]; // the distance is measured in the whole image
     const out = createImage(w, h);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const t = Math.min(1, Math.max(0, (distance(x, y, w, h, roundness) - midpoint) / feather));
+        const t = Math.min(1, Math.max(0, (distance(x, y0 + y, w, full, roundness) - midpoint) / feather));
         const k = t * t * (3 - 2 * t) * amount;
         const i = (y * w + x) * 4;
         const a = src.data[i + 3]!;
@@ -64,18 +65,19 @@ fn run(xy: vec2i, p: Params) -> vec4f {
     }
     return out;
   },
-  fast: (src, { amount, midpoint, feather, roundness }) => {
+  fast: (src, { amount, midpoint, feather, roundness }, _mask, region) => {
     const { width: w, height: h } = src;
+    const [y0, full] = [region?.y0 ?? 0, region?.fullHeight ?? h];
     const s = src.data;
     const out = createImage(w, h);
     const d = out.data;
     // distance() with its per-image constants hoisted.
-    const side = Math.max(w, h);
+    const side = Math.max(w, full);
     const sx = (1 + (w / side - 1) * roundness) / (w / 2);
-    const sy = (1 + (h / side - 1) * roundness) / (h / 2);
-    const norm = 1 / Math.hypot(1 + (w / side - 1) * roundness, 1 + (h / side - 1) * roundness);
+    const sy = (1 + (full / side - 1) * roundness) / (full / 2);
+    const norm = 1 / Math.hypot(1 + (w / side - 1) * roundness, 1 + (full / side - 1) * roundness);
     for (let y = 0; y < h; y++) {
-      const qy = (y + 0.5 - h / 2) * sy;
+      const qy = (y0 + y + 0.5 - full / 2) * sy;
       for (let x = 0; x < w; x++) {
         const qx = (x + 0.5 - w / 2) * sx;
         const t = Math.min(1, Math.max(0, (Math.sqrt(qx * qx + qy * qy) * norm - midpoint) / feather));
