@@ -41,7 +41,7 @@ export const renderer = await createRenderer({ backend: 'cpu', threads: 4 });
 ```
 
 - Only images of about 2 MP and more start the pool (the workers need ~0.1–0.3 s to start); once it exists, images from 0.5 MP use it. Smaller ones, and steps that need the whole image (`equalize`, `clahe`, `otsu`), run in the render worker alone.
-- By default bands travel by copy (structured clone), which needs nothing from your page. On a page served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` the source and output are `SharedArrayBuffer`s instead and nothing is copied.
+- Bands travel by copy (structured clone), which needs nothing from your page. `pool: { shared: true }` uses `SharedArrayBuffer`s instead, on a page served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`; measured at 12 MP it was not faster (the source is still copied in and the result out), so copying is the default.
 - Needs nested workers (Chrome, Firefox, Safari 15.5+). Where the browser has none, rendering stays on one thread. A pool that cannot start (a bundler that does not ship `band-worker.js`) fails the render with a message naming the file.
 - Real speed-ups depend on the machine: see the numbers in [docs/design/tiled-cpu.md](https://github.com/Stocastico/rullino/blob/main/docs/design/tiled-cpu.md) and measure yours with `pnpm bench:threads:web` in the repository.
 

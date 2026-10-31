@@ -11,7 +11,7 @@ export default defineConfig({
       include: ['packages/*/src/**/*.ts', 'apps/playground/src/**/*.ts'],
       // main.ts is the playground's entry wiring: the e2e smoke test (scripts/smoke.mjs) exercises it.
       // worker.ts: the scripts of the CPU workers (web, node) run in threads the coverage of the test process cannot see; the worker tests run them for real.
-      exclude: ['**/*.test.ts', '**/test-utils.ts', '**/*.d.ts', 'apps/playground/src/main.ts', 'packages/*/src/worker.ts'],
+      exclude: ['**/*.test.ts', '**/test-utils.ts', '**/*.d.ts', 'apps/playground/src/main.ts', 'packages/*/src/worker.ts', 'packages/*/src/band-worker.ts'],
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'coverage',
       // Just below what is measured, per area (the whole area's total, not each file): a drop

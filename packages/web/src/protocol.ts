@@ -26,7 +26,7 @@ export interface PoolOptions {
   readonly useAtPixels?: number;
   /** Cut into the requested number of bands whatever the halo (tests); normally a band is at least 4 × halo rows. */
   readonly forceBands?: boolean;
-  /** Share the image with the band workers instead of copying bands: `true` needs cross-origin isolation. Default: when the page is isolated. */
+  /** Share the image with the band workers instead of copying bands: `true` needs cross-origin isolation. Default false: measured no faster than copies. */
   readonly shared?: boolean;
   /** Where the band worker script is; default: next to this one. */
   readonly workerUrl?: string | URL;

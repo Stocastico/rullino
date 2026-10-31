@@ -1,6 +1,6 @@
 # Tiled CPU execution across workers
 
-Status: **agreed, spike done (go), phase 1 done** (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 is done (the Node worker executor, see "Phase 2 results" below); phase 3 (Web Workers) is next ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
+Status: **agreed, spike done (go), phase 1 done** (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 is done (the Node worker executor, see "Phase 2 results" below), and so is phase 3 (Web Workers, "Phase 3 results"); phase 4 (docs, the `'auto'` default) is next ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
 
 ## Why, and what would count as success
 
@@ -118,6 +118,24 @@ Success criteria of the proposal (≥ 2.5× at 12 MP, no slowdown on small image
 | kuwahara r4 + sharpen | 14441 | 7438 (1.94×) | 4144 (3.48×) |
 
 The first render of a renderer also starts the pool (+0.7-1 s here: workers, the filters bundle, first allocations). The success criterion (≥ 2.5× at 12 MP) holds for the banded chains; the chain with a global step shows the limit of "global steps run alone", which two-phase global filters (histograms per band, merged, then a banded apply) would lift. The gap to the spike's 3.3-4.8× is serial work around the bands (copying the source into shared memory, 192 MB allocations whose page faults cost 0.1-0.8 s in this container, the copy out): a pool of spare buffers and `render()` consuming its result in shared memory improved the 4-thread figures between two runs (exposure + curves 2.3× → 2.7×, blur + unsharp 3.4× → 4.0×; page-fault costs are noisy here, so read these as a trend).
+
+## Phase 3 results (31 Oct)
+
+`createRenderer({ threads })` in `@rullino/web`: the render worker is the coordinator (it runs `applyEdit` with the `cpu` hook), plans the segments and bands like the Node executor and sends each band to a nested module worker (`band-worker`). Two transports: **copy** (default; the band's input rows, halo included, are copied and transferred, the result rows come back transferred) and **shared** (`pool.shared`, needs COOP/COEP: the source is copied once into a `SharedArrayBuffer` and bands write into a shared output). Measured with `pnpm bench:threads:web` (headless Chromium on the 4-core container, 12 MP, `renderer.apply`, median of 2; speed-up over 1 thread):
+
+| Chain | 1 thread | 2 | 4 | 4, shared |
+|---|---|---|---|---|
+| exposure + curves | 3640 ms | 1914 (1.90×) | 923 (3.95×) | 1011 (3.60×) |
+| blur + unsharp | 6908 | 3329 (2.08×) | 1946 (3.55×) | 1982 (3.49×) |
+| levels + vignette + grain | 4899 | 2417 (2.03×) | 1438 (3.41×) | 1774 (2.76×) |
+| look (LUT, vignette, grain) | 3400 | 2285 (1.49×) | 1175 (2.89×) | 1436 (2.37×) |
+| blur + equalize + sharpen | 6428 | 5555 (1.16×) | 4851 (1.33×) | 5923 (1.09×) |
+| kuwahara r4 + sharpen | 14888 | 10278 (1.45×) | 5842 (2.55×) | 6339 (2.35×) |
+
+- **Copy is the default and shared is not faster.** The prediction of the spike held in a browser: cloning bands costs little, and the shared path still copies the source into shared memory and the result out of it (Blob, ImageData and the encoders refuse views of shared buffers), so it saves nothing and loses on some chains. It stays as an option (`pool.shared`) for pages that are isolated anyway and for a future where the result can be consumed in place; it is tested bit for bit like the copy path.
+- The bands equal one thread byte for byte in Chromium (five documents incl. a global step, geometry and `longSide`, 8-bit input, `pixels()`, overlapping renders of different documents).
+- The same limits as the Node executor: global steps run alone (the equalize chain gains 1.3×), the pool starts from 2 MP (then from 0.5 MP), 1 MP images are unchanged; a 4-core container, not a laptop or a phone; the 2-thread rows are noisy (the host shares its cores).
+- A pool that cannot start rejects the render with a message naming the file; where the browser has no nested workers it stays on one thread.
 
 ## Plan
 

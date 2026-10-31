@@ -7,7 +7,7 @@ import type { BandJob, BandReply, PoolOptions } from './protocol';
 // its band plus a halo of extra rows and returns only the rows it owns. Everything that cannot be
 // banded (a step that needs the whole image, small images) runs on the calling thread, exactly as
 // without threads. Bands travel by copy by default (structured clone: no cross-origin isolation
-// needed); on an isolated page the source and output are SharedArrayBuffers and nothing is copied.
+// needed); `pool.shared` (cross-origin isolated pages) uses SharedArrayBuffers for the bands instead.
 
 /** The number of threads an option stands for: 1 (none) by default, 'auto' = the cores, at most 8. */
 export function resolveThreads(option: number | 'auto' | undefined, cores = (globalThis.navigator?.hardwareConcurrency ?? 1)): number {
@@ -32,8 +32,9 @@ const MP = 1_000_000;
 export function createThreadedExecutor(threads: number, pool: PoolOptions = {}): ThreadedExecutor {
   const createAtPixels = pool.createAtPixels ?? 2 * MP;
   const useAtPixels = pool.useAtPixels ?? 0.5 * MP;
-  const shared = pool.shared ?? (typeof SharedArrayBuffer !== 'undefined' && (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true);
-  const workerUrl = pool.workerUrl ?? new URL('./band-worker.ts', import.meta.url);
+  // Copied bands are the default: measured at 12 MP, shared memory is no faster (the source is copied into it and the result out of it).
+  const shared = pool.shared ?? false;
+  const workerUrl = pool.workerUrl ?? 'band-worker.js';
   let workers: Worker[] | undefined;
   let starting: Promise<Worker[]> | undefined;
   let destroyed = false;
@@ -53,7 +54,8 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
       let worker: Worker;
       const fail = (message: string) => reject(new Error(`could not start the band workers (${message}); @rullino/web loads ${String(workerUrl)}`));
       try {
-        worker = new Worker(workerUrl, { type: 'module' });
+        // The literal form, inside `new Worker(...)`: bundlers only recognise a worker entry by it.
+        worker = pool.workerUrl === undefined ? new Worker(new URL('./band-worker.ts', import.meta.url), { type: 'module' }) : new Worker(pool.workerUrl, { type: 'module' });
       } catch (e) {
         fail((e as Error).message);
         return;

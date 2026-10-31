@@ -188,6 +188,14 @@ const [a, b] = [await onGpu.apply(src, doc), await onCpu.apply(src, doc)];
 let webWorst = onGpu.backend === 'gpu' && onCpu.backend === 'cpu' ? 0 : 1;
 for (let i = 0; i < a.data.length; i++) webWorst = Math.max(webWorst, Math.abs(a.data[i] - b.data[i]));
 result.webCpuWorkerVsGpu = workers === 1 ? webWorst : 1;
+// Band workers from the packed package (dist/band-worker.js must survive the bundle): two of them,
+// bands forced, give the bytes of the single worker (0 = identical and really banded).
+let bandJobs = 0;
+const banded = await createRenderer({ backend: 'cpu', threads: 2, pool: { createAtPixels: 0, useAtPixels: 0, forceBands: true, onRender: (i) => (bandJobs += i.bands) } });
+const c = await banded.apply(src, doc);
+let threadsWorst = bandJobs > 1 ? 0 : 1;
+for (let i = 0; i < b.data.length; i++) threadsWorst = Math.max(threadsWorst, Math.abs(c.data[i] - b.data[i]));
+result.webThreads = threadsWorst;
 // @rullino/konva: a preview at the node's size swapped into a Konva.Image (0 = ok).
 const stage = new Konva.Stage({ container: document.body.appendChild(document.createElement('div')), width: 40, height: 30 });
 const layer = new Konva.Layer();
