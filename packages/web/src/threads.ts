@@ -94,7 +94,6 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
       const cleanup = () => {
         worker.onmessage = null;
         worker.onerror = null;
-        worker.onmessageerror = null;
       };
       worker.onmessage = ({ data }: MessageEvent<BandReply>) => {
         cleanup();
@@ -104,10 +103,6 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
       worker.onerror = (event) => {
         cleanup();
         reject(new Error(destroyed ? 'the renderer was destroyed' : `a band worker failed: ${event.message}`));
-      };
-      worker.onmessageerror = () => {
-        cleanup();
-        reject(new Error('a band worker sent a message that could not be read'));
       };
       worker.postMessage(job, transfer);
     });
