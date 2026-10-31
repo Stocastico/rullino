@@ -39,6 +39,25 @@ function ramp(w: number, h: number) {
 }
 
 describe('applyEdit (CPU)', () => {
+  it('hands the chain to a CPU executor when it is given one (steps, framed image, scale), and uses its result', async () => {
+    const doc = serializeChain([{ filter: gain, params: { amount: 2 } }, { filter: shift, params: { by: 4 } }]);
+    const seen: { ids: string[]; size: string; scale: number }[] = [];
+    const out = await applyEdit(ramp(8, 6), doc, {
+      filters,
+      scale: 0.5,
+      cpu: async (steps, image, o) => {
+        seen.push({ ids: steps.map((s) => s.filter.id), size: `${image.width}x${image.height}`, scale: o.scale });
+        return runChainCpu(steps, image, { scale: o.scale, fast: true });
+      },
+    });
+    expect(seen).toEqual([{ ids: ['gain', 'shift'], size: '8x6', scale: 0.5 }]);
+    expect(Array.from(out.data)).toEqual(Array.from(runChainCpu([{ filter: gain, params: { amount: 2 } }, { filter: shift, params: { by: 4 } }], ramp(8, 6), { scale: 0.5, fast: true }).data));
+    // The executor's image is what is shrunk and returned.
+    const flat = await applyEdit(ramp(8, 6), serializeChain([{ filter: gain }], { output: { longSide: 4 } }), { filters, cpu: async (_s, image) => createImage(image.width, image.height, new Float32Array(image.data.length).fill(0.5)) });
+    expect([flat.width, flat.height]).toEqual([4, 3]);
+    expect(flat.data[0]).toBeCloseTo(0.5, 6);
+  });
+
   it('takes 8-bit RGBA pixels too, decoded like decodeSrgb8', async () => {
     const bytes = new Uint8ClampedArray(5 * 3 * 4).map((_, i) => (i % 4 === 3 ? [255, 128, 0][i % 3]! : (i * 29) % 256));
     const doc = serializeChain([{ filter: gain, params: { amount: 1.5 } }]);

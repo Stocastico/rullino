@@ -104,6 +104,18 @@ function runBand(steps: readonly Step[], reaches: readonly number[], rows: Linea
 }
 
 /**
+ * One band of a banded segment, for executors that run bands elsewhere (worker threads): `full`
+ * is the whole input of the segment (or a view of it), `steps` the segment's steps (all with a
+ * numeric reach), `band` one entry of {@link planBands} for that image's height. Returns exactly the
+ * rows `band.y0` to `band.y1`, as {@link runChainBands} computes them.
+ */
+export function runChainBand(steps: readonly Step[], full: LinearImage, band: BandPlan, options: ChainOptions = {}): LinearImage {
+  const reaches = steps.map((s) => stepReach(s, options.scale));
+  if (reaches.some((r) => r === 'global')) throw new RangeError('runChainBand: a global step cannot run on a band');
+  return runBand(steps, reaches as number[], rowsOf(full, band.from, band.to), band, full.height, options);
+}
+
+/**
  * {@link runChainCpu} through bands, one after the other on this thread: the oracle the tests
  * compare the whole-image result with, and the code worker threads run on their bands. The result
  * is identical to `runChainCpu(steps, src, options)`; the input is not changed.

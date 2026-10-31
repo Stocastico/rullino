@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defineFilter } from '../define';
 import { createImage, type LinearImage } from '../image';
 import type { Mask } from '../mask';
-import { planBands, planSegments, runChainBands } from './bands';
+import { planBands, planSegments, runChainBand, runChainBands } from './bands';
 import { runChainCpu, type Step } from './chain';
 
 // Synthetic filters with a known reach: the real filters get their own, much larger suite in
@@ -216,6 +216,17 @@ describe('runChainBands', () => {
   it('hands the frame to a filter called through its own wrapper', () => {
     const out = rowIndex.cpu(createImage(2, 3, new Float32Array(24)), {}, undefined, { y0: 4, fullHeight: 10 });
     expect([out.data[0]!, out.data[8]!, out.data[16]!].map((v) => Number(v.toFixed(6)))).toEqual([0.4, 0.5, 0.6]);
+  });
+
+  it('runChainBand gives a band exactly the rows the whole image has there, and refuses a global step', () => {
+    const steps = [step(columnMean, { r: 2 }), step(gain), step(columnMean, { r: 1 })];
+    const whole = runChainCpu(steps, src);
+    for (const band of planBands(h, 4, 3, { force: true })) {
+      const rows = runChainBand(steps, src, band, {});
+      expect(rows.height).toBe(band.y1 - band.y0);
+      expect(Array.from(rows.data)).toEqual(Array.from(whole.data.subarray(band.y0 * w * 4, band.y1 * w * 4)));
+    }
+    expect(() => runChainBand([step(centre)], src, planBands(h, 2, 0)[0]!)).toThrow(/global/);
   });
 
   it('applies disabled steps nowhere and returns a copy when nothing runs', () => {

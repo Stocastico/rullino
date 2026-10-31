@@ -1,6 +1,6 @@
 # Tiled CPU execution across workers
 
-Status: **agreed, spike done (go), phase 1 done** (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 (the Node worker executor) is next ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
+Status: **agreed, spike done (go), phase 1 done** (reach, planner, sequential executor, the frame argument for the position-dependent filters, and the banded-equals-whole suite; only equalize, clahe and otsu stay global). Phase 2 is done (the Node worker executor, see "Phase 2 results" below); phase 3 (Web Workers) is next ([#128](https://github.com/Stocastico/rullino/issues/128)). The five decisions at the end were confirmed on 31 Oct. Nothing in this document changes behaviour.
 
 ## Why, and what would count as success
 
@@ -103,6 +103,21 @@ Throw-away harness (not kept; the phase 2 bench replaces it): Node 22 `worker_th
 - **Small images**: 1155×866 (1 MP) pointwise 322 ms whole vs 100 ms banded (3.2×), blur 274 vs 93 ms (2.9×); 1600×1200 and 2400×1600 about 3.3–4.4×. With a warm pool there is no size below which tiling loses (down to 1 MP, the smallest tried).
 
 Success criteria of the proposal (≥ 2.5× at 12 MP, no slowdown on small images, bit-identical): met. Caveats: Node only; three chains with simple reaches (no canny or inpaint, whose halo is large); global steps not measured; a 4-core container, not a user's laptop or phone.
+
+## Phase 2 results (31 Oct)
+
+`createRenderer({ threads })` in `@rullino/node`, measured with `pnpm bench:threads` (4-core container, 12 MP, the whole renderer: the image is copied into shared memory, the source/output buffers allocated, the result copied out by `apply()`; medians):
+
+| Chain | 1 thread | 2 | 4 |
+|---|---|---|---|
+| exposure + curves | 2163 ms | 1386 (1.56×) | 793 (2.73×) |
+| blur + unsharp | 5821 | 1942 (3.00×) | 1474 (3.95×) |
+| levels + vignette + grain | 3337 | 1727 (1.93×) | 1472 (2.27×) |
+| look (LUT, vignette, grain) | 3301 | 1867 (1.77×) | 1248 (2.65×) |
+| blur + equalize + sharpen | 5757 | 4704 (1.22×) | 4711 (1.22×) |
+| kuwahara r4 + sharpen | 14441 | 7438 (1.94×) | 4144 (3.48×) |
+
+The first render of a renderer also starts the pool (+0.7-1 s here: workers, the filters bundle, first allocations). The success criterion (≥ 2.5× at 12 MP) holds for the banded chains; the chain with a global step shows the limit of "global steps run alone", which two-phase global filters (histograms per band, merged, then a banded apply) would lift. The gap to the spike's 3.3-4.8× is serial work around the bands (copying the source into shared memory, 192 MB allocations whose page faults cost 0.1-0.8 s in this container, the copy out): a pool of spare buffers and `render()` consuming its result in shared memory improved the 4-thread figures between two runs (exposure + curves 2.3× → 2.7×, blur + unsharp 3.4× → 4.0×; page-fault costs are noisy here, so read these as a trend).
 
 ## Plan
 

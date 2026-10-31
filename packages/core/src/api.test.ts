@@ -26,7 +26,7 @@ describe('@rullino/core public API', () => {
     'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'exportSamples',
     'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
     'lutSamplerWgsl', 'lutTexture', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
-    'passShader', 'planBands', 'planSegments', 'poolStats', 'renderMask', 'reportGpuError', 'runChainBands', 'runFused',
+    'passShader', 'planBands', 'planSegments', 'poolStats', 'renderMask', 'reportGpuError', 'runChainBand', 'runChainBands', 'runFused',
     'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'stepReach', 'toGpuError', 'validateSchema',
     ]);
     const publicNames = new Set(Object.keys(api));

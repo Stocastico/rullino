@@ -102,6 +102,19 @@ out.readmeJson = edit.startsWith('{"version":2,"steps":[{"filter":"exposure","pa
 const renderer = await createRenderer();
 const png = (await renderer.render({ data: new Uint8Array(8 * 6 * 4).fill(200), width: 8, height: 6 }, presets.lookEdit(presets.looks[0]))).bytes;
 out.nodeFallback = renderer.backend === 'cpu' && /webgpu/.test(renderer.reason ?? '') && png[1] === 0x50 && png[2] === 0x4e && png[3] === 0x47;
+// Worker threads, from the installed package: its dist/worker.js, three threads, an image cut into
+// bands with the same result as the calling thread (bit for bit), a step that needs the whole image in the middle.
+const photo = core.createImage(120, 90, Float32Array.from({ length: 120 * 90 * 4 }, (_, i) => (i % 4 === 3 ? 1 : ((i * 7) % 251) / 251)));
+const threadedEdit = JSON.parse(JSON.stringify(core.serializeChain([
+  { filter: filters.find((f) => f.id === 'gaussianBlur'), params: { sigma: 2 } },
+  { filter: filters.find((f) => f.id === 'equalize') },
+  { filter: filters.find((f) => f.id === 'vignette') },
+])));
+const threaded = await createRenderer({ backend: 'cpu', threads: 3, pool: { createAtPixels: 0, useAtPixels: 0, forceBands: true } });
+const unthreaded = await createRenderer({ backend: 'cpu' });
+const [a, b] = [await threaded.apply(photo, threadedEdit), await unthreaded.apply(photo, threadedEdit)];
+out.nodeThreads = threaded.threads === 3 && a.data.every((v, i) => Object.is(v, b.data[i]));
+threaded.destroy();
 console.log(JSON.stringify(out));
 `,
   );

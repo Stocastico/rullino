@@ -20,6 +20,7 @@
     "bench": "vitest run --project bench && node scripts/fs.mjs cat packages/filters/bench/results.txt",
     "report:parity": "vitest run --project report && node scripts/fs.mjs cat packages/filters/report/parity-report.md",
     "bench:cpu": "node scripts/bench-cpu.mjs",
+    "bench:threads": "node scripts/bench-threads.mjs",
     "bench:web": "pnpm --filter @rullino/bench bench",
     "test:pack": "node scripts/pack-smoke.mjs",
     "size": "node scripts/size-budget.mjs",
