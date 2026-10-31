@@ -32,6 +32,7 @@ export async function renderFile(input: string, editJson: string, output: string
 
 - `createRenderer({ backend: 'gpu' })` fails with `WebGpuUnavailableError` instead of falling back; `'cpu'` never loads Dawn.
 - `renderer.apply(image, doc)` returns the linear image instead of a file (see `applyEdit` in `@rullino/core`).
+- `createRenderer({ threads: 4 })` (or `'auto'`: the cores, at most 8) spreads CPU renders over worker threads. The image is cut into bands that are rendered in parallel with the very same result, bit for bit; a step that needs the whole image (equalize, clahe, otsu) runs on the calling thread, and so do small images (the threads start from about 2 MP, 80-240 ms; later renders use them from 0.5 MP). On 4 cores, 12 MP: blur + unsharp 5.8 s to 1.5 s, exposure + curves 2.2 s to 0.8 s, Kuwahara 14.4 s to 4.1 s (`pnpm bench:threads` in the repository measures your machine). Memory: two 12 MP images' worth of shared buffers are kept between renders; `destroy()` stops the threads and frees them. Ignored on the GPU backend and with custom `filters`.
 
 ### An HTTP endpoint
 

@@ -2,6 +2,7 @@ import { applyEdit, createGpuContext, encodeImage, parseChain, WebGpuUnavailable
 import { exportSamples } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
+import { createThreadedExecutor, DEFAULT_WORKER_URL, resolveThreads } from './threads';
 
 export interface RendererOptions {
   /**
@@ -17,6 +18,16 @@ export interface RendererOptions {
   readonly filters?: readonly Filter<any>[] | undefined;
   /** Resolves LUT names in documents. Default: the looks of `@rullino/presets` (`look:<id>`). */
   readonly resolveLut?: ((ref: string) => Lut | undefined) | undefined;
+  /**
+   * Worker threads for the CPU backend: a number, or 'auto' (the cores, at most 8). Default 1: the
+   * calling thread. With more, large images are cut into bands rendered in parallel with the same
+   * result, bit for bit; small images and steps that need the whole image (equalize, clahe, otsu) stay
+   * on the calling thread. Ignored on the GPU, and with custom `filters` (functions cannot be sent to a
+   * worker). Call `destroy()` to stop the threads.
+   */
+  readonly threads?: number | 'auto' | undefined;
+  /** Advanced (bundlers, tests): where the worker script is, and from how many pixels threads are worth it. */
+  readonly pool?: { readonly workerUrl?: URL | undefined; readonly createAtPixels?: number | undefined; readonly useAtPixels?: number | undefined; readonly forceBands?: boolean | undefined } | undefined;
 }
 
 /** 8-bit straight-alpha sRGB pixels, row by row: what image decoders produce. */
@@ -32,6 +43,8 @@ export interface Rendered {
 
 export interface Renderer {
   readonly backend: 'gpu' | 'cpu';
+  /** Worker threads in use for the CPU backend: 1 means the calling thread. */
+  readonly threads: number;
   /** Why 'auto' chose the CPU. */
   readonly reason?: string;
   /** The GPU context, when the backend is 'gpu'. */
@@ -90,10 +103,36 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     }
   }
 
-  const apply = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}) => applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale });
+  const threads = ctx || options.filters ? 1 : resolveThreads(options.threads);
+  const executor =
+    threads > 1
+      ? createThreadedExecutor({
+          threads,
+          workerUrl: options.pool?.workerUrl ?? DEFAULT_WORKER_URL,
+          // A pool takes 80-240 ms to start: from ~2 MP a render is long enough to pay for it; an existing one pays from ~0.5 MP.
+          createAtPixels: options.pool?.createAtPixels ?? 2_000_000,
+          useAtPixels: options.pool?.useAtPixels ?? 500_000,
+          forceBands: options.pool?.forceBands ?? false,
+        })
+      : undefined;
+
+  const applyInternal = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}, shared = false) => {
+    if (!executor) return applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale });
+    // The workers parse the document again: they need the LUTs it names, by name.
+    const luts = new Map<string, Lut>();
+    const resolveLut = (ref: string) => {
+      const lut = parse.resolveLut(ref);
+      if (lut) luts.set(ref, lut);
+      return lut;
+    };
+    return applyEdit(image, edit, { ...parse, resolveLut, scale: o.scale, cpu: (steps, framed, c) => executor.run(edit, luts, steps, framed, { scale: c.scale, shared }) });
+  };
+  // Images that leave the renderer are ordinary memory; `render` only reads its result, so it can stay in shared memory.
+  const apply = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}) => applyInternal(image, edit, o);
 
   return {
     backend: ctx ? 'gpu' : 'cpu',
+    threads,
     ...(reason !== undefined ? { reason } : {}),
     ...(ctx ? { gpu: ctx } : {}),
     apply,
@@ -101,7 +140,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       const { output = {} } = parseChain(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
       const image = 'width' in input ? input : await decodeFile(input);
-      const out = await apply(image, edit); // decoded where it renders (on Dawn: on the GPU)
+      const out = await applyInternal(image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)
       const done = (bytes: Uint8Array) => ({ bytes, format, width: out.width, height: out.height });
       if (format === 'png') return done(new Uint8Array(await (await encodeImage(out, output)).arrayBuffer()));
       const sharp = await loadSharp(`${format.toUpperCase()} output`);
@@ -111,6 +150,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       return done(new Uint8Array(await file.toBuffer()));
     },
     destroy() {
+      executor?.destroy();
       ctx?.device.destroy();
       gpu = undefined;
     },

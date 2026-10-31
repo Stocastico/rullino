@@ -6,7 +6,8 @@
     "rootDir": "src",
     "declaration": true,
     "types": [
-      "@webgpu/types"
+      "@webgpu/types",
+      "node"
     ],
     "paths": {
       "@rullino/core": [
