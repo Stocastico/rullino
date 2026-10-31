@@ -110,9 +110,18 @@ function runBand(steps: readonly Step[], reaches: readonly number[], rows: Linea
  * rows `band.y0` to `band.y1`, as {@link runChainBands} computes them.
  */
 export function runChainBand(steps: readonly Step[], full: LinearImage, band: BandPlan, options: ChainOptions = {}): LinearImage {
+  return runChainBandRows(steps, rowsOf(full, band.from, band.to), band, full.height, options);
+}
+
+/**
+ * {@link runChainBand} for an executor that holds only the band's input: `rows` are the rows
+ * `band.from` to `band.to` of an image `fullHeight` rows tall (a copy sent to a worker, say).
+ */
+export function runChainBandRows(steps: readonly Step[], rows: LinearImage, band: BandPlan, fullHeight: number, options: ChainOptions = {}): LinearImage {
   const reaches = steps.map((s) => stepReach(s, options.scale));
   if (reaches.some((r) => r === 'global')) throw new RangeError('runChainBand: a global step cannot run on a band');
-  return runBand(steps, reaches as number[], rowsOf(full, band.from, band.to), band, full.height, options);
+  if (rows.height !== band.to - band.from) throw new RangeError(`runChainBandRows: ${rows.height} rows given, the band needs ${band.to - band.from}`);
+  return runBand(steps, reaches as number[], rows, band, fullHeight, options);
 }
 
 /**

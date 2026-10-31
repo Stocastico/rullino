@@ -20,5 +20,5 @@ export { blendMask, renderMask } from './gpu/mask';
 export { curveSamplersWgsl, packParams, paramsLayout, paramsStructWgsl, scaleParams, validateSchema } from './params';
 export { colorWgsl } from './wgsl';
 export { effectiveParams, runStepCpu } from './pipeline/chain';
-export { planBands, planSegments, runChainBand, runChainBands, stepReach, type BandOptions, type BandPlan, type PlanOptions, type Segment, type StepReach } from './pipeline/bands';
+export { planBands, planSegments, runChainBand, runChainBandRows, runChainBands, stepReach, type BandOptions, type BandPlan, type PlanOptions, type Segment, type StepReach } from './pipeline/bands';
 export { applyEditPixels } from './edit';
