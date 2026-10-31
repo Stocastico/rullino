@@ -39,13 +39,13 @@ export function effectiveParams(step: Step, scale = 1): Record<string, unknown> 
 export function runStepCpu(step: Step, img: LinearImage, options: ChainOptions = {}, region?: RowRegion): LinearImage {
   if (step.mask) validateMask(step.mask);
   const params = effectiveParams(step, options.scale) as never;
-  const run: (src: LinearImage, p: never, mask?: Float32Array) => LinearImage = (options.fast && step.filter.fast) || step.filter.cpu;
+  const run: (src: LinearImage, p: never, mask?: Float32Array, region?: RowRegion) => LinearImage = (options.fast && step.filter.fast) || step.filter.cpu;
   let out: LinearImage;
   if (step.filter.kind === 'multipass' && step.filter.usesMask) {
     if (!step.mask) throw new Error(`filter "${step.filter.id}" needs a mask`);
-    out = run(img, params, maskImage(step.mask, img.width, img.height, region));
+    out = run(img, params, maskImage(step.mask, img.width, img.height, region), region);
   } else {
-    out = run(img, params);
+    out = run(img, params, undefined, region);
   }
   return step.mask ? blendMasked(img, out, step.mask, region) : out;
 }

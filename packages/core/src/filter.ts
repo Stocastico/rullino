@@ -1,4 +1,5 @@
 import type { Tolerance } from './compare';
+import type { RowRegion } from './mask';
 import type { LinearImage } from './image';
 import type { ParamSchema, ParamValues } from './params';
 
@@ -135,14 +136,20 @@ export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends
    */
   readonly reach?: Reach<S>;
   readonly passes: readonly PassDef[];
-  /** Whole-image CPU reference: obvious, not fast. Must not mutate `src`. */
-  readonly cpu: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array) => LinearImage;
+  /**
+   * Whole-image CPU reference: obvious, not fast. Must not mutate `src`. `region` says that `src`
+   * is a band of a taller image (its first row is row `region.y0` of `region.fullHeight` rows, same
+   * width): a filter that depends on the position of a pixel (its distance from the centre, a hash
+   * of its coordinates, a grid anchored at the origin, a normalised coordinate) must use it, so that
+   * a band gives what the whole image gives at its rows. Without it `src` is the whole image.
+   */
+  readonly cpu: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array, region?: RowRegion) => LinearImage;
   /**
    * Optional fast CPU implementation of the whole image, used by `runChainCpu(..., { fast: true })`
    * and so by `applyEdit` without a GPU. Same result as the reference within `tolerance`, which a
    * test checks; receives resolved params; must not mutate `src`.
    */
-  readonly fast?: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array) => LinearImage;
+  readonly fast?: (src: LinearImage, p: ParamValues<S>, mask?: Float32Array, region?: RowRegion) => LinearImage;
 }
 
 export interface MultipassFilter<S extends ParamSchema = ParamSchema> extends Omit<MultipassFilterDef<S>, 'cpu'> {
@@ -150,7 +157,7 @@ export interface MultipassFilter<S extends ParamSchema = ParamSchema> extends Om
    * Whole-image CPU reference. Missing params take their defaults. Never mutates `src`.
    * `mask` (one value per pixel, see `maskImage`) is required by mask-aware filters.
    */
-  cpu(src: LinearImage, params?: Partial<ParamValues<S>>, mask?: Float32Array): LinearImage;
+  cpu(src: LinearImage, params?: Partial<ParamValues<S>>, mask?: Float32Array, region?: RowRegion): LinearImage;
 }
 
 export type Filter<S extends ParamSchema = ParamSchema> = PointwiseFilter<S> | MultipassFilter<S>;
