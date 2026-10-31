@@ -1,5 +1,5 @@
 import { createImage, defineFilter, type LinearImage } from '@rullino/core';
-import { gaussianCpu, gaussianPass } from '../convolution';
+import { gaussianCpu, gaussianPass, gaussianReach } from '../convolution';
 import { gaussianFast } from '../fast';
 
 /**
@@ -30,6 +30,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ sigma }) => gaussianReach(sigma),
   cpu: (src, { amount, sigma }) => sharpenFrom(src, gaussianCpu(src, sigma), amount),
   fast: (src, { amount, sigma }) => sharpenFrom(src, gaussianFast(src, sigma), amount),
   // The blurred intermediate is rounded to f16 and then amplified by `amount` (up to 5).

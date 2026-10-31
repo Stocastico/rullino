@@ -1,6 +1,6 @@
 import { createImage, defineFilter, linearToSrgb, luminance, type LinearImage } from '@rullino/core';
 import { float16ToFloat32, float32ToFloat16 } from '@rullino/core/internal';
-import { clampLoad, convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { clampLoad, convolve1d, gaussianPass, gaussianReach, gaussianWeights, q16 } from '../convolution';
 import { convolve1dFast } from '../fast';
 
 /** tan(22.5°): boundary between the four quantised gradient directions. */
@@ -113,6 +113,8 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  // Gaussian, Sobel (1), non-maximum suppression (1), then one pixel per hysteresis round.
+  reach: ({ sigma, iterations }) => gaussianReach(sigma) + 2 + iterations,
   cpu: (src, { sigma, low, high, iterations }) => {
     // Mirrors the passes, rounding each intermediate to f16 like the GPU textures.
     const lum = q16(map(src, (x, y) => {

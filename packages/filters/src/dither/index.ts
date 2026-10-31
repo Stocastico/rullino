@@ -105,6 +105,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
   cpu: (src, { levels, matrix, seed, mode, scale }) => {
     const out = createImage(src.width, src.height);
     const n = levels - 1;

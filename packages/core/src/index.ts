@@ -12,6 +12,7 @@ export type {
   PassDef,
   PointwiseFilter,
   PointwiseFilterDef,
+  Reach,
   Rgba,
   TexturePassDef,
 } from './filter';
@@ -28,7 +29,7 @@ export { fromFloat16Array, toFloat16Array } from './half';
 export { createImage, MAX_IMAGE_SIDE, sampleImage, type LinearImage, type Rgba8Image } from './image';
 export { applyLutCpu, createLut, identityLut, lutFromFunction, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
 export { applyGeometry } from './gpu/geometry';
-export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type Vec2 } from './mask';
+export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type RowRegion, type Vec2 } from './mask';
 export { fillShape, paintStroke, type BrushOptions, type FillOptions, type Shape } from './paint';
 export { magicWand, type WandOptions } from './wand';
 export { histogramSrgb8, type Histogram } from './histogram';

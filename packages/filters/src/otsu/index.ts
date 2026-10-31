@@ -114,6 +114,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: 'global', // needs the histogram of the whole image
   cpu: (src, { invert }) => {
     const straight = (i: number): [number, number, number, number] => {
       const a = src.data[i + 3]!;

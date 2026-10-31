@@ -45,6 +45,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: () => 2, // the 5×5 kernel
   cpu: (src, { kernel, normalize, bias }) => {
     const total = kernel.reduce((a, b) => a + b, 0);
     const norm = normalize && Math.abs(total) > 1e-6 ? total : 1;

@@ -81,6 +81,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
   cpu: (src, { depth, focus, range, radius }) => {
     const out = createImage(src.width, src.height);
     const size = [src.width, src.height] as const;

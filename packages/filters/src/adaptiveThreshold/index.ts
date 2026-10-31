@@ -1,5 +1,5 @@
 import { createImage, defineFilter, linearToSrgb, luminance } from '@rullino/core';
-import { convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { convolve1d, gaussianPass, gaussianReach, gaussianWeights, q16 } from '../convolution';
 import { convolve1dFast } from '../fast';
 
 /**
@@ -43,6 +43,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ sigma }) => gaussianReach(sigma),
   cpu: (src, { sigma, offset, invert }) => {
     // Mirrors the passes, rounding intermediates to f16 like the GPU textures.
     const lum = createImage(src.width, src.height);

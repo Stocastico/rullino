@@ -135,17 +135,28 @@ export function maskValue(m: Mask, x: number, y: number, w: number, h: number): 
   return value * (m.opacity ?? 1);
 }
 
-/** The mask evaluated at every pixel of a w x h image, row-major. */
-export function maskImage(m: Mask, w: number, h: number): Float32Array {
+/**
+ * The rows of a larger image that an image holds when it is a band of it: the first row is row
+ * `y0` of a full image `fullHeight` rows tall. Masks are normalised to the full image, so a band
+ * needs to know where it sits to see the same values the whole image has there.
+ */
+export interface RowRegion {
+  readonly y0: number;
+  readonly fullHeight: number;
+}
+
+/** The mask evaluated at every pixel of a w x h image, row-major (or of a band of a taller one, see {@link RowRegion}). */
+export function maskImage(m: Mask, w: number, h: number, region?: RowRegion): Float32Array {
   const out = new Float32Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * w + x] = maskValue(m, x, y, w, h);
+  const [y0, full] = region ? [region.y0, region.fullHeight] : [0, h];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * w + x] = maskValue(m, x, y0 + y, w, full);
   return out;
 }
 
 /** CPU reference of a masked step: mix(input, filtered, m) on premultiplied values, alpha included. */
-export function blendMasked(input: LinearImage, filtered: LinearImage, m: Mask): LinearImage {
+export function blendMasked(input: LinearImage, filtered: LinearImage, m: Mask, region?: RowRegion): LinearImage {
   const out = createImage(input.width, input.height);
-  const k = maskImage(m, input.width, input.height);
+  const k = maskImage(m, input.width, input.height, region);
   for (let i = 0; i < out.data.length; i++) out.data[i] = input.data[i]! + (filtered.data[i]! - input.data[i]!) * k[i >> 2]!;
   return out;
 }

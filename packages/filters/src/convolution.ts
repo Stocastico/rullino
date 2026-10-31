@@ -21,6 +21,9 @@ export function gaussianWeights(sigma: number): number[] {
   return w.map((v) => v / total);
 }
 
+/** Rows (and columns) a Gaussian of `sigma` reads on each side: the radius of its taps. */
+export const gaussianReach = (sigma: number): number => (gaussianWeights(sigma).length - 1) / 2;
+
 /** 1-D convolution along x or y with symmetric `weights` (length 2r + 1), all four channels. */
 export function convolve1d(src: LinearImage, weights: readonly number[], axis: 'x' | 'y'): LinearImage {
   const r = (weights.length - 1) / 2;

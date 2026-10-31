@@ -31,6 +31,7 @@ export const pixelate = defineFilter({
     size: { type: 'int', min: 1, max: 128, default: 12, unit: 'px', label: 'Cell size (px)', description: 'Width of each square in pixels.' },
   },
   passes: [pass('h', 'input', 'x'), pass('v', 'h', 'y')],
+  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
   cpu: (src, { size }) => {
     const { width: w, height: h } = src;
     const out = createImage(w, h);

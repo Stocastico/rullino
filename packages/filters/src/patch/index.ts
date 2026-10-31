@@ -29,6 +29,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: 'global', // depends on the position in the full image: banded once it receives the frame (#128)
   cpu: (src, { patch: img }) => {
     const out = createImage(src.width, src.height);
     for (let y = 0; y < src.height; y++)

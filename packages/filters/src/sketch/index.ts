@@ -1,5 +1,5 @@
 import { createImage, defineFilter, linearToSrgb, luminance, srgbToLinear } from '@rullino/core';
-import { convolve1d, gaussianPass, gaussianWeights, q16 } from '../convolution';
+import { convolve1d, gaussianPass, gaussianReach, gaussianWeights, q16 } from '../convolution';
 
 /** Smallest blurred luminance divided by: keeps black areas from dividing by zero. */
 const MIN_BLUR = 1e-3;
@@ -50,6 +50,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ sigma }) => gaussianReach(sigma),
   cpu: (src, { sigma, darkness }) => {
     // The GPU stores the luminance and both blur passes as half floats: round them the same way
     // (the division and the darkness exponent amplify the difference).

@@ -25,6 +25,7 @@ export const boxBlur = defineFilter({
     radius: { type: 'int', min: 0, max: 50, default: 3, unit: 'px', label: 'Radius (px)', description: 'Half the side of the square, in pixels; 0 changes nothing.' },
   },
   passes: [pass('h', 'input', 'vec2i(k, 0)'), pass('v', 'h', 'vec2i(0, k)')],
+  reach: ({ radius }) => radius,
   cpu: (src, { radius }) => {
     const w = new Array(2 * radius + 1).fill(1 / (2 * radius + 1));
     return convolve1d(convolve1d(src, w, 'x'), w, 'y');

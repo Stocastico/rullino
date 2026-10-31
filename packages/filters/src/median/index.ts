@@ -94,6 +94,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
+  reach: ({ radius }) => radius,
   cpu: (src, { radius }) => {
     const out = createImage(src.width, src.height);
     for (let y = 0; y < src.height; y++)
