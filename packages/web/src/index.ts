@@ -1,1 +1,1 @@
-export { createRenderer, type Renderer, type RendererOptions } from './renderer';
+export { createRenderer, type PoolOptions, type Renderer, type RendererOptions } from './renderer';
