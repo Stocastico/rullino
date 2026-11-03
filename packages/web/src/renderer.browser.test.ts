@@ -199,6 +199,16 @@ describe('createRenderer({ threads }) (browser)', () => {
     expect(seen).toEqual([0]);
   });
 
+  it('without the option, uses the band workers on a machine with at least 4 cores, and `threads: 1` turns them off', async () => {
+    const seen: number[] = [];
+    const byDefault = await make({ backend: 'cpu', pool: { ...FORCE, onRender: (i) => seen.push(i.bands) } });
+    sameBytes(await byDefault.apply(src, edit), await (await make({ backend: 'cpu', threads: 1 })).apply(src, edit));
+    expect(seen[0]! > 1, `${navigator.hardwareConcurrency} cores, bands ${seen[0]}`).toBe(navigator.hardwareConcurrency >= 4);
+    const off: number[] = [];
+    await (await make({ backend: 'cpu', threads: 1, pool: { ...FORCE, onRender: (i) => off.push(i.bands) } })).apply(src, edit);
+    expect(off).toEqual([0]);
+  });
+
   it('validates the option, and accepts auto', async () => {
     await expect(createRenderer({ backend: 'cpu', threads: 0 })).rejects.toThrow(/threads/);
     await expect(createRenderer({ backend: 'cpu', threads: 1.5 })).rejects.toThrow(/threads/);

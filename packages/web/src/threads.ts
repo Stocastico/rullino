@@ -9,9 +9,13 @@ import type { BandJob, BandReply, PoolOptions } from './protocol';
 // without threads. Bands travel by copy by default (structured clone: no cross-origin isolation
 // needed). A shared-memory variant was built and measured (docs/design/tiled-cpu.md, phase 3): once the copies reuse their buffers it is no faster, and it needs COOP/COEP.
 
-/** The number of threads an option stands for: 1 (none) by default, 'auto' = the cores, at most 8. */
+/**
+ * The number of threads an option stands for. By default 4 on a machine with at least 4 cores and
+ * 1 below (measured: 12 MP chains scale to 3.9× at 4 workers and 6.5× at 8 on 24 cores; a phone often
+ * reports 8 cores of which 4 are slow, hence the cap of 4 instead of 'auto'), 'auto' = the cores, at most 8.
+ */
 export function resolveThreads(option: number | 'auto' | undefined, cores = (globalThis.navigator?.hardwareConcurrency ?? 1)): number {
-  if (option === undefined) return 1;
+  if (option === undefined) return cores >= 4 ? 4 : 1;
   if (option === 'auto') return Math.max(1, Math.min(8, cores));
   if (!Number.isInteger(option) || option < 1) throw new RangeError(`threads must be a whole number >= 1 or 'auto', got ${String(option)}`);
   return Math.min(option, 64);

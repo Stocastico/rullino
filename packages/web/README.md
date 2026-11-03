@@ -36,7 +36,7 @@ On the CPU, large images can be cut into horizontal bands that a pool of workers
 ```ts
 import { createRenderer } from '@rullino/web';
 
-// Up to 4 band workers (or 'auto': the cores, at most 8). The default is 1.
+// Up to 4 band workers (or 'auto': the cores, at most 8). The default is 4 on a machine with at least 4 cores, else 1; `threads: 1` turns the pool off.
 export const renderer = await createRenderer({ backend: 'cpu', threads: 4 });
 ```
 
