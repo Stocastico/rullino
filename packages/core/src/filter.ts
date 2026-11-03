@@ -112,6 +112,27 @@ interface FilterBase<S extends ParamSchema> {
 export type Reach<S extends ParamSchema = ParamSchema> = 'global' | ((p: ParamValues<S>) => number);
 
 /**
+ * A global filter in two phases, so that bands of the image can be rendered in parallel: a
+ * statistic of the whole image (a histogram), then a mapping of every pixel that needs nothing
+ * but the pixel and that statistic. `cpu` of the filter must equal `apply(src, p, stat(src, p))`
+ * on the whole image; the banded executors rely on it (and tests check it bit for bit).
+ *
+ * The statistic is an array of counts: the statistics of the bands are added element by element,
+ * which is exact for whole numbers (below 2^53) and does not depend on the order, so the sum is
+ * the statistic of the whole image bit for bit.
+ */
+export interface TwoPhase<S extends ParamSchema = ParamSchema> {
+  /**
+   * Counts over the rows of `src`, which is the whole image or a band of it (`region` says where it
+   * sits, see {@link RowRegion}; a tile or a row parity must be taken from the full image's rows).
+   * Every call of one render returns an array of the same length, whatever the band.
+   */
+  readonly stat: (src: LinearImage, p: ParamValues<S>, region?: RowRegion) => Float64Array;
+  /** The filter on `src` (whole image or band) given the statistic of the whole image. Reads no neighbours. */
+  readonly apply: (src: LinearImage, p: ParamValues<S>, stat: Float64Array, region?: RowRegion) => LinearImage;
+}
+
+/**
  * A filter made of a fixed sequence of passes (the last one is the output), for anything that
  * reads neighbours: convolutions, edges, morphology. Works on premultiplied linear values.
  */
@@ -135,6 +156,12 @@ export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends
    * built-in filter declares it (the registry test checks).
    */
   readonly reach?: Reach<S>;
+  /**
+   * Set on a filter whose `reach` is `'global'` because of a statistic (equalize, clahe, otsu): banded
+   * executors then run it in two phases instead of alone. Keep `reach: 'global'`, which is what an
+   * executor that does not know about two phases reads.
+   */
+  readonly twoPhase?: TwoPhase<S>;
   readonly passes: readonly PassDef[];
   /**
    * Whole-image CPU reference: obvious, not fast. Must not mutate `src`. `region` says that `src`

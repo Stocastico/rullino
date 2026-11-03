@@ -22,12 +22,12 @@ describe('@rullino/core public API', () => {
   it('keeps the plumbing under the unstable "./internal" subpath', async () => {
     const internal = await import('./internal');
     expect(Object.keys(internal).sort()).toEqual([
-    'CURVE_SAMPLES', 'WORKING_FORMAT', 'applyEditPixels', 'blendMask', 'colorWgsl', 'createWorkingTexture', 'curveLut',
+    'CURVE_SAMPLES', 'WORKING_FORMAT', 'applyEditPixels', 'bandReach', 'blendMask', 'colorWgsl', 'createWorkingTexture', 'curveLut',
     'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'exportSamples',
     'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
     'lutSamplerWgsl', 'lutTexture', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
     'passShader', 'planBands', 'planSegments', 'poolStats', 'renderMask', 'reportGpuError', 'runChainBand', 'runChainBandRows', 'runChainBands', 'runFused',
-    'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'stepReach', 'toGpuError', 'validateSchema',
+    'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'stepReach', 'sumStats', 'toGpuError', 'twoPhaseStat', 'validateSchema',
     ]);
     const publicNames = new Set(Object.keys(api));
     for (const name of Object.keys(internal)) expect(publicNames.has(name), `${name} is public and internal`).toBe(false);

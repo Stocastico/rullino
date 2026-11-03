@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { defineFilter } from '../define';
 import { createImage, type LinearImage } from '../image';
 import type { Mask } from '../mask';
-import { planBands, planSegments, runChainBand, runChainBandRows, runChainBands } from './bands';
-import { runChainCpu, type Step } from './chain';
+import { bandReach, planBands, planSegments, runChainBand, runChainBandRows, runChainBands, sumStats, twoPhaseStat } from './bands';
+import { effectiveParams, runChainCpu, runStepCpu, type Step } from './chain';
 
 // Synthetic filters with a known reach: the real filters get their own, much larger suite in
 // packages/filters (bands.test.ts); this one checks the planner and the executor in isolation.
@@ -48,6 +48,40 @@ const centre = defineFilter({
     mean /= src.width * src.height;
     return createImage(src.width, src.height, src.data.map((v, i) => (i % 4 === 0 ? v - mean : v)));
   },
+  tolerance: { abs: 0, rel: 0 },
+});
+
+/**
+ * A two-phase filter: the statistic is a histogram of the first channel over the even rows of the
+ * FULL image (so a band must use its position), and the mapping adds the share of pixels below
+ * each pixel's own bin. `cpu` is the composition on the whole image.
+ */
+const BINS_T = 8;
+const binOfValue = (v: number) => Math.min(BINS_T - 1, Math.floor(Math.min(1, Math.max(0, v)) * BINS_T));
+const stretchStat = (src: LinearImage, region?: { y0: number }) => {
+  const hist = new Float64Array(BINS_T);
+  for (let y = 0; y < src.height; y++) if (((region?.y0 ?? 0) + y) % 2 === 0) for (let x = 0; x < src.width; x++) hist[binOfValue(src.data[(y * src.width + x) * 4]!)]!++;
+  return hist;
+};
+const stretchApply = (src: LinearImage, amount: number, stat: Float64Array) => {
+  const total = stat.reduce((a, b) => a + b, 0) || 1;
+  const below = new Float64Array(BINS_T);
+  for (let b = 1; b < BINS_T; b++) below[b] = below[b - 1]! + stat[b - 1]!;
+  return createImage(src.width, src.height, src.data.map((v, i) => (i % 4 === 0 ? v + (amount * below[binOfValue(v)]!) / total : v)));
+};
+const stretch = defineFilter({
+  id: 'stretch',
+  label: 'Stretch',
+  category: 'adjust',
+  kind: 'multipass',
+  params: { amount: { type: 'float', min: 0, max: 1, step: 0.1, default: 0.5, label: 'Amount' } },
+  passes: [pass],
+  reach: 'global', // whole-image meaning, for executors that know nothing of two phases
+  twoPhase: {
+    stat: (src, _p, region) => stretchStat(src, region),
+    apply: (src, { amount }, stat) => stretchApply(src, amount, stat),
+  },
+  cpu: (src, { amount }) => stretchApply(src, amount, stretchStat(src)),
   tolerance: { abs: 0, rel: 0 },
 });
 
@@ -169,6 +203,43 @@ describe('planSegments', () => {
   });
 });
 
+describe('planSegments with two phases', () => {
+  const two = { twoPhase: true } as const;
+
+  it('ends the segment before a two-phase step with that step as the one whose statistic it produces, and starts the next with it (apply reach 0)', () => {
+    const g = step(stretch);
+    const segs = planSegments([step(columnMean, { r: 2 }), g, step(gain), step(columnMean, { r: 1 })], 1, two);
+    expect(segs.map((x) => [x.steps.length, x.halo, x.statFor === g])).toEqual([[1, 2, true], [3, 1, false]]);
+    expect(segs[1]!.steps[0]).toBe(g);
+  });
+
+  it('opens with an empty segment when a two-phase step has nothing banded before it', () => {
+    const g = step(stretch);
+    const segs = planSegments([g, step(gain)], 1, two);
+    expect(segs.map((x) => [x.steps.length, x.halo, x.statFor === g])).toEqual([[0, 0, true], [2, 0, false]]);
+    const after = planSegments([step(centre), g], 1, two);
+    expect(after.map((x) => [x.steps.length, x.halo, x.statFor === g])).toEqual([[1, 'global', false], [0, 0, true], [1, 0, false]]);
+  });
+
+  it('chains two two-phase steps: the first one is part of the segment that makes the statistic of the second', () => {
+    const [a, b] = [step(stretch), step(stretch)];
+    const segs = planSegments([a, b, step(columnMean, { r: 1 })], 1, two);
+    expect(segs.map((x) => [x.steps.length, x.halo, x.statFor === a ? 'a' : x.statFor === b ? 'b' : '-'])).toEqual([[0, 0, 'a'], [1, 0, 'b'], [2, 1, '-']]);
+  });
+
+  it('leaves the plan alone without the option: a two-phase filter is global, as for any executor that does not know them', () => {
+    const segs = planSegments([step(columnMean, { r: 2 }), step(stretch), step(gain)]);
+    expect(segs.map((x) => [x.steps.length, x.halo])).toEqual([[1, 2], [1, 'global'], [1, 0]]);
+    expect(segs.every((x) => x.statFor === undefined)).toBe(true);
+  });
+
+  it('bandReach: 0 for the apply of a two-phase step, the usual reach for the others', () => {
+    expect(bandReach(step(stretch))).toBe(0);
+    expect(bandReach(step(columnMean, { r: 3 }))).toBe(3);
+    expect(bandReach(step(centre))).toBe('global');
+  });
+});
+
 describe('runChainBands', () => {
   const w = 9;
   const h = 31;
@@ -268,5 +339,58 @@ describe('runChainBands', () => {
 
   it('keeps the usual errors', () => {
     expect(() => runChainBands([step(showMask)], src, { bands: 2 })).toThrow(/needs a mask/);
+  });
+
+  describe('with two-phase steps', () => {
+    const bandCounts = [1, 2, 3, 5, 8, h, h + 4];
+    const radial: Mask = { kind: 'radial', center: [0.4, 0.55], radius: [0.3, 0.2], feather: 0.5 };
+    const chains: Record<string, () => Step[]> = {
+      'alone': () => [step(stretch)],
+      'first, then banded steps': () => [step(stretch), step(gain), step(columnMean, { r: 2 })],
+      'after a banded step': () => [step(columnMean, { r: 2 }), step(stretch)],
+      'in the middle': () => [step(columnMean, { r: 2 }), step(stretch, { amount: 0.8 }), step(gain, { k: 0.7 }), step(columnMean, { r: 3 })],
+      'two in a row': () => [step(columnMean, { r: 1 }), step(stretch), step(stretch, { amount: 0.3 }), step(gain)],
+      'around a global step': () => [step(columnMean, { r: 2 }), step(stretch), step(centre), step(stretch), step(columnMean, { r: 1 })],
+      'after a global step': () => [step(centre), step(stretch), step(gain)],
+      'with a mask': () => [step(columnMean, { r: 1 }), step(stretch, { amount: 1 }, { mask: radial }), step(gain)],
+      'position-dependent neighbours': () => [step(rowIndex), step(stretch), step(rowIndex), step(columnMean, { r: 2 })],
+      'with a disabled one': () => [step(columnMean, { r: 2 }), step(stretch, {}, { enabled: false }), step(gain)],
+    };
+
+    for (const [name, make] of Object.entries(chains))
+      it(`${name}: equals the whole image for every number of bands`, () => {
+        for (const bands of bandCounts) same(make(), bands);
+      });
+
+    it('at a scale other than 1', () => {
+      const chain = [step(columnMean, { r: 4 }), step(stretch), step(columnMean, { r: 4 })];
+      const whole = runChainCpu(chain, src, { scale: 0.5 });
+      expect(Array.from(runChainBands(chain, src, { scale: 0.5, bands: 5, force: true }).data)).toEqual(Array.from(whole.data));
+    });
+
+    it('sums the statistics of the bands into the statistic of the whole image', () => {
+      const g = step(stretch);
+      const params = effectiveParams(g) as never;
+      const whole = twoPhaseStat(g, src, { y0: 0, fullHeight: h });
+      for (const bands of [2, 3, 7, h]) {
+        const parts = planBands(h, bands, 0).map((b) => twoPhaseStat(g, createImage(w, b.y1 - b.y0, src.data.subarray(b.y0 * w * 4, b.y1 * w * 4)), { y0: b.y0, fullHeight: h }));
+        expect(Array.from(sumStats(parts))).toEqual(Array.from(whole));
+      }
+      expect(Array.from(whole)).toEqual(Array.from(stretch.twoPhase!.stat(src, params, { y0: 0, fullHeight: h })));
+      expect(() => sumStats([new Float64Array(3), new Float64Array(4)])).toThrow(RangeError);
+    });
+
+    it('applies the given statistic instead of computing one: runStepCpu and runChainBandRows', () => {
+      const g = step(stretch);
+      const other = new Float64Array(BINS_T).fill(1);
+      expect(Array.from(runStepCpu(g, src, {}, undefined, other).data)).toEqual(Array.from(stretchApply(src, 0.5, other).data));
+      expect(Array.from(runStepCpu(g, src).data)).toEqual(Array.from(stretch.cpu(src).data));
+      expect(() => runStepCpu(step(gain), src, {}, undefined, other)).toThrow(/two-phase/);
+      const band = planBands(h, 3, 0)[1]!;
+      const rows = createImage(w, band.to - band.from, src.data.slice(band.from * w * 4, band.to * w * 4));
+      const got = runChainBandRows([g, step(gain)], rows, band, h, {}, { stat: other });
+      const expected = runChainCpu([step(gain)], stretchApply(src, 0.5, other));
+      expect(Array.from(got.data)).toEqual(Array.from(expected.data.subarray(band.y0 * w * 4, band.y1 * w * 4)));
+    });
   });
 });

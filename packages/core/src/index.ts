@@ -15,6 +15,7 @@ export type {
   Reach,
   Rgba,
   TexturePassDef,
+  TwoPhase,
 } from './filter';
 export { createGpuContext, WebGpuUnavailableError, type GpuContext, type GpuContextOptions } from './gpu/context';
 export { GpuError, ShaderCompileError, type GpuErrorKind, type ShaderMessage } from './gpu/errors';
