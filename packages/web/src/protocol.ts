@@ -48,14 +48,19 @@ export interface BandJob {
   readonly width: number;
   readonly height: number;
   readonly band: BandPlan;
-  /** Copy path: the band's input rows (transferred). Shared path: the whole source and output. */
-  readonly rows?: Float32Array;
+  /**
+   * Copy path: a transferred buffer whose first `length` floats are the band's input rows (halo
+   * included); the worker writes the rows it owns over its start and sends the buffer back, so the
+   * coordinator can reuse it. Shared path: the whole source and output instead.
+   */
+  readonly buffer?: ArrayBuffer;
+  readonly length?: number;
   readonly src?: SharedArrayBuffer;
   readonly dst?: SharedArrayBuffer;
 }
 
 /** Band worker -> coordinator. */
-export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly rows?: Float32Array } | { readonly type: 'error'; readonly message: string };
+export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly buffer?: ArrayBuffer; readonly length?: number } | { readonly type: 'error'; readonly message: string };
 
 /** Worker -> main thread: the result, or the error's message. */
 export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly shared: boolean; readonly bandedMs: number; readonly inlineMs: number } | { readonly id: number; readonly error: string };
