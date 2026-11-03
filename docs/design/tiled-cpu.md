@@ -175,6 +175,8 @@ Speed-up over one thread, medians of 3, `pnpm bench:threads` and `pnpm bench:thr
 
 **Executors.** Done in `@rullino/node`: a band job carries `stat` (for the first step of its segment) and `statFor` (compute the statistic of the next step on the rows I own); the reply carries the partial; the coordinator adds the partials and passes the sum on. A segment of no steps has no output buffer: its bands only count. A segment kept on the calling thread (a halo as tall as the image gives one band) computes its statistic inline, which is why a test mixes an inline segment with a banded one after it. `@rullino/web` is next (same protocol, copied buffers).
 
+Measured in the Linux container (4 cores, 12 MP, `blur + equalize + sharpen`, `pnpm bench:threads --only equalize`): 4 threads took **2179 ms**, against 4711 ms when equalize ran alone (phase 2 table, 1.22×); 2 threads 3452 ms. The one-thread baseline of that run was 9.7 s against 5.7 s in the phase 2 run, so the ratio over one thread (4.4×) says more about the machine's mood than about the change; read the absolute times.
+
 ## Plan
 
 1. **Spike (a branch, thrown away).** Measure on this container: worker start-up with the filters bundle, `postMessage` clone of a 24 MB and a 192 MB buffer, `SharedArrayBuffer` throughput, and tiled-vs-whole for a pointwise chain and a blur chain with a hand-rolled pool. Decide go / no-go on the success numbers above before phase 1.
