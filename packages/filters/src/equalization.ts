@@ -3,7 +3,7 @@
 // whose lightness falls in a neighbouring bin on the GPU (f32 vs f64) moves the result by one
 // count in a histogram, not by a whole step.
 
-import { createImage, linearToOklab, oklabToLinear, type LinearImage, type PassDef } from '@rullino/core';
+import { createImage, linearToOklab, oklabToLinear, type LinearImage, type PassDef, type RowRegion } from '@rullino/core';
 
 export const BINS = 256;
 
@@ -45,43 +45,60 @@ function tileBlend(x: number, size: number, tiles: number): [number, number, num
   return [t0, Math.min(t0 + 1, tiles - 1), g - t0];
 }
 
-export function equalizeCpu(src: LinearImage, tilesParam: number, clip: number, amount: number): LinearImage {
+/**
+ * First phase: the histograms of OKLab lightness, one per tile, of the rows of `src` (the whole
+ * image, or a band at `region`: tiles come from the full image's size and rows). Counts, so the
+ * histograms of bands add up to the histogram of the image exactly.
+ */
+export function equalizeStat(src: LinearImage, tilesParam: number, region?: RowRegion): Float64Array {
   const { width: w, height: h } = src;
-  const tiles = effectiveTiles(tilesParam, w, h);
-  const labs = new Float64Array(w * h * 3);
+  const [y0, fullHeight] = region ? [region.y0, region.fullHeight] : [0, h];
+  const tiles = effectiveTiles(tilesParam, w, fullHeight);
   const hist = new Float64Array(tiles * tiles * BINS);
-  for (let y = 0; y < h; y++)
+  for (let y = 0; y < h; y++) {
+    const ty = Math.min(Math.floor(((y0 + y) * tiles) / fullHeight), tiles - 1);
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const a = src.data[i * 4 + 3]!;
       if (a <= 0) continue;
-      const lab = linearToOklab(src.data[i * 4]! / a, src.data[i * 4 + 1]! / a, src.data[i * 4 + 2]! / a);
-      labs.set(lab, i * 3);
-      const tile = Math.min(Math.floor((y * tiles) / h), tiles - 1) * tiles + Math.min(Math.floor((x * tiles) / w), tiles - 1);
-      hist[tile * BINS + Math.min(BINS - 1, Math.floor(Math.min(1, Math.max(0, lab[0])) * BINS))]!++;
+      const L = linearToOklab(src.data[i * 4]! / a, src.data[i * 4 + 1]! / a, src.data[i * 4 + 2]! / a)[0];
+      const tile = ty * tiles + Math.min(Math.floor((x * tiles) / w), tiles - 1);
+      hist[tile * BINS + Math.min(BINS - 1, Math.floor(Math.min(1, Math.max(0, L)) * BINS))]!++;
     }
+  }
+  return hist;
+}
+
+/** Second phase: the mapping of every pixel through the (blended) CDFs of the histograms of the whole image. Reads only the pixel. */
+export function equalizeApply(src: LinearImage, tilesParam: number, clip: number, amount: number, hist: Float64Array, region?: RowRegion): LinearImage {
+  const { width: w, height: h } = src;
+  const [y0Row, fullHeight] = region ? [region.y0, region.fullHeight] : [0, h];
+  const tiles = effectiveTiles(tilesParam, w, fullHeight);
   const cdfs = new Float64Array(tiles * tiles * BINS);
   for (let t = 0; t < tiles * tiles; t++) cdfs.set(clippedCdf(hist.subarray(t * BINS, (t + 1) * BINS), clip), t * BINS);
 
   const out = createImage(w, h);
   for (let y = 0; y < h; y++) {
-    const [y0, y1, fy] = tileBlend(y, h, tiles);
+    const [y0, y1, fy] = tileBlend(y0Row + y, fullHeight, tiles);
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const a = src.data[i * 4 + 3]!;
       if (a <= 0) continue;
       const [x0, x1, fx] = tileBlend(x, w, tiles);
-      const L = labs[i * 3]!;
+      const [L, A, B] = linearToOklab(src.data[i * 4]! / a, src.data[i * 4 + 1]! / a, src.data[i * 4 + 2]! / a);
       const m = (ty: number, tx: number) => cdfAt(cdfs, (ty * tiles + tx) * BINS, L);
       const top = m(y0, x0) + (m(y0, x1) - m(y0, x0)) * fx;
       const bottom = m(y1, x0) + (m(y1, x1) - m(y1, x0)) * fx;
       const mapped = top + (bottom - top) * fy;
-      const rgb = oklabToLinear(L + (mapped - L) * amount, labs[i * 3 + 1]!, labs[i * 3 + 2]!);
+      const rgb = oklabToLinear(L + (mapped - L) * amount, A, B);
       out.data.set([rgb[0] * a, rgb[1] * a, rgb[2] * a, a], i * 4);
     }
   }
   return out;
 }
+
+/** The whole filter: the statistic of the image, then the mapping (the reference the two phases of the bands must reproduce). */
+export const equalizeCpu = (src: LinearImage, tilesParam: number, clip: number, amount: number): LinearImage => equalizeApply(src, tilesParam, clip, amount, equalizeStat(src, tilesParam));
 
 /** Buffer sizes for at most `maxTiles` per axis. */
 export const equalizeBuffers = (maxTiles: number) => ({ hist: maxTiles * maxTiles * BINS, cdf: maxTiles * maxTiles * BINS });
