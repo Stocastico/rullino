@@ -149,6 +149,16 @@ describe('threads: filters that need a statistic of the whole image run in two p
     expect(seen.every((i) => i.bands > 1 && i.inlineMs >= 0 && i.bandedMs > 0), `${name}: ${JSON.stringify(seen)}`).toBe(true);
   }, 60_000);
 
+  it('a segment kept on the calling thread (its halo is as tall as the image) hands its statistic to the banded segment after it', async () => {
+    // Without forceBands a blur this wide leaves one band, so it runs inline; equalize has no halo and is cut into bands.
+    const seen: number[] = [];
+    const r = await renderer({ threads: 3, pool: { workerUrl, createAtPixels: 0, useAtPixels: 0, onRender: (i) => seen.push(i.bands) } });
+    const one = await renderer();
+    const steps = doc([{ filter: gaussianBlur, params: { sigma: 14 } }, { filter: equalize }, { filter: exposure, params: { ev: 0.1 } }]);
+    same(await r.apply(photo(120, 30), steps), await one.apply(photo(120, 30), steps), 'mixed');
+    expect(seen[0], 'the equalize segment was banded').toBeGreaterThan(1);
+  }, 60_000);
+
   it('with a small image kept on the calling thread, the statistic is still the same', async () => {
     // Below the thresholds nothing is banded; above them for one segment only the statistic is.
     const r = await renderer({ threads: 3, pool: { workerUrl, createAtPixels: 3000, useAtPixels: 3000, forceBands: true } });
