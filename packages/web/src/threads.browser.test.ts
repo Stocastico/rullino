@@ -57,14 +57,15 @@ describe('createThreadedExecutor', () => {
       'three in a row': doc(['equalize', { amount: 0.7 }], ['clahe'], ['otsu'], ['exposure', { ev: 0.3 }]),
       'masked': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 1.5 } }, { filter: 'clahe', params: {}, mask }, { filter: 'exposure', params: { ev: -0.2 } }] } as never,
     };
+    const e = make(2, FORCE); // one pool for all: starting workers is the slow part, especially with coverage on
     for (const [name, edit] of Object.entries(chains))
       for (const [scale, image] of [[1, src], [0.5, picture(33, 9)]] as const) {
-        const out = await run(make(2, FORCE), edit, image, scale);
+        const out = await run(e, edit, image, scale);
         same(out.image, whole(edit, image, scale));
         expect(out.bands, `${name}: in bands`).toBeGreaterThan(1);
         expect(out.inlineMs, `${name}: nothing left on the calling thread`).toBe(0);
       }
-  });
+  }, 60_000);
 
   it('a segment kept on the calling thread (its halo is as tall as the image) hands its statistic to the banded segment after it', async () => {
     // Without forceBands a blur this wide leaves one band, so it runs inline; equalize has no halo and is cut into bands.
