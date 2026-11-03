@@ -11,6 +11,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.6.0]
+
+The CPU backend uses all the cores: `@rullino/node` and `@rullino/web` render bands of the image on worker threads, with the same result as one thread bit for bit.
+
 ### Added
 - **node**: `createRenderer({ threads: n | 'auto' })` spreads CPU renders over worker threads (default 1). The image is cut into horizontal bands rendered in parallel with the same result as one thread, bit for bit; equalize, clahe and otsu run in two phases (the bands count their rows first) and images below about 2 MP stay on the calling thread. On 4 cores at 12 MP: 2.3–4.0× on the banded chains. `renderer.threads` reports the count; `pool` holds advanced options. Needs `dist/worker.js`, which ships in the package.
 - **web**: `createRenderer({ threads: n | 'auto' })` (**by default 4 workers on a machine with at least 4 cores**, 1 below; `threads: 1` turns it off) does the same for the CPU backend with nested module workers (`dist/band-worker.js`); bands travel by copy through reused buffers (a shared-memory variant was measured to be no faster and is not offered). `PoolOptions` is exported. In Chromium on 4 cores at 12 MP: 2.5–3.95× at four workers; `pool.onRender` reports where a render's time went.
