@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createImage, fromFloat16Array, serializeChain, toFloat16Array, type LinearImage, type Mask, type Step } from '@rullino/core';
-import { equalize, exposure, gaussianBlur, grain, halftone, kuwahara, pixelate, sharpen, unsharpMask, vignette } from '@rullino/filters';
+import { clahe, equalize, exposure, gaussianBlur, grain, halftone, kuwahara, otsu, pixelate, sharpen, unsharpMask, vignette } from '@rullino/filters';
 import { lookEdit, looks } from '@rullino/presets';
 import { build } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -121,11 +121,40 @@ describe('threads: when they are used', () => {
     same(out, await (await renderer()).apply(photo(64, 48), edits['blur and unsharp']), 'small image');
   });
 
-  it('does not touch them for a chain that needs the whole image', async () => {
+  it('uses them for the filters that need a statistic of the whole image too (two phases)', async () => {
     const r = await renderer({ threads: 3, pool: { workerUrl: new URL('file:///nowhere/worker.mjs'), ...FORCE } });
-    const out = await r.apply(photo(64, 48), doc([{ filter: equalize }]));
-    same(out, await (await renderer()).apply(photo(64, 48), doc([{ filter: equalize }])), 'global only');
+    await expect(r.apply(photo(64, 48), doc([{ filter: equalize }]))).rejects.toThrow(/could not start the worker threads/);
   });
+});
+
+describe('threads: filters that need a statistic of the whole image run in two phases', () => {
+  const chains: Record<string, Step[]> = {
+    'equalize alone': [{ filter: equalize }],
+    'clahe alone': [{ filter: clahe, params: { tiles: 6 } }],
+    'otsu alone': [{ filter: otsu }],
+    'blur, equalize, sharpen': [{ filter: gaussianBlur, params: { sigma: 2 } }, { filter: equalize }, { filter: sharpen }],
+    'equalize, clahe, otsu in a row': [{ filter: equalize, params: { amount: 0.7 } }, { filter: clahe }, { filter: otsu }, { filter: exposure, params: { ev: 0.3 } }],
+    'masked': [{ filter: gaussianBlur, params: { sigma: 1.5 } }, { filter: clahe, mask: radial }, { filter: exposure, params: { ev: -0.2 } }],
+    'position-dependent around it': [{ filter: vignette }, { filter: equalize }, { filter: grain, params: { amount: 0.4 } }],
+  };
+
+  it.each(Object.entries(chains))('%s: the result of one thread, in bands', async (name, steps) => {
+    const seen: { bands: number; bandedMs: number; inlineMs: number }[] = [];
+    const [one, many] = [await renderer(), await renderer({ threads: 3, pool: { workerUrl, ...FORCE, onRender: (i) => seen.push(i) } })];
+    for (const [w, h] of [[160, 120], [97, 61], [31, 5]] as const) {
+      const src = photo(w, h);
+      same(await many.apply(src, doc(steps)), await one.apply(src, doc(steps)), `${name} ${w}x${h}`);
+    }
+    expect(seen).toHaveLength(3);
+    expect(seen.every((i) => i.bands > 1 && i.inlineMs >= 0 && i.bandedMs > 0), `${name}: ${JSON.stringify(seen)}`).toBe(true);
+  }, 60_000);
+
+  it('with a small image kept on the calling thread, the statistic is still the same', async () => {
+    // Below the thresholds nothing is banded; above them for one segment only the statistic is.
+    const r = await renderer({ threads: 3, pool: { workerUrl, createAtPixels: 3000, useAtPixels: 3000, forceBands: true } });
+    const one = await renderer();
+    for (const [w, h] of [[20, 20], [80, 60]] as const) same(await r.apply(photo(w, h), doc(chains['blur, equalize, sharpen']!)), await one.apply(photo(w, h), doc(chains['blur, equalize, sharpen']!)), `${w}x${h}`);
+  }, 60_000);
 });
 
 describe('threads: failures', () => {

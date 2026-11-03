@@ -1,7 +1,7 @@
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
 import { createImage, type LinearImage, type Lut, type Step } from '@rullino/core';
-import { planBands, planSegments, runStepCpu, type BandPlan } from '@rullino/core/internal';
+import { planBands, planSegments, runStepCpu, sumStats, twoPhaseStat, type BandPlan } from '@rullino/core/internal';
 
 // CPU rendering on worker threads: the image is cut into horizontal bands (docs/design/tiled-cpu.md),
 // each worker runs the whole segment of the chain on its band plus a halo of extra rows and writes
@@ -25,10 +25,15 @@ export interface BandJob {
   readonly height: number;
   readonly band: BandPlan;
   readonly src: SharedArrayBuffer;
-  readonly dst: SharedArrayBuffer;
+  /** Where the owned rows go; absent for a segment of no steps, whose bands only compute a statistic. */
+  readonly dst?: SharedArrayBuffer;
+  /** The statistic of the whole image for the first step, a two-phase step (see `planSegments`). */
+  readonly stat?: Float64Array;
+  /** Also compute the statistic of the step at index `to` (the next one, two-phase) on the rows this band owns. */
+  readonly statFor?: boolean;
 }
 
-export type WorkerReply = { readonly type: 'ready' } | { readonly type: 'done' } | { readonly type: 'error'; readonly message: string };
+export type WorkerReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly stat?: Float64Array } | { readonly type: 'error'; readonly message: string };
 
 export interface ThreadedOptions {
   /** Worker threads (at least 2: with one the caller runs unthreaded). */
@@ -40,6 +45,8 @@ export interface ThreadedOptions {
   readonly useAtPixels: number;
   /** Cut into the requested number of bands whatever the halo (tests); normally a band is at least 4 × halo rows. */
   readonly forceBands: boolean;
+  /** Called after each render with the band jobs it ran and where its time went (diagnostics). */
+  readonly onRender?: ((info: { readonly bands: number; readonly bandedMs: number; readonly inlineMs: number }) => void) | undefined;
 }
 
 /** The worker, next to this file once built (`dist/worker.js`). */
@@ -139,10 +146,10 @@ export function createThreadedExecutor(options: ThreadedOptions): ThreadedExecut
 
   /** One band on one worker; rejects if the worker reports an error or dies. */
   const call = (worker: Worker, job: BandJob) =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<Float64Array | undefined>((resolve, reject) => {
       const done = (m: WorkerReply) => {
         cleanup();
-        if (m.type === 'done') resolve();
+        if (m.type === 'done') resolve(m.stat);
         else reject(new Error(m.type === 'error' ? m.message : 'unexpected reply from a worker'));
       };
       const failed = (e: Error) => {
@@ -168,19 +175,28 @@ export function createThreadedExecutor(options: ThreadedOptions): ThreadedExecut
     let ours: SharedArrayBuffer | undefined; // the buffer behind `current`, if this render made it
     let enabled = 0; // steps handled so far, counted among the enabled ones
     let pool: Worker[] | undefined;
+    let stat: Float64Array | undefined; // the statistic for the first step of the next segment
+    let bandJobs = 0;
+    let bandedMs = 0;
+    let inlineMs = 0;
     try {
-      for (const seg of planSegments(steps, scale)) {
+      for (const seg of planSegments(steps, scale, { twoPhase: true })) {
+        const t0 = performance.now();
         const from = enabled;
         enabled += seg.steps.length;
+        const first = stat;
+        stat = undefined;
         const pixels = current.width * current.height;
         const worth = seg.halo !== 'global' && pixels >= (workers ? options.useAtPixels : options.createAtPixels);
         const bands: BandPlan[] = worth ? planBands(current.height, options.threads * 2, seg.halo as number, { force: options.forceBands }) : [];
         if (bands.length <= 1) {
-          for (const s of seg.steps) current = runStepCpu(s, current, { scale, fast: true });
+          seg.steps.forEach((s, k) => (current = runStepCpu(s, current, { scale, fast: true }, undefined, k === 0 ? first : undefined)));
+          if (seg.statFor) stat = twoPhaseStat(seg.statFor, current, { y0: 0, fullHeight: current.height }, { scale });
           if (ours && sharedBuffer(current) !== ours) {
             give(ours); // the steps made ordinary memory: the shared buffer is free again
             ours = undefined;
           }
+          inlineMs += performance.now() - t0;
           continue;
         }
         pool ??= await start();
@@ -191,20 +207,32 @@ export function createThreadedExecutor(options: ThreadedOptions): ThreadedExecut
           srcBuffer = ours = take(bytes);
           new Float32Array(srcBuffer).set(current.data);
         }
-        const dst = take(bytes);
+        // A segment of no steps only makes a statistic: its rows are the input's, nothing to write.
+        const dst = seg.steps.length > 0 ? take(bytes) : undefined;
         const key = ++renders;
         const pending = [...bands];
+        const parts: Float64Array[] = [];
+        bandJobs += bands.length;
         const [width, height] = [current.width, current.height];
         // Workers take the next band when they finish one: uneven bands even out.
         await Promise.all(
           pool.map(async (worker) => {
-            for (let band = pending.shift(); band; band = pending.shift())
-              await call(worker, { type: 'band', edit, luts: lutRecord, key, scale, from, to: enabled, width, height, band, src: srcBuffer, dst });
+            for (let band = pending.shift(); band; band = pending.shift()) {
+              const part = await call(worker, { type: 'band', edit, luts: lutRecord, key, scale, from, to: enabled, width, height, band, src: srcBuffer, ...(dst && { dst }), ...(first && { stat: first }), ...(seg.statFor && { statFor: true }) });
+              if (part) parts.push(part);
+            }
           }),
         );
-        if (ours) give(ours); // this segment's input is not needed any more
-        ours = dst;
-        current = createImage(width, height, new Float32Array(dst));
+        if (seg.statFor) stat = sumStats(parts);
+        if (dst) {
+          if (ours) give(ours); // this segment's input is not needed any more
+          ours = dst;
+          current = createImage(width, height, new Float32Array(dst));
+        } else if (ours === srcBuffer) {
+          // The copy made for the workers is the same picture: the next segment reads it without another copy.
+          current = createImage(width, height, new Float32Array(srcBuffer));
+        }
+        bandedMs += performance.now() - t0;
       }
     } catch (e) {
       stop(); // a worker that failed may be half way through a band: start afresh next time
@@ -212,6 +240,7 @@ export function createThreadedExecutor(options: ThreadedOptions): ThreadedExecut
     } finally {
       for (const w of workers ?? []) w.unref();
     }
+    options.onRender?.({ bands: bandJobs, bandedMs, inlineMs });
     if (!sharedBuffer(current) || keepShared) return current;
     // Hand back ordinary memory: some APIs (Blob, TextDecoder) refuse views of shared buffers.
     const copy = createImage(current.width, current.height, current.data.slice());

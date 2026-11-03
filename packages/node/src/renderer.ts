@@ -21,13 +21,22 @@ export interface RendererOptions {
   /**
    * Worker threads for the CPU backend: a number, or 'auto' (the cores, at most 8). Default 1: the
    * calling thread. With more, large images are cut into bands rendered in parallel with the same
-   * result, bit for bit; small images and steps that need the whole image (equalize, clahe, otsu) stay
-   * on the calling thread. Ignored on the GPU, and with custom `filters` (functions cannot be sent to a
+   * result, bit for bit; small images stay on the calling thread, and so do the steps that need the
+   * whole image (equalize, clahe, otsu) except for their statistic, which the bands compute. Ignored on the GPU, and with custom `filters` (functions cannot be sent to a
    * worker). Call `destroy()` to stop the threads.
    */
   readonly threads?: number | 'auto' | undefined;
   /** Advanced (bundlers, tests): where the worker script is, and from how many pixels threads are worth it. */
-  readonly pool?: { readonly workerUrl?: URL | undefined; readonly createAtPixels?: number | undefined; readonly useAtPixels?: number | undefined; readonly forceBands?: boolean | undefined } | undefined;
+  readonly pool?:
+    | {
+        readonly workerUrl?: URL | undefined;
+        readonly createAtPixels?: number | undefined;
+        readonly useAtPixels?: number | undefined;
+        readonly forceBands?: boolean | undefined;
+        /** Called after each render that used the executor, with the band jobs it ran and where its time went (diagnostics, benchmarks). */
+        readonly onRender?: ((info: { readonly bands: number; readonly bandedMs: number; readonly inlineMs: number }) => void) | undefined;
+      }
+    | undefined;
 }
 
 /** 8-bit straight-alpha sRGB pixels, row by row: what image decoders produce. */
@@ -113,6 +122,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
           createAtPixels: options.pool?.createAtPixels ?? 2_000_000,
           useAtPixels: options.pool?.useAtPixels ?? 500_000,
           forceBands: options.pool?.forceBands ?? false,
+          onRender: options.pool?.onRender,
         })
       : undefined;
 
