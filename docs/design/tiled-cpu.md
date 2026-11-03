@@ -173,7 +173,7 @@ Speed-up over one thread, medians of 3, `pnpm bench:threads` and `pnpm bench:thr
 
 **Tests.** The synthetic filter in core (position-dependent statistic, every chain shape: start, middle, end, twice, around a global step, masked, disabled, scaled); in filters, every parameter case of the three on tiny and odd images with a band per row, every position in a chain, `cpu` equals `stat` + `apply`, a half-image statistic changes the picture, and the random chains of the existing suite now contain them. Mutations: local row in `stat` or in the blend, tiles from the band height in either phase.
 
-**Next.** The two executors (Node threads, web workers) hand the statistic between segments: bands return partial statistics with their rows, the coordinator adds them and sends the sum with the jobs of the next segment.
+**Executors.** Done in `@rullino/node`: a band job carries `stat` (for the first step of its segment) and `statFor` (compute the statistic of the next step on the rows I own); the reply carries the partial; the coordinator adds the partials and passes the sum on. A segment of no steps has no output buffer: its bands only count. A segment kept on the calling thread (a halo as tall as the image gives one band) computes its statistic inline, which is why a test mixes an inline segment with a banded one after it. `@rullino/web` is next (same protocol, copied buffers).
 
 ## Plan
 

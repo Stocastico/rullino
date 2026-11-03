@@ -17,8 +17,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 - **core** (internal): `Filter.reach`, `planSegments`, `planBands`, `runChainBands`, `runChainBand`, `runChainBandRows` and the `cpu` hook of `applyEdit`, the plumbing the two executors are built on (`@rullino/core/internal`, no stability promise); position-dependent filters take the frame (`RowRegion`) as a fourth argument.
 - Benchmarks `pnpm bench:threads` (Node) and `pnpm bench:threads:web` (Chromium).
 
+- **core / filters** (internal plumbing, `twoPhase` on a filter): `equalize`, `clahe` and `otsu` can run in bands: their statistic is a histogram, so the statistics of the bands add up to the one of the whole image bit for bit, and the pixel map reads nothing else. `@rullino/node`'s `threads` use it; `@rullino/web`'s do not yet.
+
 ### Not done
-- `threads: 'auto'` is not the default: it waits for numbers on more hardware. Equalize, clahe and otsu still run alone.
+- `threads: 'auto'` is not the default: it waits for numbers on more hardware. In `@rullino/web` equalize, clahe and otsu still run alone on the render worker.
 
 ## [0.5.1]
 
