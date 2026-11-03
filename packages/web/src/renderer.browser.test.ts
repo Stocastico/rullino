@@ -158,19 +158,14 @@ describe('createRenderer({ threads }) (browser)', () => {
   };
   const src = chart(53, 61);
 
-  for (const shared of [false, true]) {
-    describe(shared ? 'shared memory' : 'copied bands', () => {
-      it.each(Object.entries(documents))('%s: the result is bit-identical to one thread', async (_, doc) => {
-        const seen: { bands: number; shared: boolean }[] = [];
-        const one = await make({ backend: 'cpu' });
-        const many = await make({ backend: 'cpu', threads: 3, pool: { ...FORCE, shared, onRender: (i) => seen.push(i) } });
-        sameBytes(await many.apply(src, doc), await one.apply(src, doc));
-        expect(seen).toHaveLength(1);
-        expect(seen[0]!.shared).toBe(shared);
-        expect(seen[0]!.bands, 'the render was split into bands').toBeGreaterThan(1);
-      });
-    });
-  }
+  it.each(Object.entries(documents))('%s: the result is bit-identical to one thread', async (_, doc) => {
+    const seen: { bands: number }[] = [];
+    const one = await make({ backend: 'cpu' });
+    const many = await make({ backend: 'cpu', threads: 3, pool: { ...FORCE, onRender: (i) => seen.push(i) } });
+    sameBytes(await many.apply(src, doc), await one.apply(src, doc));
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.bands, 'the render was split into bands').toBeGreaterThan(1);
+  });
 
   it('pixels() and 8-bit input give the same bytes too', async () => {
     const bytes = new ImageData(new Uint8ClampedArray(31 * 23 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 7) % 256)), 31, 23);

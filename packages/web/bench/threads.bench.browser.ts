@@ -1,4 +1,4 @@
-// The CPU backend of @rullino/web with 1, 2, 4 band workers, copied bands and shared memory, on the
+// The CPU backend of @rullino/web with 1, 2, 4... band workers on the
 // PLAN chains, in Chromium. Not a test: `pnpm bench:threads:web` runs it (VITE_BENCH_SIZE=4000x3000 by
 // default there; `pnpm bench` runs a small size so that CI only checks that it still runs). Browser
 // console output is not forwarded, so results go to a file.
@@ -41,10 +41,9 @@ const median = (a: number[]) => [...a].sort((x, y) => x - y)[a.length >> 1]!;
 // Sweeps are interleaved: every round runs every configuration on every chain, one after the other, and
 // the table shows the median over the rounds. A run of one configuration after another let drift (other
 // load, memory, thermal) pose as a difference between configurations.
-interface Config { readonly label: string; readonly threads: number; readonly shared: boolean }
+interface Config { readonly label: string; readonly threads: number }
 const configs: Config[] = [
-  ...COUNTS.map((n) => ({ label: `${n} thread${n > 1 ? 's' : ''}`, threads: n, shared: false })),
-  ...COUNTS.filter((n) => n > 1).map((n) => ({ label: `${n} threads, shared`, threads: n, shared: true })),
+  ...COUNTS.map((n) => ({ label: `${n} thread${n > 1 ? 's' : ''}`, threads: n })),
 ];
 const out: string[] = [];
 afterAll(() =>
@@ -54,7 +53,7 @@ afterAll(() =>
   ),
 );
 
-it('renders the PLAN chains with 1, 2, 4... band workers, by copy and in shared memory', { timeout: 7_200_000 }, async () => {
+it('renders the PLAN chains with 1, 2, 4... band workers', { timeout: 7_200_000 }, async () => {
   const src = image();
   const names = Object.keys(chains).filter((n) => n.includes(ONLY));
   type Sample = { ms: number; banded: number; inline: number };
@@ -63,7 +62,7 @@ it('renders the PLAN chains with 1, 2, 4... band workers, by copy and in shared 
   for (let round = 0; round < RUNS; round++) {
     for (const c of configs) {
       let last = { bandedMs: 0, inlineMs: 0 };
-      const r = await createRenderer({ backend: 'cpu', threads: c.threads, pool: { shared: c.shared, onRender: (i) => (last = i) } });
+      const r = await createRenderer({ backend: 'cpu', threads: c.threads, pool: { onRender: (i) => (last = i) } });
       await r.apply(src, chains[names[0]!]!); // starts the pool and warms the code up; not measured
       for (const name of names) {
         const t = performance.now();
