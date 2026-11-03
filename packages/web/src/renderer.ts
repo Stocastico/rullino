@@ -47,7 +47,7 @@ export interface RendererOptions {
    * (the default); ignored with custom `filters` or `worker: false`.
    */
   readonly threads?: number | 'auto' | undefined;
-  /** Advanced options of the band workers: where their script is, when they start, copy or shared memory. */
+  /** Advanced options of the band workers: where their script is, when they start. */
   readonly pool?: PoolOptions | undefined;
 }
 
@@ -95,7 +95,7 @@ function workerBackend(threads: number, pool: PoolOptions | undefined) {
       pending.delete(data.id);
       if ('error' in data) p?.reject(new Error(data.error));
       else {
-        pool?.onRender?.({ bands: data.bands, shared: data.shared, bandedMs: data.bandedMs, inlineMs: data.inlineMs });
+        pool?.onRender?.({ bands: data.bands, bandedMs: data.bandedMs, inlineMs: data.inlineMs });
         p?.resolve(data.image);
       }
     };

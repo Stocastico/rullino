@@ -26,12 +26,10 @@ export interface PoolOptions {
   readonly useAtPixels?: number;
   /** Cut into the requested number of bands whatever the halo (tests); normally a band is at least 4 × halo rows. */
   readonly forceBands?: boolean;
-  /** Share the image with the band workers instead of copying bands: `true` needs cross-origin isolation. Default false: measured no faster than copies. */
-  readonly shared?: boolean;
   /** Where the band worker script is; default: next to this one. */
   readonly workerUrl?: string | URL;
   /** Called with the number of band jobs each render ran (0 when it stayed in one thread). */
-  readonly onRender?: (info: { readonly bands: number; readonly shared: boolean; readonly bandedMs: number; readonly inlineMs: number }) => void;
+  readonly onRender?: (info: { readonly bands: number; readonly bandedMs: number; readonly inlineMs: number }) => void;
 }
 
 /** Coordinator -> band worker: one band of one segment. */
@@ -49,18 +47,16 @@ export interface BandJob {
   readonly height: number;
   readonly band: BandPlan;
   /**
-   * Copy path: a transferred buffer whose first `length` floats are the band's input rows (halo
+   * A transferred buffer whose first `length` floats are the band's input rows (halo
    * included); the worker writes the rows it owns over its start and sends the buffer back, so the
-   * coordinator can reuse it. Shared path: the whole source and output instead.
+   * coordinator can reuse it.
    */
-  readonly buffer?: ArrayBuffer;
-  readonly length?: number;
-  readonly src?: SharedArrayBuffer;
-  readonly dst?: SharedArrayBuffer;
+  readonly buffer: ArrayBuffer;
+  readonly length: number;
 }
 
 /** Band worker -> coordinator. */
 export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly buffer?: ArrayBuffer; readonly length?: number } | { readonly type: 'error'; readonly message: string };
 
 /** Worker -> main thread: the result, or the error's message. */
-export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly shared: boolean; readonly bandedMs: number; readonly inlineMs: number } | { readonly id: number; readonly error: string };
+export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly bandedMs: number; readonly inlineMs: number } | { readonly id: number; readonly error: string };

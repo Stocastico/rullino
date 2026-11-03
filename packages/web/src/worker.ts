@@ -19,7 +19,6 @@ scope.onmessage = async ({ data: { id, image, edit, luts, scale, pixels, threads
   try {
     if (threads > 1 && typeof Worker !== 'undefined') executor ??= createThreadedExecutor(threads, pool);
     let bands = 0;
-    let shared = false;
     let bandedMs = 0;
     let inlineMs = 0;
     const options: ApplyEditOptions = {
@@ -30,7 +29,6 @@ scope.onmessage = async ({ data: { id, image, edit, luts, scale, pixels, threads
         cpu: async (steps, framed, c) => {
           const done = await executor!.run(edit, luts, steps, framed, c.scale);
           bands += done.bands;
-          shared ||= done.shared;
           bandedMs += done.bandedMs;
           inlineMs += done.inlineMs;
           return done.image;
@@ -38,7 +36,7 @@ scope.onmessage = async ({ data: { id, image, edit, luts, scale, pixels, threads
       }),
     };
     const out = await (pixels ? applyEditPixels : applyEdit)(image, edit, options);
-    scope.postMessage({ id, image: out, bands, shared, bandedMs, inlineMs }, [out.data.buffer]);
+    scope.postMessage({ id, image: out, bands, bandedMs, inlineMs }, [out.data.buffer]);
   } catch (e) {
     scope.postMessage({ id, error: e instanceof Error ? e.message : String(e) });
   }
