@@ -13,7 +13,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ### Added
 - **node**: `createRenderer({ threads: n | 'auto' })` spreads CPU renders over worker threads (default 1). The image is cut into horizontal bands rendered in parallel with the same result as one thread, bit for bit; steps that need the whole image (equalize, clahe, otsu) and images below about 2 MP stay on the calling thread. On 4 cores at 12 MP: 2.3–4.0× on the banded chains. `renderer.threads` reports the count; `pool` holds advanced options. Needs `dist/worker.js`, which ships in the package.
-- **web**: `createRenderer({ threads: n | 'auto' })` does the same for the CPU backend with nested module workers (`dist/band-worker.js`); bands travel by copy, `pool: { shared: true }` uses `SharedArrayBuffer`s on a cross-origin isolated page (measured no faster). `PoolOptions` is exported. In Chromium on 4 cores at 12 MP: 2.5–3.95× at four workers.
+- **web**: `createRenderer({ threads: n | 'auto' })` does the same for the CPU backend with nested module workers (`dist/band-worker.js`); bands travel by copy (a shared-memory variant was measured slower and is not offered). `PoolOptions` is exported. In Chromium on 4 cores at 12 MP: 2.5–3.95× at four workers.
 - **core** (internal): `Filter.reach`, `planSegments`, `planBands`, `runChainBands`, `runChainBand`, `runChainBandRows` and the `cpu` hook of `applyEdit`, the plumbing the two executors are built on (`@rullino/core/internal`, no stability promise); position-dependent filters take the frame (`RowRegion`) as a fourth argument.
 - Benchmarks `pnpm bench:threads` (Node) and `pnpm bench:threads:web` (Chromium).
 

@@ -1,4 +1,4 @@
-// The CPU backend of @rullino/web with 1, 2, 4 band workers, copied bands and shared memory, on the
+// The CPU backend of @rullino/web with 1, 2, 4 band workers on the
 // PLAN chains, in Chromium. Not a test: `pnpm bench:threads:web` runs it (VITE_BENCH_SIZE=4000x3000 by
 // default there; `pnpm bench` runs a small size so that CI only checks that it still runs). Browser
 // console output is not forwarded, so results go to a file.
@@ -46,11 +46,12 @@ afterAll(() =>
   ),
 );
 
-it('renders the PLAN chains with 1, 2, 4 band workers, by copy and in shared memory', { timeout: 3_600_000 }, async () => {
+it('renders the PLAN chains with 1, 2, 4 band workers', { timeout: 3_600_000 }, async () => {
   const src = image();
   const base: Record<string, number> = {};
-  for (const [label, threads, shared] of [...COUNTS.map((n) => [`${n} thread${n > 1 ? 's' : ''}`, n, false] as const), ...COUNTS.filter((n) => n > 1).map((n) => [`${n} threads, shared`, n, true] as const)]) {
-    const r = await createRenderer({ backend: 'cpu', threads, pool: { shared } });
+  for (const threads of COUNTS) {
+    const label = `${threads} thread${threads > 1 ? 's' : ''}`;
+    const r = await createRenderer({ backend: 'cpu', threads });
     for (const [name, edit] of Object.entries(chains)) {
       if (!name.includes(ONLY)) continue;
       const times: number[] = [];

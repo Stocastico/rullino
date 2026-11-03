@@ -1,5 +1,5 @@
 // `pnpm bench:threads:web [--size WxH] [--threads 1,2,4] [--runs n] [--only text]`: the CPU backend of
-// @rullino/web with 1, 2, 4 band workers (copied bands and shared memory) on the PLAN chains, in
+// @rullino/web with 1, 2, 4 band workers on the PLAN chains, in
 // headless Chromium, through the `bench` Vitest project. Prints and writes packages/web/bench/results.txt.
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';

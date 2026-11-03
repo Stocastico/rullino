@@ -26,12 +26,10 @@ export interface PoolOptions {
   readonly useAtPixels?: number;
   /** Cut into the requested number of bands whatever the halo (tests); normally a band is at least 4 × halo rows. */
   readonly forceBands?: boolean;
-  /** Share the image with the band workers instead of copying bands: `true` needs cross-origin isolation. Default false: measured no faster than copies. */
-  readonly shared?: boolean;
   /** Where the band worker script is; default: next to this one. */
   readonly workerUrl?: string | URL;
   /** Called with the number of band jobs each render ran (0 when it stayed in one thread). */
-  readonly onRender?: (info: { readonly bands: number; readonly shared: boolean }) => void;
+  readonly onRender?: (info: { readonly bands: number }) => void;
 }
 
 /** Coordinator -> band worker: one band of one segment. */
@@ -48,14 +46,12 @@ export interface BandJob {
   readonly width: number;
   readonly height: number;
   readonly band: BandPlan;
-  /** Copy path: the band's input rows (transferred). Shared path: the whole source and output. */
-  readonly rows?: Float32Array;
-  readonly src?: SharedArrayBuffer;
-  readonly dst?: SharedArrayBuffer;
+  /** The band's input rows, halo included (a copy, transferred). */
+  readonly rows: Float32Array;
 }
 
 /** Band worker -> coordinator. */
 export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly rows?: Float32Array } | { readonly type: 'error'; readonly message: string };
 
 /** Worker -> main thread: the result, or the error's message. */
-export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly shared: boolean } | { readonly id: number; readonly error: string };
+export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number } | { readonly id: number; readonly error: string };
