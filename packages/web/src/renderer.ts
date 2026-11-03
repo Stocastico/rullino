@@ -42,7 +42,7 @@ export interface RendererOptions {
   /**
    * CPU threads for the CPU backend: the image is cut into horizontal bands that a pool of workers
    * renders at once, with the same result as one thread bit for bit. A number (at least 1), or
-   * `'auto'` for the cores (at most 8). Default 1. Only images of about 2 MP and more start the
+   * `'auto'` for the cores (at most 8). Default: 4 on a machine with 4 cores or more, else 1; `1` renders in the worker alone. Only images of about 2 MP and more start the
    * pool, and steps that need the whole image (equalize, clahe, otsu) run alone. Needs the worker
    * (the default); ignored with custom `filters` or `worker: false`.
    */

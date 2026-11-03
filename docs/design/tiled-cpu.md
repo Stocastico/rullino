@@ -214,3 +214,7 @@ The point of the design is that "tiled equals whole" can be checked without any 
 3. A new optional argument (`frame`) on `cpu` / `fast` and a new filter field (`reach`) are public types: a deliberate API change, in 0.x.
 4. `threads` defaults to `1` for the first release.
 5. The spike decides go / no-go before phase 1 is written.
+
+## Default (3 Nov, evening)
+
+After the two-phase work the 24-core Windows run (equalize chain, 12 MP, 5 interleaved rounds, Chromium) scaled almost linearly: 17.2 s on one thread, 9.1 s on 2 (1.89×), 4.5 s on 4 (3.86×), 2.7 s on 8 (6.48×), `inline` 0 everywhere and ranges within ±5%. Node (one run, three rounds): 5.3 s on one thread, 0.93 s on 8. Decision: **`@rullino/web` uses 4 workers by default on a machine reporting at least 4 cores, one below** (the pool only starts from 2 MP, so previews do not change; 4 and not 8 because phones often report 8 cores of which 4 are slow; two or three cores gain too little to pay for the pool). **`@rullino/node` stays at 1**: a server scales with processes, and several renderers each using every core step on each other; it is opt-in (`threads: 4`, `'auto'`). Not measured on laptops or phones; an app that has seen a problem passes `threads: 1`.

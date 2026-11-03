@@ -13,14 +13,14 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ### Added
 - **node**: `createRenderer({ threads: n | 'auto' })` spreads CPU renders over worker threads (default 1). The image is cut into horizontal bands rendered in parallel with the same result as one thread, bit for bit; equalize, clahe and otsu run in two phases (the bands count their rows first) and images below about 2 MP stay on the calling thread. On 4 cores at 12 MP: 2.3–4.0× on the banded chains. `renderer.threads` reports the count; `pool` holds advanced options. Needs `dist/worker.js`, which ships in the package.
-- **web**: `createRenderer({ threads: n | 'auto' })` does the same for the CPU backend with nested module workers (`dist/band-worker.js`); bands travel by copy through reused buffers (a shared-memory variant was measured to be no faster and is not offered). `PoolOptions` is exported. In Chromium on 4 cores at 12 MP: 2.5–3.95× at four workers; `pool.onRender` reports where a render's time went.
+- **web**: `createRenderer({ threads: n | 'auto' })` (**by default 4 workers on a machine with at least 4 cores**, 1 below; `threads: 1` turns it off) does the same for the CPU backend with nested module workers (`dist/band-worker.js`); bands travel by copy through reused buffers (a shared-memory variant was measured to be no faster and is not offered). `PoolOptions` is exported. In Chromium on 4 cores at 12 MP: 2.5–3.95× at four workers; `pool.onRender` reports where a render's time went.
 - **core** (internal): `Filter.reach`, `planSegments`, `planBands`, `runChainBands`, `runChainBand`, `runChainBandRows` and the `cpu` hook of `applyEdit`, the plumbing the two executors are built on (`@rullino/core/internal`, no stability promise); position-dependent filters take the frame (`RowRegion`) as a fourth argument.
 - Benchmarks `pnpm bench:threads` (Node) and `pnpm bench:threads:web` (Chromium).
 
 - **core / filters** (internal plumbing, `twoPhase` on a filter): `equalize`, `clahe` and `otsu` can run in bands: their statistic is a histogram, so the statistics of the bands add up to the one of the whole image bit for bit, and the pixel map reads nothing else. `threads` in `@rullino/node` and `@rullino/web` use it.
 
 ### Not done
-- `threads: 'auto'` is not the default: it waits for numbers on more hardware.
+- `@rullino/node` keeps `threads: 1` by default (servers scale with processes; opt in with a number or `'auto'`). Not measured on laptops or phones: the web default of 4 is the cap chosen for them.
 
 ## [0.5.1]
 
