@@ -11,6 +11,9 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+### Added
+- Example `examples/nextjs-server-render`: a Next.js app that previews an edit document in the browser with `@rullino/web` and renders it at full resolution in a route handler with `@rullino/node`; built and driven in `pnpm test:pack`.
+
 ## [0.6.0]
 
 The CPU backend uses all the cores: `@rullino/node` and `@rullino/web` render bands of the image on worker threads, with the same result as one thread bit for bit.
