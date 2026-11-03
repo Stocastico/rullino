@@ -1,4 +1,4 @@
-import { createImage, defineFilter, linearToSrgb, luminance } from '@rullino/core';
+import { createImage, defineFilter, linearToSrgb, luminance, type LinearImage } from '@rullino/core';
 
 /** Histogram bin (0..255) of a straight colour's perceptual luminance. Mirrors `bin()` in WGSL. */
 const binOf = (r: number, g: number, b: number) => Math.min(255, Math.floor(Math.min(1, Math.max(0, linearToSrgb(luminance(r, g, b)))) * 256));
@@ -34,6 +34,34 @@ export function otsuThreshold(hist: readonly number[]): number {
     }
   }
   return best;
+}
+
+/** A pixel's straight colour and alpha (zeros for colour where it is transparent). */
+const straightAt = (src: LinearImage, i: number): [number, number, number, number] => {
+  const a = src.data[i + 3]!;
+  return a > 0 ? [src.data[i]! / a, src.data[i + 1]! / a, src.data[i + 2]! / a, a] : [0, 0, 0, a];
+};
+
+/** First phase: the 256-bin histogram (counts) of the luminance of the opaque pixels of `src`. */
+function otsuStat(src: LinearImage): Float64Array {
+  const hist = new Float64Array(256);
+  for (let i = 0; i < src.data.length; i += 4) {
+    const [r, g, b, a] = straightAt(src, i);
+    if (a > 0) hist[binOf(r, g, b)]!++;
+  }
+  return hist;
+}
+
+/** Second phase: white where the luminance is above the threshold of the histogram of the whole image. */
+function otsuApply(src: LinearImage, invert: boolean, hist: Float64Array): LinearImage {
+  const t = otsuThreshold(Array.from(hist));
+  const out = createImage(src.width, src.height);
+  for (let i = 0; i < src.data.length; i += 4) {
+    const [r, g, b, a] = straightAt(src, i);
+    const v = binOf(r, g, b) > t !== invert ? a : 0;
+    out.data.set([v, v, v, a], i);
+  }
+  return out;
 }
 
 /**
@@ -114,26 +142,13 @@ fn run(xy: vec2i, p: Params) -> vec4f {
 }`,
     },
   ],
-  reach: 'global', // needs the histogram of the whole image
-  cpu: (src, { invert }) => {
-    const straight = (i: number): [number, number, number, number] => {
-      const a = src.data[i + 3]!;
-      return a > 0 ? [src.data[i]! / a, src.data[i + 1]! / a, src.data[i + 2]! / a, a] : [0, 0, 0, a];
-    };
-    const hist = new Array<number>(256).fill(0);
-    for (let i = 0; i < src.data.length; i += 4) {
-      const [r, g, b, a] = straight(i);
-      if (a > 0) hist[binOf(r, g, b)]!++;
-    }
-    const t = otsuThreshold(hist);
-    const out = createImage(src.width, src.height);
-    for (let i = 0; i < src.data.length; i += 4) {
-      const [r, g, b, a] = straight(i);
-      const v = binOf(r, g, b) > t !== invert ? a : 0;
-      out.data.set([v, v, v, a], i);
-    }
-    return out;
+  reach: 'global', // needs the histogram of the whole image...
+  // ...which banded executors take as the sum of the histograms of the bands, then threshold every pixel.
+  twoPhase: {
+    stat: (src) => otsuStat(src),
+    apply: (src, { invert }, stat) => otsuApply(src, invert, stat),
   },
+  cpu: (src, { invert }) => otsuApply(src, invert, otsuStat(src)),
   // f32 vs f64 luminance can move a pixel sitting on a bin edge into the neighbouring bin.
   tolerance: { abs: 0, rel: 0, outliers: 0.002 },
 });

@@ -157,6 +157,24 @@ Speed-up over one thread, medians of 3, `pnpm bench:threads` and `pnpm bench:thr
 - The bench now interleaves its rounds (every round runs every configuration, medians over rounds, the range is printed) and `onRender` reports where the time went (`bandedMs`: segments cut into bands, copies and waiting included; `inlineMs`: segments run on the calling thread), so the equalize chain can be taken apart. Until a run with it shows a stable picture, the shared variant stays, `threads` stays at 1 by default and `'auto'` is not the default.
 - Superlinear speed-ups (9× with 8 threads) are real: the one-thread baseline is slow on this machine. Bands run on one thread gain only 1.0–1.24× in the Linux container, so it is not just cache; allocation of the 192 MB intermediates (page faults) on Windows is the untested suspect.
 
+## Two-phase global filters (3 Nov)
+
+**Why.** The 24-core run showed the limit of "global steps run alone": a chain with equalize in the middle spent 8–9 s of 10–11 s in that one step, on one thread, whatever the number of workers (Amdahl). Equalize, clahe and otsu are the only global built-ins and all three are a histogram followed by a pixel map.
+
+**The model.** A filter keeps `reach: 'global'` (what an executor that knows nothing more reads) and adds `twoPhase: { stat, apply }`. `stat(rows, p, region)` returns a `Float64Array` of **counts** over the rows it is given; `apply(rows, p, stat, region)` maps those rows given the statistic of the *whole* image and reads no neighbour (reach 0). `cpu` is `apply(src, p, stat(src, p))` on the whole image, so the reference is the composition, not a second implementation.
+
+**Why counts.** The statistic of the image is the sum of the statistics of its bands, and a sum of whole numbers below 2^53 is exact in any order: the banded result is the whole-image result bit for bit, with no tolerance, and the executors need no filter-specific merge.
+
+**The plan.** `planSegments(steps, scale, { twoPhase: true })` closes the segment before a two-phase step: its bands end by computing the statistic of the rows they own (the final rows, after the halo is dropped: a partition of the image), and the step starts the next segment, where it is reached 0 and merges with its neighbours. A two-phase step with nothing banded before it (the start of the chain, or after a global step) gets an empty segment whose bands only compute the statistic. A chain `blur, equalize, sharpen` becomes: `[blur] → stat → [equalize.apply, sharpen]`, two barriers instead of an isolated step.
+
+**Region.** Tiles (clahe) come from the *full* image's size and a pixel's tile and blend weights from its row in the full image: `effectiveTiles(tiles, w, fullHeight)` and `y0 + y`. A band shorter than the tile grid is the case that breaks.
+
+**What it costs.** `apply` recomputes the OKLab of each pixel (the whole-image reference used to keep them in a 3-floats-per-pixel array, 288 MB at 12 MP); the statistic is an extra pass over the owned rows of the previous segment, in the same job.
+
+**Tests.** The synthetic filter in core (position-dependent statistic, every chain shape: start, middle, end, twice, around a global step, masked, disabled, scaled); in filters, every parameter case of the three on tiny and odd images with a band per row, every position in a chain, `cpu` equals `stat` + `apply`, a half-image statistic changes the picture, and the random chains of the existing suite now contain them. Mutations: local row in `stat` or in the blend, tiles from the band height in either phase.
+
+**Next.** The two executors (Node threads, web workers) hand the statistic between segments: bands return partial statistics with their rows, the coordinator adds them and sends the sum with the jobs of the next segment.
+
 ## Plan
 
 1. **Spike (a branch, thrown away).** Measure on this container: worker start-up with the filters bundle, `postMessage` clone of a 24 MB and a 192 MB buffer, `SharedArrayBuffer` throughput, and tiled-vs-whole for a pointwise chain and a blur chain with a hand-rolled pool. Decide go / no-go on the success numbers above before phase 1.

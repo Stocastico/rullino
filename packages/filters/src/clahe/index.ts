@@ -1,5 +1,5 @@
 import { defineFilter } from '@rullino/core';
-import { equalizeBuffers, equalizeCpu, equalizePasses } from '../equalization';
+import { equalizeApply, equalizeBuffers, equalizeCpu, equalizePasses, equalizeStat } from '../equalization';
 import { OKLAB_TOLERANCE } from '../shared';
 
 const MAX_TILES = 16;
@@ -25,7 +25,12 @@ export const clahe = defineFilter({
   buffers: equalizeBuffers(MAX_TILES),
   // Read through the global uniform: the shared helpers have no `p` in scope.
   passes: equalizePasses('params.tiles', 'params.clipLimit'),
-  reach: 'global', // needs the histogram of the whole image
+  reach: 'global', // needs the histogram of the whole image...
+  // ...which banded executors take as the sum of the histograms of the bands, then map every pixel.
+  twoPhase: {
+    stat: (src, { tiles }, region) => equalizeStat(src, tiles, region),
+    apply: (src, { tiles, clipLimit, amount }, stat, region) => equalizeApply(src, tiles, clipLimit, amount, stat, region),
+  },
   cpu: (src, { tiles, clipLimit, amount }) => equalizeCpu(src, tiles, clipLimit, amount),
   tolerance: OKLAB_TOLERANCE,
 });

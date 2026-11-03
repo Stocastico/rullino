@@ -1,5 +1,5 @@
 import { defineFilter } from '@rullino/core';
-import { equalizeBuffers, equalizeCpu, equalizePasses } from '../equalization';
+import { equalizeApply, equalizeBuffers, equalizeCpu, equalizePasses, equalizeStat } from '../equalization';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /**
@@ -19,7 +19,12 @@ export const equalize = defineFilter({
   },
   buffers: equalizeBuffers(1),
   passes: equalizePasses('1', '1e9'),
-  reach: 'global', // needs the histogram of the whole image
+  reach: 'global', // needs the histogram of the whole image...
+  // ...which banded executors take as the sum of the histograms of the bands, then map every pixel.
+  twoPhase: {
+    stat: (src, _p, region) => equalizeStat(src, 1, region),
+    apply: (src, { amount }, stat, region) => equalizeApply(src, 1, 1e9, amount, stat, region),
+  },
   cpu: (src, { amount }) => equalizeCpu(src, 1, 1e9, amount),
   tolerance: OKLAB_TOLERANCE,
 });

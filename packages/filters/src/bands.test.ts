@@ -179,6 +179,64 @@ describe('random chains', () => {
   }, SLOW);
 });
 
+describe('two-phase filters', () => {
+  const two = filters.filter((f): f is Filter & { kind: 'multipass' } => f.kind === 'multipass' && f.twoPhase !== undefined);
+  const blur = filters.find((f) => f.id === 'gaussianBlur')! as Filter;
+  const unsharp = filters.find((f) => f.id === 'unsharpMask')! as Filter;
+  const exposure = filters.find((f) => f.id === 'exposure')! as Filter;
+  // Tiles are limited by the FULL image's size and a tile is found from the full image's row: heights
+  // smaller than the number of tiles, and band counts down to a band per row, are where it shows.
+  const sizes: [number, number][] = [[23, 41], [7, 3], [5, 1], [31, 17]];
+  const imageOf = (w: number, h: number) => {
+    const rand = rng(w * 100 + h);
+    return createImage(w, h, Float32Array.from({ length: w * h * 4 }, (_, i) => (i % 4 === 3 ? (rand() < 0.1 ? 0 : 1) : rand())));
+  };
+
+  it.each(two.map((f) => [f.id, f] as const))('%s: banded equals whole in every parameter case, on tiny and odd images, down to a band per row', (_, f) => {
+    for (const [w, h] of sizes) {
+      const src = imageOf(w, h);
+      for (const [name, params] of parityCases(f.params)) {
+        const steps = [stepOf(f, params)];
+        const whole = runChainCpu(steps, src, { fast: true });
+        for (const bands of [2, 3, h, h + 2]) {
+          const diff = firstDifference(runChainBands(steps, src, { fast: true, bands, force: true }), whole);
+          expect(diff, `${f.id} ${name} on ${w}x${h}, ${bands} bands: ${diff}`).toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it.each(two.map((f) => [f.id, f] as const))('%s: in a chain, at the start, in the middle, at the end, twice, after itself', (_, f) => {
+    const src = imageOf(29, 37);
+    const chains: Step[][] = [
+      [stepOf(f, {}), stepOf(blur, { sigma: 2 })],
+      [stepOf(blur, { sigma: 2 }), stepOf(f, {}), stepOf(unsharp, {}), stepOf(exposure, { ev: 0.4 })],
+      [stepOf(exposure, { ev: -0.3 }), stepOf(blur, { sigma: 1.5 }), stepOf(f, {})],
+      [stepOf(f, {}), stepOf(f, {}), stepOf(blur, { sigma: 1 })],
+      [stepOf(blur, { sigma: 3 }), stepOf(f, {}), stepOf(exposure, { ev: 0.2 }), stepOf(f, {}), stepOf(unsharp, {})],
+      [stepOf(blur, { sigma: 1 }), stepOf(f, {}, { kind: 'radial', center: [0.4, 0.5], radius: [0.3, 0.3], feather: 0.5 }), stepOf(exposure, { ev: 0.1 })],
+    ];
+    for (const steps of chains) {
+      const whole = runChainCpu(steps, src, { fast: true });
+      for (const bands of [1, 2, 5, 11, 37]) {
+        const diff = firstDifference(runChainBands(steps, src, { fast: true, bands, force: true }), whole);
+        expect(diff, `${steps.map((s) => s.filter.id).join(' > ')}, ${bands} bands: ${diff}`).toBeUndefined();
+      }
+    }
+  });
+
+  it.each(two.map((f) => [f.id, f] as const))('%s: its cpu equals stat + apply on the whole image, and a statistic from the wrong half gives another picture', (_, f) => {
+    const src = imageOf(19, 23);
+    const params = { ...defaultParams(f.params) } as never;
+    const whole = { y0: 0, fullHeight: src.height };
+    const stat = f.twoPhase!.stat(src, params, whole);
+    expect(firstDifference(f.twoPhase!.apply(src, params, stat, whole), f.cpu(src, params))).toBeUndefined();
+    const top = createImage(src.width, 11, src.data.slice(0, 11 * src.width * 4));
+    const half = f.twoPhase!.stat(top, params, { y0: 0, fullHeight: src.height });
+    expect(firstDifference(f.twoPhase!.apply(src, params, half, whole), f.cpu(src, params)), `${f.id}: the statistic matters`).toBeDefined();
+  });
+});
+
 describe('reach declarations', () => {
   it('every multipass filter declares a reach, as a number of rows or global', () => {
     const missing = filters.filter((f) => f.kind === 'multipass' && f.reach === undefined).map((f) => f.id);
@@ -186,8 +244,12 @@ describe('reach declarations', () => {
   });
 
   it('lists the filters that are still global, so that making one banded changes this test', () => {
-    // Position-dependent ones wait for the frame argument; the others need the whole image.
-    const global = filters.filter((f) => f.kind === 'multipass' && f.reach === 'global').map((f) => f.id).sort();
-    expect(global).toEqual(['clahe', 'equalize', 'otsu']);
+    // Every built-in filter can be banded: the ones that need a statistic of the whole image do it in two phases.
+    const global = filters.filter((f) => f.kind === 'multipass' && f.reach === 'global' && !f.twoPhase).map((f) => f.id).sort();
+    expect(global).toEqual([]);
+    const twoPhase = filters.filter((f) => f.kind === 'multipass' && f.twoPhase).map((f) => f.id).sort();
+    expect(twoPhase).toEqual(['clahe', 'equalize', 'otsu']);
+    // They keep `reach: 'global'` for executors that do not know about two phases.
+    expect(filters.filter((f) => f.kind === 'multipass' && f.twoPhase).every((f) => f.kind === 'multipass' && f.reach === 'global')).toBe(true);
   });
 });

@@ -36,9 +36,16 @@ export function effectiveParams(step: Step, scale = 1): Record<string, unknown> 
  * and then the blend with the step's mask. `region` says that `img` is a band of a taller image
  * (see {@link RowRegion}): masks are then evaluated where the band sits in the full image.
  */
-export function runStepCpu(step: Step, img: LinearImage, options: ChainOptions = {}, region?: RowRegion): LinearImage {
+export function runStepCpu(step: Step, img: LinearImage, options: ChainOptions = {}, region?: RowRegion, stat?: Float64Array): LinearImage {
   if (step.mask) validateMask(step.mask);
   const params = effectiveParams(step, options.scale) as never;
+  if (stat) {
+    // The second phase of a two-phase filter, with the statistic of the whole image computed elsewhere.
+    const phase = step.filter.kind === 'multipass' ? step.filter.twoPhase : undefined;
+    if (!phase) throw new Error(`filter "${step.filter.id}" is not a two-phase filter`);
+    const mapped = phase.apply(img, params, stat, region);
+    return step.mask ? blendMasked(img, mapped, step.mask, region) : mapped;
+  }
   const run: (src: LinearImage, p: never, mask?: Float32Array, region?: RowRegion) => LinearImage = (options.fast && step.filter.fast) || step.filter.cpu;
   let out: LinearImage;
   if (step.filter.kind === 'multipass' && step.filter.usesMask) {
