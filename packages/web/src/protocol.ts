@@ -53,10 +53,14 @@ export interface BandJob {
    */
   readonly buffer: ArrayBuffer;
   readonly length: number;
+  /** The statistic of the whole image for the first step, a two-phase step (see `planSegments`). */
+  readonly stat?: Float64Array;
+  /** Also compute the statistic of the step at index `to` (the next one, two-phase) on the rows this band owns. */
+  readonly statFor?: boolean;
 }
 
 /** Band worker -> coordinator. */
-export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly buffer?: ArrayBuffer; readonly length?: number } | { readonly type: 'error'; readonly message: string };
+export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly buffer?: ArrayBuffer; readonly length?: number; readonly stat?: Float64Array } | { readonly type: 'error'; readonly message: string };
 
 /** Worker -> main thread: the result, or the error's message. */
 export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly bandedMs: number; readonly inlineMs: number } | { readonly id: number; readonly error: string };

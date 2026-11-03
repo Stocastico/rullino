@@ -1,5 +1,5 @@
 import { createImage, type LinearImage, type Lut, type Step } from '@rullino/core';
-import { planBands, planSegments, runStepCpu, type BandPlan } from '@rullino/core/internal';
+import { planBands, planSegments, runStepCpu, sumStats, twoPhaseStat, type BandPlan } from '@rullino/core/internal';
 import type { BandJob, BandReply, PoolOptions } from './protocol';
 
 // CPU rendering on a pool of band workers (docs/design/tiled-cpu.md), driven from the render worker:
@@ -111,7 +111,7 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
 
   /** One band on one worker; rejects if the worker reports an error or dies. */
   const call = (worker: Worker, job: BandJob, transfer: Transferable[]) =>
-    new Promise<{ buffer?: ArrayBuffer; length?: number }>((resolve, reject) => {
+    new Promise<{ buffer?: ArrayBuffer; length?: number; stat?: Float64Array }>((resolve, reject) => {
       const cleanup = () => {
         worker.onmessage = null;
         worker.onerror = null;
@@ -136,16 +136,20 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
     let bandedMs = 0;
     let inlineMs = 0;
     let pool_: Worker[] | undefined;
+    let stat: Float64Array | undefined; // the statistic for the first step of the next segment
     try {
-      for (const seg of planSegments(steps, scale)) {
+      for (const seg of planSegments(steps, scale, { twoPhase: true })) {
         const from = enabled;
         enabled += seg.steps.length;
+        const first = stat;
+        stat = undefined;
         const pixels = current.width * current.height;
         const worth = seg.halo !== 'global' && pixels >= (workers ? useAtPixels : createAtPixels);
         const bands: BandPlan[] = worth ? planBands(current.height, threads * 2, seg.halo as number, { force: pool.forceBands ?? false }) : [];
         const t0 = performance.now();
         if (bands.length <= 1) {
-          for (const s of seg.steps) current = runStepCpu(s, current, { scale, fast: true });
+          seg.steps.forEach((s, k) => (current = runStepCpu(s, current, { scale, fast: true }, undefined, k === 0 ? first : undefined)));
+          if (seg.statFor) stat = twoPhaseStat(seg.statFor, current, { y0: 0, fullHeight: current.height }, { scale });
           inlineMs += performance.now() - t0;
           continue;
         }
@@ -154,9 +158,11 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
         const rowLength = width * 4;
         const key = ++renders;
         const pending = [...bands];
+        const parts: Float64Array[] = [];
         bandJobs += bands.length;
-        const job = { type: 'band' as const, edit, luts, key, scale, from, to: enabled, width, height };
-        const out = createImage(width, height);
+        const job = { type: 'band' as const, edit, luts, key, scale, from, to: enabled, width, height, ...(first && { stat: first }), ...(seg.statFor && { statFor: true }) };
+        // A segment of no steps only makes a statistic: its rows are the input's, nothing to write back.
+        const out = seg.steps.length > 0 ? createImage(width, height) : undefined;
         const source = current.data;
         await Promise.all(
           pool_.map(async (worker) => {
@@ -165,12 +171,14 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
               const buffer = acquire(length * 4);
               new Float32Array(buffer, 0, length).set(source.subarray(band.from * rowLength, band.to * rowLength)); // a copy, transferred
               const result = await call(worker, { ...job, band, buffer, length }, [buffer]);
-              out.data.set(new Float32Array(result.buffer!, 0, result.length), band.y0 * rowLength);
+              if (out) out.data.set(new Float32Array(result.buffer!, 0, result.length), band.y0 * rowLength);
+              if (result.stat) parts.push(result.stat);
               release(result.buffer!);
             }
           }),
         );
-        current = out;
+        if (seg.statFor) stat = sumStats(parts);
+        if (out) current = out;
         bandedMs += performance.now() - t0;
       }
     } catch (e) {

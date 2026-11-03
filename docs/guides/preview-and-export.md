@@ -27,7 +27,7 @@ const renderer = await createRenderer({ threads: 4 });
 console.log(renderer.backend); // the threads only apply on the 'cpu' backend
 ```
 
-Previews at screen size are small and do not need it; a 12 MP export on four cores is about 3× faster for most chains (equalize, clahe and otsu need the whole image and run alone). `pnpm bench:threads:web` in the repository measures your machine. `threads: 'auto'` (the cores, at most 8) is also accepted, but the default stays 1 until it has been measured on more hardware.
+Previews at screen size are small and do not need it; a 12 MP export on four cores is about 3× faster for most chains (equalize, clahe and otsu need a histogram of the whole image: the bands count their rows first and map their pixels after). `pnpm bench:threads:web` in the repository measures your machine. `threads: 'auto'` (the cores, at most 8) is also accepted, but the default stays 1 until it has been measured on more hardware.
 
 ## 2. Describe the edit as data
 

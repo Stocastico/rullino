@@ -154,6 +154,7 @@ describe('createRenderer({ threads }) (browser)', () => {
     'pointwise only': { version: 2, steps: [{ filter: 'exposure', params: { ev: 0.5 } }, { filter: 'vignette', params: {} }] },
     'positional and neighbourhood': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 3 } }, { filter: 'grain', params: {} }, { filter: 'unsharpMask', params: {} }] },
     'a global step in the middle': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }, { filter: 'equalize', params: {} }, { filter: 'sharpen', params: {} }] },
+    'equalize, clahe and otsu, two phases': { version: 2, steps: [{ filter: 'equalize', params: { amount: 0.8 } }, { filter: 'clahe', params: { tiles: 5 } }, { filter: 'exposure', params: { ev: 0.2 } }, { filter: 'otsu', params: {} }] },
     'geometry and long side': { version: 2, geometry: { rotate: 0, flipH: false, flipV: false, straighten: 5, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } }, steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }], output: { format: 'png', longSide: 40 } },
   };
   const src = chart(53, 61);
