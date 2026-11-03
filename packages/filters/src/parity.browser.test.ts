@@ -20,5 +20,6 @@ describe.each(filters.map((f) => [f.id, f as Filter] as const))('%s GPU <-> CPU 
     const out = await readImage(ctx, runFilter(ctx, f, uploadImage(ctx, src), full, mask));
     const result = compareImages(out, mask ? f.cpu(src, full, maskImage(mask, src.width, src.height)) : f.cpu(src, full), (!software && f.hardwareTolerance) || f.tolerance);
     expect(result.pass, `${result.outliers} channels out of tolerance, worst ${JSON.stringify(result.worst)}`).toBe(true);
-  });
+    // The CPU reference of bilateral at sigmaSpace 20 takes ~15 s on a loaded CI runner (coverage on): the default 15 s timeout was the limit.
+  }, 120_000);
 });

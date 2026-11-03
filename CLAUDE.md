@@ -333,5 +333,6 @@ Things that already bit us. Add new ones as they come up.
 - **Photon 0.3.3's noise functions (`add_noise_rand`, `pink_noise`) trap in WASM** ("unreachable", random source unavailable), and the trap leaves the image borrowed ("attempted to take ownership of Rust value while it was borrowed" on `free()`): the bench skips Photon's grain.
 - **wasm-vips: `extractBand` makes a 'multiband' image**, from which colour operations (sharpen's LabS round trip, `colourspace`) have no route: set `interpretation: srgb` with `copy()` first. **pixi-filters' `ConvolutionFilter` `width` / `height` are the image's** (texel size), not the kernel's: 1 × 1 gave a garbage picture (\|Δ\| 118).
 - **`performance.measureUserAgentSpecificMemory` throws in headless Chromium** even when cross-origin isolated: catch it and fall back to `performance.memory` (JS heap only, coarse).
+- **The bilateral parity case `sigmaSpace=20` runs the slow CPU reference (~15 s with coverage on a loaded runner)**: with Vitest's 15 s default it timed out in two CI runs in a row (once the suite grew), the parity cases now have a 120 s timeout. A test that is slow by nature gets a timeout, not a skip.
 - **An e2e check on a two-stage effect must wait for both effects** (lens blur: background blurred *and* the picked focus applied); the first stage alone already satisfies half of the condition.
 
