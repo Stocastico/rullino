@@ -47,11 +47,33 @@ describe('createThreadedExecutor', () => {
     same(out.image, whole(edit, src));
   });
 
-  it('runs the segments around a global step on the pool and the global step alone', async () => {
-    const mixed = doc(['gaussianBlur', { sigma: 2 }], ['equalize'], ['sharpen']);
-    const out = await run(make(2, FORCE), mixed, src, 0.5);
-    same(out.image, whole(mixed, src, 0.5));
-    expect(out.bands).toBeGreaterThan(2); // the blur and the sharpen, each in bands
+  it('runs equalize, clahe and otsu in two phases: the bands count their rows, the counts are added, the bands map their pixels', async () => {
+    const mask = { kind: 'radial', center: [0.4, 0.5], radius: [0.3, 0.3], feather: 0.5 };
+    const chains: Record<string, ReturnType<typeof doc>> = {
+      'blur, equalize, sharpen': doc(['gaussianBlur', { sigma: 2 }], ['equalize'], ['sharpen']),
+      'equalize alone': doc(['equalize']),
+      'clahe alone': doc(['clahe', { tiles: 6 }]),
+      'otsu alone': doc(['otsu']),
+      'three in a row': doc(['equalize', { amount: 0.7 }], ['clahe'], ['otsu'], ['exposure', { ev: 0.3 }]),
+      'masked': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 1.5 } }, { filter: 'clahe', params: {}, mask }, { filter: 'exposure', params: { ev: -0.2 } }] } as never,
+    };
+    for (const [name, edit] of Object.entries(chains))
+      for (const [scale, image] of [[1, src], [0.5, picture(33, 9)]] as const) {
+        const out = await run(make(2, FORCE), edit, image, scale);
+        same(out.image, whole(edit, image, scale));
+        expect(out.bands, `${name}: in bands`).toBeGreaterThan(1);
+        expect(out.inlineMs, `${name}: nothing left on the calling thread`).toBe(0);
+      }
+  });
+
+  it('a segment kept on the calling thread (its halo is as tall as the image) hands its statistic to the banded segment after it', async () => {
+    // Without forceBands a blur this wide leaves one band, so it runs inline; equalize has no halo and is cut into bands.
+    const mixed = doc(['gaussianBlur', { sigma: 14 }], ['equalize'], ['exposure', { ev: 0.1 }]);
+    const wide = picture(120, 30);
+    const out = await run(make(3, { createAtPixels: 0, useAtPixels: 0 }), mixed, wide);
+    same(out.image, whole(mixed, wide));
+    expect(out.bands).toBeGreaterThan(1);
+    expect(out.inlineMs).toBeGreaterThan(0);
   });
 
   it('stays on the calling thread below the thresholds, and a pool that exists is used from useAtPixels', async () => {

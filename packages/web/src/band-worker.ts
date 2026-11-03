@@ -1,6 +1,6 @@
 // A band worker of the CPU renderer (see threads.ts): runs one band of a segment of a chain.
 import { activeSteps, createImage, parseChain, type Step } from '@rullino/core';
-import { runChainBandRows } from '@rullino/core/internal';
+import { runChainBandRows, twoPhaseStat } from '@rullino/core/internal';
 import { filters } from '@rullino/filters';
 import type { BandJob, BandReply } from './protocol';
 
@@ -24,12 +24,14 @@ scope.onmessage = ({ data: job }) => {
     const options = { scale: job.scale, fast: true };
     const buffer = job.buffer;
     const rows = createImage(width, band.to - band.from, new Float32Array(buffer, 0, job.length));
-    const out = runChainBandRows(steps, rows, band, height, options);
+    const out = runChainBandRows(steps, rows, band, height, options, { ...(job.stat && { stat: job.stat }) });
+    // The statistic of the next (two-phase) step over the rows this band owns, which are `out`.
+    const stat = job.statFor ? twoPhaseStat(cached.steps[job.to]!, out, { y0: band.y0, fullHeight: height }, options) : undefined;
     // The owned rows are never more than the rows given: write them over the start of the buffer and
     // send it back (the coordinator reuses it for another band). `set` copes with overlapping views.
     const length = (band.y1 - band.y0) * width * 4;
     new Float32Array(buffer, 0, length).set(out.data);
-    scope.postMessage({ type: 'done', buffer, length }, [buffer]);
+    scope.postMessage({ type: 'done', buffer, length, ...(stat && { stat }) }, [buffer]);
   } catch (e) {
     scope.postMessage({ type: 'error', message: e instanceof Error ? e.message : String(e) });
   }

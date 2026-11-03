@@ -41,7 +41,7 @@ import { createRenderer } from '@rullino/node';
 export const renderer = await createRenderer({ threads: 4 }); // default 1; 'auto' is the cores, at most 8
 ```
 
-On 4 cores a 12 MP blur + unsharp goes from 5.8 s to 1.5 s. Images below about 2 MP and steps that need the whole image (equalize, clahe, otsu) stay on the calling thread. Create the renderer once and call `destroy()` when the process is done with it: it stops the threads and frees the shared buffers it keeps between renders.
+On 4 cores a 12 MP blur + unsharp goes from 5.8 s to 1.5 s. Images below about 2 MP stay on the calling thread; equalize, clahe and otsu run in two phases (the bands count their rows, then map their pixels). Create the renderer once and call `destroy()` when the process is done with it: it stops the threads and frees the shared buffers it keeps between renders.
 
 ## 3. Serve it
 
