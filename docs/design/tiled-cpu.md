@@ -137,6 +137,24 @@ The first render of a renderer also starts the pool (+0.7-1 s here: workers, the
 - The same limits as the Node executor: global steps run alone (the equalize chain gains 1.3×), the pool starts from 2 MP (then from 0.5 MP), 1 MP images are unchanged; a 4-core container, not a laptop or a phone; the 2-thread rows are noisy (the host shares its cores).
 - A pool that cannot start rejects the render with a message naming the file; where the browser has no nested workers it stays on one thread.
 
+## Real hardware, 3 Nov (24 logical cores, Windows, Chrome / Node 22, 12 MP)
+
+Speed-up over one thread, medians of 3, `pnpm bench:threads` and `pnpm bench:threads:web` (the first version of the web bench, which ran the configurations one after the other).
+
+| Chain | Node 4 | 8 | 16 | Chromium 4 (copy) | 8 | 16 |
+|---|---|---|---|---|---|---|
+| exposure + curves | 3.3× | 5.0× | 3.4× | 1.7× | 2.6× | 5.1× |
+| blur + unsharp | 6.2× | 9.0× | 4.7× | 1.6× | 2.7× | 4.9× |
+| levels + vignette + grain | 3.3× | 4.8× | 2.9× | 1.8× | 3.1× | 6.5× |
+| look | 3.5× | 4.5× | 3.2× | 2.1× | 3.7× | 7.6× |
+| blur + equalize + sharpen | 1.6× | 1.7× | **0.6×** | **0.48×** | 1.1× | 1.3× |
+| kuwahara + sharpen | 4.1× | 5.0× | 4.0× | 2.4× | 5.7× | 8.4× |
+
+- Node peaks at 8 threads and loses at 16 (the global-step chain falls to 0.6×, slower than one thread): the `'auto'` cap of 8 is the right one for Node. Chromium keeps scaling to 16.
+- **Copy against shared memory is not settled.** Two Chromium runs on this machine contradict each other: the first had copy ahead (4 workers: 2.4–8.3× against 1.7–4.4×), the second had shared ahead at 4–8 workers (2.6–4.2× against 1.7–2.4×) and copy ahead at 16. In both, the chain with equalize in the middle ran **twice as slow as one thread** (0.44–0.50×) in two neighbouring configurations, in the shared one the first time and in the copy one the second. That points to drift in the machine or to memory pressure (a 12 MP chain with a global step holds several 192 MB arrays at once), not to a transport; the sequential bench could not tell. The Linux container never showed it (1.1–1.3×).
+- The bench now interleaves its rounds (every round runs every configuration, medians over rounds, the range is printed) and `onRender` reports where the time went (`bandedMs`: segments cut into bands, copies and waiting included; `inlineMs`: segments run on the calling thread), so the equalize chain can be taken apart. Until a run with it shows a stable picture, the shared variant stays, `threads` stays at 1 by default and `'auto'` is not the default.
+- Superlinear speed-ups (9× with 8 threads) are real: the one-thread baseline is slow on this machine. Bands run on one thread gain only 1.0–1.24× in the Linux container, so it is not just cache; allocation of the 192 MB intermediates (page faults) on Windows is the untested suspect.
+
 ## Plan
 
 1. **Spike (a branch, thrown away).** Measure on this container: worker start-up with the filters bundle, `postMessage` clone of a 24 MB and a 192 MB buffer, `SharedArrayBuffer` throughput, and tiled-vs-whole for a pointwise chain and a blur chain with a hand-rolled pool. Decide go / no-go on the success numbers above before phase 1.

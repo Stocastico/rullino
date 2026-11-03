@@ -31,7 +31,7 @@ export interface PoolOptions {
   /** Where the band worker script is; default: next to this one. */
   readonly workerUrl?: string | URL;
   /** Called with the number of band jobs each render ran (0 when it stayed in one thread). */
-  readonly onRender?: (info: { readonly bands: number; readonly shared: boolean }) => void;
+  readonly onRender?: (info: { readonly bands: number; readonly shared: boolean; readonly bandedMs: number; readonly inlineMs: number }) => void;
 }
 
 /** Coordinator -> band worker: one band of one segment. */
@@ -58,4 +58,4 @@ export interface BandJob {
 export type BandReply = { readonly type: 'ready' } | { readonly type: 'done'; readonly rows?: Float32Array } | { readonly type: 'error'; readonly message: string };
 
 /** Worker -> main thread: the result, or the error's message. */
-export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly shared: boolean } | { readonly id: number; readonly error: string };
+export type RenderResponse = { readonly id: number; readonly image: ImageMessage; readonly bands: number; readonly shared: boolean; readonly bandedMs: number; readonly inlineMs: number } | { readonly id: number; readonly error: string };

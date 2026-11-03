@@ -38,31 +38,51 @@ function image(): LinearImage {
 }
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[a.length >> 1]!;
 
-const rows: string[] = [];
+// Sweeps are interleaved: every round runs every configuration on every chain, one after the other, and
+// the table shows the median over the rounds. A run of one configuration after another let drift (other
+// load, memory, thermal) pose as a difference between configurations.
+interface Config { readonly label: string; readonly threads: number; readonly shared: boolean }
+const configs: Config[] = [
+  ...COUNTS.map((n) => ({ label: `${n} thread${n > 1 ? 's' : ''}`, threads: n, shared: false })),
+  ...COUNTS.filter((n) => n > 1).map((n) => ({ label: `${n} threads, shared`, threads: n, shared: true })),
+];
+const out: string[] = [];
 afterAll(() =>
   commands.writeFile(
     'packages/web/bench/results.txt',
-    `${W}x${H} on the CPU in Chromium (crossOriginIsolated ${String(crossOriginIsolated)}, ${navigator.hardwareConcurrency} cores), median of ${RUNS}; first render, which starts the pool, in brackets\n${rows.join('\n')}\n`,
+    `${W}x${H} on the CPU in Chromium (crossOriginIsolated ${String(crossOriginIsolated)}, ${navigator.hardwareConcurrency} cores), median of ${RUNS} interleaved rounds (a fresh renderer per round and configuration, warmed up first)\nms = median; speed-up over 1 thread; banded / inline = milliseconds in segments cut into bands (copies and waiting included) and in segments run on the calling thread\n${out.join('\n')}\n`,
   ),
 );
 
-it('renders the PLAN chains with 1, 2, 4 band workers, by copy and in shared memory', { timeout: 3_600_000 }, async () => {
+it('renders the PLAN chains with 1, 2, 4... band workers, by copy and in shared memory', { timeout: 7_200_000 }, async () => {
   const src = image();
-  const base: Record<string, number> = {};
-  for (const [label, threads, shared] of [...COUNTS.map((n) => [`${n} thread${n > 1 ? 's' : ''}`, n, false] as const), ...COUNTS.filter((n) => n > 1).map((n) => [`${n} threads, shared`, n, true] as const)]) {
-    const r = await createRenderer({ backend: 'cpu', threads, pool: { shared } });
-    for (const [name, edit] of Object.entries(chains)) {
-      if (!name.includes(ONLY)) continue;
-      const times: number[] = [];
-      for (let i = 0; i <= RUNS; i++) {
+  const names = Object.keys(chains).filter((n) => n.includes(ONLY));
+  type Sample = { ms: number; banded: number; inline: number };
+  const samples = new Map<string, Sample[]>();
+  const key = (c: Config, chain: string) => `${c.label}|${chain}`;
+  for (let round = 0; round < RUNS; round++) {
+    for (const c of configs) {
+      let last = { bandedMs: 0, inlineMs: 0 };
+      const r = await createRenderer({ backend: 'cpu', threads: c.threads, pool: { shared: c.shared, onRender: (i) => (last = i) } });
+      await r.apply(src, chains[names[0]!]!); // starts the pool and warms the code up; not measured
+      for (const name of names) {
         const t = performance.now();
-        await r.apply(src, edit);
-        times.push(performance.now() - t);
+        await r.apply(src, chains[name]);
+        const ms = performance.now() - t;
+        (samples.get(key(c, name)) ?? samples.set(key(c, name), []).get(key(c, name))!).push({ ms, banded: last.bandedMs, inline: last.inlineMs });
       }
-      const med = median(times.slice(1));
-      if (threads === 1) base[name] = med;
-      rows.push(`${label.padEnd(18)} ${name.padEnd(28)} ${med.toFixed(0).padStart(7)} ms ${base[name] ? `(${(base[name]! / med).toFixed(2)}x)` : ''} [${times[0]!.toFixed(0)}]`);
+      r.destroy();
     }
-    r.destroy();
+  }
+  const median = (a: number[]) => [...a].sort((x, y) => x - y)[a.length >> 1]!;
+  for (const name of names) {
+    const base = median(samples.get(key(configs[0]!, name))!.map((s) => s.ms));
+    out.push(`${name}`);
+    for (const c of configs) {
+      const all = samples.get(key(c, name))!;
+      const ms = median(all.map((s) => s.ms));
+      const spread = `${Math.min(...all.map((s) => s.ms)).toFixed(0)}-${Math.max(...all.map((s) => s.ms)).toFixed(0)}`;
+      out.push(`  ${c.label.padEnd(18)} ${ms.toFixed(0).padStart(7)} ms (${(base / ms).toFixed(2)}x)  range ${spread.padEnd(11)} banded ${median(all.map((s) => s.banded)).toFixed(0).padStart(6)}  inline ${median(all.map((s) => s.inline)).toFixed(0).padStart(6)}`);
+    }
   }
 });
