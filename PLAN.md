@@ -195,7 +195,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 **Where we are (29 Oct, end of day; published: 0.5.0 of all seven packages).** Next, in this order:
 1. ~~**Node batch example**~~ (`examples/node-batch`, done 29 Oct): one file that renders an edit document onto a folder of photos with `@rullino/node`; `pnpm test:pack` runs it against the tarballs and checks the files and their size.
 2. ~~**Status line in plain words**~~ (done 29 Oct): the playground says "On the GPU (WebGPU) · River 2048×1365 · 3 steps · 370 ms", or "On the CPU (WebGPU unavailable: …)" (`status-text.ts`).
-3. ~~**Worker fallback example**~~ (`examples/worker-fallback`, done 29 Oct) and **Next.js server render example** (the remaining one-file example except Fabric).
+3. ~~**Worker fallback example**~~ (`examples/worker-fallback`, done 29 Oct) and ~~**Next.js server render example**~~ (`examples/nextjs-server-render`, done 3 Nov; Fabric is the one left).
 4. ~~Docs by job~~ (four guides, done 29 Oct) and ~~the migration notes~~ (30 Oct). Phase 2 is then only the optional adapters and examples below.
 5. Fabric only if Konva gets interest (watch npm downloads / issues of `@rullino/konva`).
 

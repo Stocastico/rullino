@@ -5,11 +5,13 @@
 //   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one,
 //   4. builds examples/konva-editor against them and moves its exposure slider,
 //   5. runs examples/node-batch on a folder of photos and checks the files it writes,
-//   6. builds examples/worker-fallback and drives it on the CPU worker backend.
+//   6. builds examples/worker-fallback and drives it on the CPU worker backend,
+//   7. builds examples/nextjs-server-render with Next.js, starts it and drives preview + server render in Chromium.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { copyFileSync, existsSync, mkdirSync, statSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, statSync, readFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { chromium } from 'playwright';
@@ -275,6 +277,63 @@ window.__result = result;
       console.log(`pack-smoke: worker-fallback example ${JSON.stringify(shown)}`);
     } finally {
       await fallbackServer.close();
+    }
+
+    // 7. examples/nextjs-server-render: `next build` against the tarballs (no webgpu: the route renders on the CPU),
+    // `next start`, then the page previews, the button renders on the server and the result has the document's size.
+    const next = join(work, 'nextjs');
+    cpSync(join(repo, 'examples/nextjs-server-render'), next, { recursive: true });
+    const nextPkg = JSON.parse(readFileSync(join(next, 'package.json'), 'utf8'));
+    delete nextPkg.dependencies.webgpu;
+    for (const n of PACKAGES) nextPkg.dependencies[`@rullino/${n}`] = `file:../tarballs/rullino-${n}-${version}.tgz`;
+    nextPkg.dependencies.sharp = '0.35.5';
+    writeFileSync(join(next, 'package.json'), JSON.stringify(nextPkg));
+    run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], next);
+    const nextBin = join(next, 'node_modules/next/dist/bin/next');
+    run('node', [nextBin, 'build'], next);
+    const port = await new Promise((resolve) => {
+      const probe = createServer().listen(0, () => {
+        const { port } = probe.address();
+        probe.close(() => resolve(port));
+      });
+    });
+    const nextServer = spawn('node', [nextBin, 'start', '-p', String(port)], { cwd: next, stdio: ['ignore', 'ignore', 'inherit'] });
+    try {
+      const url = `http://localhost:${port}/`;
+      for (let i = 0; ; i++) {
+        try { await fetch(url); break; } catch (e) { if (i > 100) throw e; await new Promise((r) => setTimeout(r, 200)); }
+      }
+      await page.goto(url);
+      await page.waitForFunction(() => window.example?.previews > 0, null, { timeout: 60000 });
+      const shown = await page.evaluate(async () => {
+        const red = () => document.querySelector('canvas').getContext('2d').getImageData(320, 240, 1, 1).data[0];
+        const wait = async (ok) => { for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 100)); };
+        const before = red();
+        const ev = document.querySelector('[name=ev]');
+        // React tracks the value through the native setter: assigning .value alone would not fire onChange.
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(ev, '1.5');
+        ev.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(() => red() > before + 20);
+        const after = red();
+        document.querySelector('button').click();
+        await wait(() => document.querySelector('#result')?.naturalWidth || document.querySelector('#error'));
+        const result = document.querySelector('#result');
+        // The server applied the same edit: scaled to the preview's size, its picture is about as bright as the preview.
+        const mean = (ctx) => { const d = ctx.getImageData(0, 0, 640, 480).data; let t = 0; for (let i = 0; i < d.length; i += 4) t += d[i]; return t / (d.length / 4); };
+        let served = -1;
+        if (result?.naturalWidth) {
+          const c = Object.assign(document.createElement('canvas'), { width: 640, height: 480 });
+          c.getContext('2d').drawImage(result, 0, 0, 640, 480);
+          served = Math.round(mean(c.getContext('2d')));
+        }
+        const previewMean = Math.round(mean(document.querySelector('canvas').getContext('2d')));
+        return { before, after, served, previewMean, width: result?.naturalWidth, height: result?.naturalHeight, server: document.querySelector('#server-status')?.textContent, error: document.querySelector('#error')?.textContent };
+      });
+      check(shown.after > shown.before + 20, `nextjs example: the preview did not change: ${JSON.stringify(shown)}`);
+      check(Math.abs(shown.served - shown.previewMean) < 8 && shown.width === 1600 && shown.height === 1200 && /Server: (gpu|cpu)/.test(shown.server ?? ''), `nextjs example: server render: ${JSON.stringify(shown)}`);
+      console.log(`pack-smoke: nextjs example ${JSON.stringify(shown)}`);
+    } finally {
+      nextServer.kill();
     }
   } finally {
     await browser.close();
