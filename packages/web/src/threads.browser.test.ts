@@ -80,6 +80,40 @@ describe('createThreadedExecutor', () => {
     same(rb.image, whole(doc(['sharpen']), b));
   });
 
+  it('reuses the band buffers: after the first bands, nothing new is allocated for the copies', async () => {
+    // Every buffer sent to a band worker, and every buffer that came back: a sent buffer that never came
+    // back is a fresh allocation (the copies are what pressed the garbage collector at 12 MP).
+    const sent: ArrayBuffer[] = [];
+    const received = new Set<ArrayBuffer>();
+    const NativeWorker = Worker;
+    const post = NativeWorker.prototype.postMessage;
+    NativeWorker.prototype.postMessage = function (this: Worker, message: unknown, ...rest: unknown[]) {
+      const buffer = (message as { type?: string; buffer?: ArrayBuffer }).type === 'band' ? (message as { buffer?: ArrayBuffer }).buffer : undefined;
+      if (buffer) sent.push(buffer);
+      return (post as (...a: unknown[]) => void).call(this, message, ...rest);
+    };
+    const listen = NativeWorker.prototype.addEventListener;
+    try {
+      globalThis.Worker = class extends NativeWorker {
+        constructor(...a: ConstructorParameters<typeof Worker>) {
+          super(...a);
+          listen.call(this, 'message', (e: Event) => {
+            const buffer = (e as MessageEvent<{ buffer?: ArrayBuffer }>).data.buffer;
+            if (buffer) received.add(buffer);
+          });
+        }
+      } as typeof Worker;
+      const e = make(2, FORCE);
+      for (let i = 0; i < 3; i++) same((await run(e, edit, src)).image, whole(edit, src));
+    } finally {
+      globalThis.Worker = NativeWorker;
+      NativeWorker.prototype.postMessage = post;
+    }
+    const fresh = sent.filter((b) => !received.has(b)).length;
+    expect(sent.length, 'bands were sent').toBeGreaterThan(8);
+    expect(fresh, `${fresh} of ${sent.length} sent buffers were new`).toBeLessThanOrEqual(4);
+  });
+
   it('reports a worker that cannot be loaded, and tries again on the next render', async () => {
     const e = make(2, { ...FORCE, workerUrl: new URL('./nothing-here.js', import.meta.url) });
     for (let i = 0; i < 2; i++) await expect(run(e, edit, src)).rejects.toThrow(/could not start the band workers/);

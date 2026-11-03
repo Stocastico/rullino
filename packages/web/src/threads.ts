@@ -98,16 +98,30 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
     return starting;
   };
 
+  // Buffers for the copied bands, kept for the next band, segment and render: copying every band into a new
+  // buffer and getting a new one back was ~400 MB of garbage per segment at 12 MP, and the garbage collector
+  // then ran in the middle of the next step. A buffer travels to a worker, is written over there and comes back.
+  const free: ArrayBuffer[] = [];
+  const acquire = (bytes: number) => {
+    let best = -1;
+    for (let i = 0; i < free.length; i++) if (free[i]!.byteLength >= bytes && (best < 0 || free[i]!.byteLength < free[best]!.byteLength)) best = i;
+    return best >= 0 ? free.splice(best, 1)[0]! : new ArrayBuffer(bytes);
+  };
+  const release = (buffer: ArrayBuffer) => {
+    free.push(buffer);
+    while (free.length > threads * 2 + 2) free.shift();
+  };
+
   /** One band on one worker; rejects if the worker reports an error or dies. */
   const call = (worker: Worker, job: BandJob, transfer: Transferable[]) =>
-    new Promise<Float32Array | undefined>((resolve, reject) => {
+    new Promise<{ buffer?: ArrayBuffer; length?: number }>((resolve, reject) => {
       const cleanup = () => {
         worker.onmessage = null;
         worker.onerror = null;
       };
       worker.onmessage = ({ data }: MessageEvent<BandReply>) => {
         cleanup();
-        if (data.type === 'done') resolve(data.rows);
+        if (data.type === 'done') resolve(data);
         else reject(new Error(data.type === 'error' ? data.message : 'unexpected reply from a band worker'));
       };
       worker.onerror = (event) => {
@@ -165,9 +179,12 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
           await Promise.all(
             pool_.map(async (worker) => {
               for (let band = pending.shift(); band; band = pending.shift()) {
-                const rows = source.slice(band.from * rowLength, band.to * rowLength); // a copy, transferred
-                const result = await call(worker, { ...job, band, rows }, [rows.buffer]);
-                out.data.set(result!, band.y0 * rowLength);
+                const length = (band.to - band.from) * rowLength;
+                const buffer = acquire(length * 4);
+                new Float32Array(buffer, 0, length).set(source.subarray(band.from * rowLength, band.to * rowLength)); // a copy, transferred
+                const result = await call(worker, { ...job, band, buffer, length }, [buffer]);
+                out.data.set(new Float32Array(result.buffer!, 0, result.length), band.y0 * rowLength);
+                release(result.buffer!);
               }
             }),
           );
@@ -191,6 +208,7 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
     destroy() {
       destroyed = true;
       stop();
+      free.length = 0;
     },
   };
 }

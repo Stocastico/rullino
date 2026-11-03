@@ -29,10 +29,14 @@ scope.onmessage = ({ data: job }) => {
       new Float32Array(job.dst, band.y0 * width * 16, (band.y1 - band.y0) * width * 4).set(out.data);
       scope.postMessage({ type: 'done' });
     } else {
-      const out = runChainBandRows(steps, createImage(width, band.to - band.from, job.rows!), band, height, options);
-      // The result may be a view into a larger buffer (rows dropped after the last step): send just its rows.
-      const data = out.data.byteLength === out.data.buffer.byteLength ? out.data : out.data.slice();
-      scope.postMessage({ type: 'done', rows: data }, [data.buffer]);
+      const buffer = job.buffer!;
+      const rows = createImage(width, band.to - band.from, new Float32Array(buffer, 0, job.length));
+      const out = runChainBandRows(steps, rows, band, height, options);
+      // The owned rows are never more than the rows given: write them over the start of the buffer and
+      // send it back (the coordinator reuses it for another band). `set` copes with overlapping views.
+      const length = (band.y1 - band.y0) * width * 4;
+      new Float32Array(buffer, 0, length).set(out.data);
+      scope.postMessage({ type: 'done', buffer, length }, [buffer]);
     }
   } catch (e) {
     scope.postMessage({ type: 'error', message: e instanceof Error ? e.message : String(e) });
