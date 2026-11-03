@@ -95,7 +95,7 @@ function workerBackend(threads: number, pool: PoolOptions | undefined) {
       pending.delete(data.id);
       if ('error' in data) p?.reject(new Error(data.error));
       else {
-        pool?.onRender?.({ bands: data.bands, shared: data.shared });
+        pool?.onRender?.({ bands: data.bands, shared: data.shared, bandedMs: data.bandedMs, inlineMs: data.inlineMs });
         p?.resolve(data.image);
       }
     };

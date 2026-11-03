@@ -17,12 +17,22 @@ export function resolveThreads(option: number | 'auto' | undefined, cores = (glo
   return Math.min(option, 64);
 }
 
+/** What a render did: the bands it ran and where its time went (diagnostics). */
+export interface ThreadedResult {
+  readonly image: LinearImage;
+  readonly bands: number;
+  readonly shared: boolean;
+  /** Milliseconds spent in segments cut into bands (copies and waiting for the workers included) and in segments run on the calling thread. */
+  readonly bandedMs: number;
+  readonly inlineMs: number;
+}
+
 export interface ThreadedExecutor {
   /**
    * Runs `steps` (parsed from `edit`) on `image` like `runChainCpu(steps, image, { scale, fast: true })`
    * does, bands on workers where the chain allows. Renders are queued, one at a time.
    */
-  run(edit: unknown, luts: Readonly<Record<string, Lut>>, steps: readonly Step[], image: LinearImage, scale: number): Promise<{ readonly image: LinearImage; readonly bands: number; readonly shared: boolean }>;
+  run(edit: unknown, luts: Readonly<Record<string, Lut>>, steps: readonly Step[], image: LinearImage, scale: number): Promise<ThreadedResult>;
   /** Stops the workers; a render in progress fails. */
   destroy(): void;
 }
@@ -112,6 +122,8 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
     let current = image;
     let enabled = 0; // steps handled so far, counted among the enabled ones
     let bandJobs = 0;
+    let bandedMs = 0;
+    let inlineMs = 0;
     let usedShared = false;
     let pool_: Worker[] | undefined;
     try {
@@ -121,8 +133,10 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
         const pixels = current.width * current.height;
         const worth = seg.halo !== 'global' && pixels >= (workers ? useAtPixels : createAtPixels);
         const bands: BandPlan[] = worth ? planBands(current.height, threads * 2, seg.halo as number, { force: pool.forceBands ?? false }) : [];
+        const t0 = performance.now();
         if (bands.length <= 1) {
           for (const s of seg.steps) current = runStepCpu(s, current, { scale, fast: true });
+          inlineMs += performance.now() - t0;
           continue;
         }
         pool_ ??= await start();
@@ -159,12 +173,13 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
           );
         }
         current = out;
+        bandedMs += performance.now() - t0;
       }
     } catch (e) {
       stop(); // a worker that failed may be half way through a band: start afresh next time
       throw e;
     }
-    return { image: current, bands: bandJobs, shared: usedShared };
+    return { image: current, bands: bandJobs, shared: usedShared, bandedMs, inlineMs };
   };
 
   return {
