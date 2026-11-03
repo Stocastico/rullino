@@ -16,7 +16,7 @@
     "@rullino/filters": "workspace:*",
     "@rullino/ml": "workspace:*",
     "@rullino/presets": "workspace:*",
-    "onnxruntime-web": "1.30.0"
+    "onnxruntime-web": "1.31.1"
   },
   "devDependencies": {
     "@rullino/node": "workspace:*",
