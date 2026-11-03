@@ -121,9 +121,9 @@ The first render of a renderer also starts the pool (+0.7-1 s here: workers, the
 
 ## Phase 3 results (31 Oct)
 
-`createRenderer({ threads })` in `@rullino/web`: the render worker is the coordinator (it runs `applyEdit` with the `cpu` hook), plans the segments and bands like the Node executor and sends each band to a nested module worker (`band-worker`). Bands travel by **copy** (the band's input rows, halo included, are copied and transferred, the result rows come back transferred). A **shared** variant (`SharedArrayBuffer`s, COOP/COEP) was built, measured and then removed (see below). Measured with `pnpm bench:threads:web` (headless Chromium on the 4-core container, 12 MP, `renderer.apply`, median of 2; speed-up over 1 thread):
+`createRenderer({ threads })` in `@rullino/web`: the render worker is the coordinator (it runs `applyEdit` with the `cpu` hook), plans the segments and bands like the Node executor and sends each band to a nested module worker (`band-worker`). Two transports: **copy** (default; the band's input rows, halo included, are copied and transferred, the result rows come back transferred) and **shared** (`pool.shared`, needs COOP/COEP: the source is copied once into a `SharedArrayBuffer` and bands write into a shared output). Measured with `pnpm bench:threads:web` (headless Chromium on the 4-core container, 12 MP, `renderer.apply`, median of 2; speed-up over 1 thread):
 
-| Chain | 1 thread | 2 | 4 | 4, shared (removed) |
+| Chain | 1 thread | 2 | 4 | 4, shared |
 |---|---|---|---|---|
 | exposure + curves | 3640 ms | 1914 (1.90×) | 923 (3.95×) | 1011 (3.60×) |
 | blur + unsharp | 6908 | 3329 (2.08×) | 1946 (3.55×) | 1982 (3.49×) |
@@ -132,7 +132,7 @@ The first render of a renderer also starts the pool (+0.7-1 s here: workers, the
 | blur + equalize + sharpen | 6428 | 5555 (1.16×) | 4851 (1.33×) | 5923 (1.09×) |
 | kuwahara r4 + sharpen | 14888 | 10278 (1.45×) | 5842 (2.55×) | 6339 (2.35×) |
 
-- **Copy won and shared was removed (3 Nov).** The prediction of the spike held in a browser: cloning bands costs little, and the shared path still copies the source into shared memory and the result out of it (Blob, ImageData and the encoders refuse views of shared buffers), so it saves nothing and loses on some chains. The maintainer's 24-core Windows machine (Chrome, 12 MP, 4 workers) confirmed it: shared 1.65× / 2.16× / 4.4× / 3.7× / 2.55× against copy 2.4× / 4.6× / 6.9× / 8.3× / 4.6×, and **0.5×** (twice as slow as one thread) on the chain with equalize in the middle, where the shared path copies the whole image three times. It was removed with its COOP/COEP test setup rather than kept as an option that can only lose.
+- **Copy is the default and shared is not faster.** The prediction of the spike held in a browser: cloning bands costs little, and the shared path still copies the source into shared memory and the result out of it (Blob, ImageData and the encoders refuse views of shared buffers), so it saves nothing and loses on some chains. It stays as an option (`pool.shared`) for pages that are isolated anyway and for a future where the result can be consumed in place; it is tested bit for bit like the copy path.
 - The bands equal one thread byte for byte in Chromium (five documents incl. a global step, geometry and `longSide`, 8-bit input, `pixels()`, overlapping renders of different documents).
 - The same limits as the Node executor: global steps run alone (the equalize chain gains 1.3×), the pool starts from 2 MP (then from 0.5 MP), 1 MP images are unchanged; a 4-core container, not a laptop or a phone; the 2-thread rows are noisy (the host shares its cores).
 - A pool that cannot start rejects the render with a message naming the file; where the browser has no nested workers it stays on one thread.

@@ -40,6 +40,7 @@ export default defineConfig({
         },
       },
       {
+        server: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } }, // the shared-memory path of @rullino/web's pool
         test: {
           name: 'bench',
           include: ['packages/*/bench/**/*.bench.browser.ts'],
@@ -67,6 +68,9 @@ export default defineConfig({
         },
       },
       {
+        // Cross-origin isolated, like a page that serves COOP / COEP: SharedArrayBuffer is there, so the
+        // shared-memory path of the CPU worker pool (@rullino/web) runs; every other test is unaffected.
+        server: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
         test: {
           name: 'browser',
           include: ['packages/*/src/**/*.browser.test.ts', 'apps/*/src/**/*.browser.test.ts'],

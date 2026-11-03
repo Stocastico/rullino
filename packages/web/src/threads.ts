@@ -6,8 +6,8 @@ import type { BandJob, BandReply, PoolOptions } from './protocol';
 // the image is cut into horizontal bands, each band worker runs the whole segment of the chain on
 // its band plus a halo of extra rows and returns only the rows it owns. Everything that cannot be
 // banded (a step that needs the whole image, small images) runs on the calling thread, exactly as
-// without threads. Bands travel by copy (structured clone): no cross-origin isolation needed. A shared-memory
-// variant was built and measured (docs/design/tiled-cpu.md, phase 3): no faster, and slower with global steps.
+// without threads. Bands travel by copy by default (structured clone: no cross-origin isolation
+// needed); `pool.shared` (cross-origin isolated pages) uses SharedArrayBuffers for the bands instead.
 
 /** The number of threads an option stands for: 1 (none) by default, 'auto' = the cores, at most 8. */
 export function resolveThreads(option: number | 'auto' | undefined, cores = (globalThis.navigator?.hardwareConcurrency ?? 1)): number {
@@ -22,7 +22,7 @@ export interface ThreadedExecutor {
    * Runs `steps` (parsed from `edit`) on `image` like `runChainCpu(steps, image, { scale, fast: true })`
    * does, bands on workers where the chain allows. Renders are queued, one at a time.
    */
-  run(edit: unknown, luts: Readonly<Record<string, Lut>>, steps: readonly Step[], image: LinearImage, scale: number): Promise<{ readonly image: LinearImage; readonly bands: number }>;
+  run(edit: unknown, luts: Readonly<Record<string, Lut>>, steps: readonly Step[], image: LinearImage, scale: number): Promise<{ readonly image: LinearImage; readonly bands: number; readonly shared: boolean }>;
   /** Stops the workers; a render in progress fails. */
   destroy(): void;
 }
@@ -32,6 +32,8 @@ const MP = 1_000_000;
 export function createThreadedExecutor(threads: number, pool: PoolOptions = {}): ThreadedExecutor {
   const createAtPixels = pool.createAtPixels ?? 2 * MP;
   const useAtPixels = pool.useAtPixels ?? 0.5 * MP;
+  // Copied bands are the default: measured at 12 MP, shared memory is no faster (the source is copied into it and the result out of it).
+  const shared = pool.shared ?? false;
   const workerUrl = pool.workerUrl ?? 'band-worker.js';
   let workers: Worker[] | undefined;
   let starting: Promise<Worker[]> | undefined;
@@ -110,6 +112,7 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
     let current = image;
     let enabled = 0; // steps handled so far, counted among the enabled ones
     let bandJobs = 0;
+    let usedShared = false;
     let pool_: Worker[] | undefined;
     try {
       for (const seg of planSegments(steps, scale)) {
@@ -129,24 +132,39 @@ export function createThreadedExecutor(threads: number, pool: PoolOptions = {}):
         const pending = [...bands];
         bandJobs += bands.length;
         const job = { type: 'band' as const, edit, luts, key, scale, from, to: enabled, width, height };
-        const out = createImage(width, height);
-        const source = current.data;
-        await Promise.all(
-          pool_.map(async (worker) => {
-            for (let band = pending.shift(); band; band = pending.shift()) {
-              const rows = source.slice(band.from * rowLength, band.to * rowLength); // a copy, transferred
-              const result = await call(worker, { ...job, band, rows }, [rows.buffer]);
-              out.data.set(result!, band.y0 * rowLength);
-            }
-          }),
-        );
+        let out: LinearImage;
+        if (shared) {
+          usedShared = true;
+          const src = new SharedArrayBuffer(current.data.byteLength);
+          new Float32Array(src).set(current.data);
+          const dst = new SharedArrayBuffer(current.data.byteLength);
+          await Promise.all(
+            pool_.map(async (worker) => {
+              for (let band = pending.shift(); band; band = pending.shift()) await call(worker, { ...job, band, src, dst }, []);
+            }),
+          );
+          // Ordinary memory out: Blob, ImageData and the like refuse views of shared buffers.
+          out = createImage(width, height, new Float32Array(dst).slice());
+        } else {
+          out = createImage(width, height);
+          const source = current.data;
+          await Promise.all(
+            pool_.map(async (worker) => {
+              for (let band = pending.shift(); band; band = pending.shift()) {
+                const rows = source.slice(band.from * rowLength, band.to * rowLength); // a copy, transferred
+                const result = await call(worker, { ...job, band, rows }, [rows.buffer]);
+                out.data.set(result!, band.y0 * rowLength);
+              }
+            }),
+          );
+        }
         current = out;
       }
     } catch (e) {
       stop(); // a worker that failed may be half way through a band: start afresh next time
       throw e;
     }
-    return { image: current, bands: bandJobs };
+    return { image: current, bands: bandJobs, shared: usedShared };
   };
 
   return {

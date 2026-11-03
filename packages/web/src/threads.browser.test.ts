@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createThreadedExecutor, type ThreadedExecutor } from './threads';
 
 // The band-worker pool driven directly from the page (the render worker drives it in the product,
-// where the coverage of this process cannot see it): thresholds, failures.
+// where the coverage of this process cannot see it): copy and shared transports, thresholds, failures.
 
 const FORCE = { createAtPixels: 0, useAtPixels: 0, forceBands: true } as const;
 const byId = new Map(filters.map((f) => [f.id, f]));
@@ -41,11 +41,14 @@ describe('createThreadedExecutor', () => {
   const edit = doc(['gaussianBlur', { sigma: 2 }], ['vignette'], ['exposure', { ev: 0.3 }]);
   const src = picture(47, 53);
 
-  it('copied bands: the result equals the whole image, bit for bit', async () => {
-    const out = await run(make(3, FORCE), edit, src);
-    expect(out.bands).toBeGreaterThan(1);
-    same(out.image, whole(edit, src));
-  });
+  for (const shared of [false, true])
+    it(`${shared ? 'shared memory' : 'copied bands'}: the result equals the whole image, bit for bit`, async () => {
+      const out = await run(make(3, { ...FORCE, shared }), edit, src);
+      expect(out.shared).toBe(shared);
+      expect(out.bands).toBeGreaterThan(1);
+      same(out.image, whole(edit, src));
+      expect(out.image.data.buffer instanceof SharedArrayBuffer).toBe(false); // ordinary memory out
+    });
 
   it('runs the segments around a global step on the pool and the global step alone', async () => {
     const mixed = doc(['gaussianBlur', { sigma: 2 }], ['equalize'], ['sharpen']);
