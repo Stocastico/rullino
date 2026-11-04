@@ -36,6 +36,8 @@
   },
   "dependencies": {
     "@rullino/core": "workspace:*",
+    "@rullino/filters": "workspace:*",
+    "@rullino/presets": "workspace:*",
     "@rullino/web": "workspace:*"
   },
   "scripts": {

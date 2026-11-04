@@ -12,6 +12,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 ## [Unreleased]
 
 ### Added
+- **konva**: `konvaFilter(doc)`, a synchronous Konva filter from an edit document, for colour edits (exposure, curves, saturation, LUTs, the looks; no masks, geometry or neighbourhood steps, which it refuses with a message): the document is baked once into a 33³ LUT and each pixel costs one lookup (about 45 ms per megapixel), so `node.filters([...])` + `cache()` and tools that look filters up by name in `Konva.Filters` (Filerobot) can use rullino. `@rullino/konva` now depends on `@rullino/filters` and `@rullino/presets` directly.
 - **core**: `formatCube(lut)` writes a LUT as a `.cube` file (the inverse of `parseCube`). With the playground's **Export look (.cube)** (bakes the enabled colour steps of the chain into a 33³ LUT), a look made in rullino works in DaVinci Resolve, Premiere, OBS and phone apps.
 - **presets**: `bakeLut` accepts per-pixel steps such as `applyLut` (a baked look can contain a LUT), refuses masked steps and skips disabled ones.
 - Documentation: [Getting started](docs/getting-started.md), [Concepts](docs/concepts.md), the [edit document reference](docs/edit-document.md) (its JSON examples are parsed and rendered by a test) and [Troubleshooting](docs/troubleshooting.md); the root README now starts from the edit document and lists the packages. The `ts` blocks of `docs/*.md` are type-checked like the guides'.

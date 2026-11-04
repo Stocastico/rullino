@@ -2,6 +2,8 @@ import type { LinearImage } from '@rullino/core';
 import { createRenderer, type Renderer } from '@rullino/web';
 import type Konva from 'konva';
 
+export { konvaFilter, type FilterPixels, type KonvaFilterOptions } from './filter';
+
 export interface AttachEditOptions {
   /** The renderer to use (shared between nodes); by default one is created and destroyed by `detach()`. */
   readonly renderer?: Renderer;
