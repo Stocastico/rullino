@@ -391,6 +391,21 @@ try {
   // Back to the chain without the look's steps, so the checks below see a known chain.
   for (let i = 0; i < 3; i++) await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
 
+  // Export look (.cube): the chain is exposure -1 EV then the inverting LUT, so black maps to white
+  // and white to 1 − sRGB(0.5) ≈ 0.265; a vignette is left out (and said so).
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'vignette'));
+  {
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#export-cube')]);
+    const lines = readFileSync(await download.path(), 'utf8').trimEnd().split('\n');
+    check(download.suggestedFilename() === 'Ramps & hues-look.cube', `expected 'Ramps & hues-look.cube', got ${download.suggestedFilename()}`);
+    check(lines.includes('LUT_3D_SIZE 33') && lines.filter((l) => /^[-\d.]+ [-\d.]+ [-\d.]+$/.test(l)).length === 33 ** 3, `.cube should hold 33³ entries, header: ${lines.slice(0, 3).join(' | ')}`);
+    const [first, last] = [lines.find((l) => /^[\d.]/.test(l)), lines.at(-1)].map((l) => l.split(' ').map(Number));
+    check(first.every((v) => Math.abs(v - 1) < 1e-3), `.cube: black should map to white (exposure, then invert), got ${first}`);
+    check(last.every((v) => Math.abs(v - 0.265) < 0.01), `.cube: white should map to 1 − sRGB(0.5) ≈ 0.265, got ${last}`);
+    check(/left out.*Vignette/.test(await page.textContent('#announce')), `the vignette should be reported as left out: ${await page.textContent('#announce')}`);
+  }
+  await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
+
   // Export happens at full resolution, not at the 2048 px display size.
   await after(() =>
     page.evaluate(async () => {

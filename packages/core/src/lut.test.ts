@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyLutCpu, createLut, identityLut, lutFromFunction, parseCube, parseHald } from './lut';
+import { applyLutCpu, createLut, formatCube, identityLut, lutFromFunction, parseCube, parseHald } from './lut';
 
 describe('3D LUTs', () => {
   it('builds identity LUTs that map every colour to itself', () => {
@@ -85,5 +85,28 @@ describe('HaldCLUT', () => {
 
   it('rejects images that are not Hald-shaped', () => {
     expect(() => parseHald(new Uint8ClampedArray(10 * 10 * 4), 10, 10)).toThrow(/Hald/);
+  });
+
+  describe('formatCube', () => {
+    const warm = lutFromFunction(5, (r, g, b) => [Math.min(1, r * 1.1), g, b * 0.9 + 0.013579]);
+
+    it('writes a .cube that parses back to the same LUT (title, domain, values to 1e-6)', () => {
+      const lut = createLut(warm.size, warm.data, { title: 'Warm "evening"', domainMin: [0, -0.1, 0], domainMax: [1, 1, 1.2] });
+      const text = formatCube(lut);
+      const back = parseCube(text);
+      expect(back.size).toBe(5);
+      expect(back.title).toBe("Warm 'evening'");
+      expect(back.domainMin).toEqual([0, -0.1, 0]);
+      expect(back.domainMax).toEqual([1, 1, 1.2]);
+      back.data.forEach((v, i) => expect(Math.abs(v - lut.data[i]!)).toBeLessThan(1e-6));
+    });
+
+    it('keeps the .cube layout: header lines, then one RGB triple per line with red fastest', () => {
+      const lines = formatCube(createLut(2, Float32Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1]), { title: 't' })).trimEnd().split('\n');
+      expect(lines.slice(0, 2)).toEqual(['TITLE "t"', 'LUT_3D_SIZE 2']);
+      expect(lines.filter((l) => l.startsWith('DOMAIN'))).toEqual([]); // default domain: not written
+      expect(formatCube(createLut(2, new Float32Array(24).fill(0.1)))).toContain('\n0.1 0.1 0.1\n'); // six decimals, not float32 noise
+      expect(lines.slice(-8)).toEqual(['0 0 0', '1 0 0', '0 1 0', '1 1 0', '0 0 1', '1 0 1', '0 1 1', '1 1 1']);
+    });
   });
 });
