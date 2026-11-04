@@ -255,7 +255,7 @@ The split view exists. On top of it:
 - **History scrubber**: a slider over undo states, to see the edit evolve.
 
 ### Proposed next steps (for the user to accept or change)
-1. Now, inside the current plan: ~~the compare UX above~~ (compare with a step and hold `\` done 4 Nov, #148), ~~`.cube` export~~ (done 4 Nov: `formatCube`, `bakeLut` on per-pixel steps, the playground's **Export look (.cube)**), a Filerobot spike (can its Adjust tab host a rullino render? how big is the adapter?).
+1. Now, inside the current plan: ~~the compare UX above~~ (compare with a step and hold `\` done 4 Nov, #148), ~~`.cube` export~~ (done 4 Nov: `formatCube`, `bakeLut` on per-pixel steps, the playground's **Export look (.cube)**), ~~a Filerobot spike~~ (done 4 Nov, [`docs/design/filerobot.md`](docs/design/filerobot.md): no extension point for tabs or the filter list; filters are synchronous Konva filters resolved by name, so the fit is a sync `konvaFilter(doc)` on the CPU fast path, plus an upstream ask for custom filters, which the maintainer opens).
 2. Decide whether the "full editor UI" exclusion in 6b holds. Proposal: allow the **embeddable component** (niche 2), still no consumer editor (no layers, text, accounts, ads).
 3. Keep the week-16 review; add "Filerobot integration live" and "`.cube` exports used" as signals.
 
