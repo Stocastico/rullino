@@ -211,13 +211,55 @@ Open issues to keep in view: [#127](https://github.com/Stocastico/rullino/issues
 ### Week-16 review
 Signals (targets are guesses, revise after the first partner calls): ≥ 1 production user not recruited, ≥ 3 design partners integrated, ≥ 10 outside issues / PRs, ≥ 15 public dependents; downloads as a trend against pixi-filters and Photon only. Decide: **grow** (WebGL2 tier if fallback speed is the top complaint, more adapters), **narrow** (Node-parity engine + adapters only) or **freeze** (reference implementation, no active development).
 
-Not doing until then: new filters, node-graph editor, full editor UI, WebGL2, marketing to photographers, ML expansion.
+Not doing until then: new filters, node-graph editor, full editor UI, WebGL2, marketing to photographers, ML expansion. (Under review: an embeddable editor component, see §6c.)
 
 ### 0.2 creative effects (frozen until the week-16 review)
 Done: gradient map, dither / halftone extensions (except gooey and moiré), ASCII. Remaining, if the review says grow: other cell effects (LED, receipt, Lego, crochet), outlines / hatching (Moebius), fluted glass and caustics, anisotropic / Papari Kuwahara. Other candidates: bicubic / Lanczos resize, NLM denoise, clarity / dehaze, blend modes, drop shadow, `.cube` export, memory budget, Firefox / WebKit CI (Firefox / WebKit CI moves up if partners need it).
 
 ### Later
 - Tier-C filters (Hough, Harris, FFT, NLM, …), film simulations, a WebGL2 backend if fallback users ask for it.
+
+## 6c. Market and positioning (review of 4 Nov 2026, proposal: not decided yet)
+
+The question raised: now that the engine is complete (51 filters, GPU + CPU, workers, Node, on-device ML), should rullino become a **client-side online editor** with a beautiful UI (no backend), and which niches can we take from the competition?
+
+### Who is already there
+| Who | What they do well | Where we are better or could be |
+|---|---|---|
+| **img.ly CE.SDK** | Complete editor SDK (photo, video, design, templates), web + iOS + Android, polished UI, AI plugins | Price: quote-based, median buyer spend ~$17.5k / year (Vendr). Closed. No published CPU/GPU tolerance, no "same edit on the server" with a parity check. We cover only the photo-adjustment part of what they do. |
+| **Pintura** (pqina) | Embeddable image editor, good UX, crop / annotate / filters / redact, $179 per developer and up | Its adjustments are a handful of colour-matrix filters; no curves on OKLab, masks, LUTs, server render, ML. Closed. |
+| **Filerobot** (Scaleflex) | MIT, React + Konva, crop / annotate / resize / presets; free and widely used | Its filters are Konva's synchronous CPU filters: slow and basic. **It is built on Konva, and we already have `@rullino/konva`**: the cheapest distribution channel we have. |
+| **Photopea, Pixlr** | Photoshop-like layers, PSD, huge feature set, free with ads | Not worth attacking: decades of features, raster-only, no non-destructive grading worth the name. |
+| **"Privacy-first" indie editors** (CloakIMG, PhotoQuill on WebGPU, MiniPx, …) | Client-side, no upload, several launched in 2026 | "Runs in your browser" is no longer a differentiator: there is one a week. Most are thin wrappers over canvas filters. |
+| **Lightroom (web), Polarr** | Non-destructive grading, presets, sync | Subscription, cloud upload. Nothing open does Lightroom-quality grading in the browser with an exportable edit. |
+| **Magnific / Freepik** | Generative AI (upscale, relight, restyle); an editor workspace around it | Server-side, credit-based. Not our game; their editor UX (one panel, before / after) is worth copying, the generative core is not. |
+| **OpenReel, FreeCut** (browser video, MIT, WebCodecs + WebGPU, months old) | Timeline editing, export, basic colour (wheels, curves, LUT import) | They need a colour engine; we have one. Partners, not competitors. |
+
+### Assessment (opinion)
+- **A general online photo editor is the wrong target.** It is the most crowded segment, the moat is UI polish and years of features, and "client-side" is now table stakes. We would be one more privacy-first editor.
+- **Our real moat** is a combination nobody has: a versioned JSON edit document, previewed on the GPU in the browser, rendered on the server within a published tolerance, MIT, with on-device ML. That sells to **developers and products**, not to end users directly.
+- **An editor still has value**, as the shop window and as an embeddable component: the playground is 80% of one already (film strip, inspector, masks, geometry, looks, undo, share links, split view).
+
+### Niches, ranked (cost to us vs. chance to win)
+1. **Filerobot's filter engine** (cheap, high reach). Offer a rullino-backed Adjust / Filters tab for Filerobot (adapter or upstream PR through `@rullino/konva`). Filerobot users get curves, looks, masks, GPU speed; we get a real integration and users we did not recruit, which is the week-16 target.
+2. **Embeddable editor component** (`@rullino/editor`, medium cost): the playground's inspector + film strip + split as a framework-free web component (`<rullino-editor>`), outputting an edit document. Positioned against Pintura and the photo part of img.ly: MIT core, the same document rendered by `@rullino/node`. Monetisation, if ever wanted: paid support / a pro tier of UI, never the engine.
+3. **Look and LUT authoring** (cheap, distinctive): grade a photo, export the look as a `.cube` (`bakeLut` exists; `.cube` export is already on the candidates list), usable in DaVinci, Premiere, OBS, phones. Creators sell presets and LUTs; existing web LUT makers are toys or need a colour card. Also the bridge to video without a video editor.
+4. **Batch consistency for catalogues** (medium): same edit on hundreds of product / real-estate photos, in the browser (folder via File System Access, band workers) or on the server. Photoroom / Pixelcut charge per image for server AI; ours is deterministic, private, free to run. Perspective correction already covers real estate.
+5. **Reproducible edits / provenance** (speculative): the edit document is an exact record of what was done; attaching it to a C2PA manifest would suit newsrooms and insurance claims. Validate demand before building anything.
+6. **Video colour engine** (later, expensive to test): per-frame grading through WebCodecs for OpenReel-like editors. Risk: `VideoFrame` import loses the device on SwiftShader (see Traps), so CI cannot test it as is.
+
+### UX worth copying (cheap, now)
+The split view exists. On top of it:
+- **Compare with any step**: the split's "before" side can be any frame of the film strip (not only the original), so you see what one step changed; "up to here" already computes those prefixes.
+- **Hold to compare** (a key or long press shows the original) and **A / B versions**: two snapshots of the edit (history already keeps immutable states) side by side or under the split.
+- **History scrubber**: a slider over undo states, to see the edit evolve.
+
+### Proposed next steps (for the user to accept or change)
+1. Now, inside the current plan: the compare UX above (playground), `.cube` export, a Filerobot spike (can its Adjust tab host a rullino render? how big is the adapter?).
+2. Decide whether the "full editor UI" exclusion in 6b holds. Proposal: allow the **embeddable component** (niche 2), still no consumer editor (no layers, text, accounts, ads).
+3. Keep the week-16 review; add "Filerobot integration live" and "`.cube` exports used" as signals.
+
+Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
 
 ## 7. Open decisions
 
