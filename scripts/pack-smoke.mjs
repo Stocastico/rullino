@@ -6,7 +6,8 @@
 //   4. builds examples/konva-editor against them and moves its exposure slider,
 //   5. runs examples/node-batch on a folder of photos and checks the files it writes,
 //   6. builds examples/worker-fallback and drives it on the CPU worker backend,
-//   7. builds examples/nextjs-server-render with Next.js, starts it and drives preview + server render in Chromium.
+//   7. builds examples/nextjs-server-render with Next.js, starts it and drives preview + server render in Chromium,
+//   8. builds examples/filerobot-looks (Filerobot Image Editor with konvaFilter looks) and switches looks in it.
 // Slow (a minute or two), so it has its own command: `pnpm test:pack`.
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -334,6 +335,55 @@ window.__result = result;
       console.log(`pack-smoke: nextjs example ${JSON.stringify(shown)}`);
     } finally {
       nextServer.kill();
+    }
+
+    // 8. examples/filerobot-looks: Filerobot loads a rullino look by name from its design state and switches
+    // looks while it runs (konvaFilter registered in Konva.Filters), built against the tarballs.
+    const filerobot = join(work, 'filerobot');
+    mkdirSync(filerobot);
+    for (const f of ['index.html', 'main.js', 'photo.jpg']) copyFileSync(join(repo, 'examples/filerobot-looks', f), join(filerobot, f));
+    const frPkg = JSON.parse(readFileSync(join(repo, 'examples/filerobot-looks/package.json'), 'utf8'));
+    for (const n of ['core', 'filters', 'presets', 'web', 'konva']) frPkg.dependencies[`@rullino/${n}`] = `file:../tarballs/rullino-${n}-${version}.tgz`;
+    delete frPkg.devDependencies;
+    writeFileSync(join(filerobot, 'package.json'), JSON.stringify(frPkg));
+    run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], filerobot);
+    await build({ root: filerobot, configFile: false, logLevel: 'error', build: { outDir: 'out', target: 'esnext' } });
+    const frServer = await preview({ root: filerobot, configFile: false, build: { outDir: 'out' }, preview: { port: 0 } });
+    try {
+      await page.goto(frServer.resolvedUrls.local[0]);
+      await page.waitForFunction(() => window.example?.update, null, { timeout: 60000 });
+      const result = await page.evaluate(async () => {
+        // The share of opaque pixels of Filerobot's picture whose three channels agree (grey), sampled.
+        const grey = () => {
+          let best = 0;
+          for (const c of document.querySelectorAll('canvas')) {
+            if (!c.width || !c.height) continue; // Filerobot keeps empty canvases around
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let opaque = 0, agree = 0;
+            for (let i = 0; i < d.length; i += 4 * 97) if (d[i + 3] > 200) { opaque++; if (Math.abs(d[i] - d[i + 1]) < 4 && Math.abs(d[i + 1] - d[i + 2]) < 4) agree++; }
+            if (opaque > 200) best = Math.max(best, agree / opaque);
+          }
+          return best;
+        };
+        const wait = async (ok) => { for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 100)); };
+        const buttons = Object.fromEntries([...document.querySelectorAll('#looks button')].map((b) => [b.textContent, b]));
+        await wait(() => grey() > 0.9); // the design state names RullinoNoir: black and white from the start
+        const loaded = grey();
+        buttons['Teal & orange'].click();
+        await wait(() => grey() < 0.5);
+        const teal = grey();
+        buttons.Noir.click(); // and back: switching works in both directions while the editor runs
+        await wait(() => grey() > 0.9);
+        const noirAgain = grey();
+        buttons['No look'].click();
+        await wait(() => grey() < 0.5);
+        const none = grey();
+        return { loaded, teal, noirAgain, none, looks: Object.keys(buttons) };
+      });
+      check(result.loaded > 0.9 && result.teal < 0.5 && result.noirAgain > 0.9 && result.none < 0.5 && result.looks.length === 4, `filerobot-looks example: ${JSON.stringify(result)}`);
+      console.log(`pack-smoke: filerobot-looks example ${JSON.stringify(result)}`);
+    } finally {
+      await frServer.close();
     }
   } finally {
     await browser.close();

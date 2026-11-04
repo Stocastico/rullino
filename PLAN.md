@@ -215,7 +215,7 @@ Done in that session: integrator documentation (`docs/getting-started.md`, `conc
 2. **Real-hardware claim**: the tolerances were verified on software GPUs and one RTX 40. Run `pnpm report:parity` on a non-NVIDIA GPU (Apple silicon, Intel or AMD) and open the playground and `@rullino/web` in Safari and Firefox; Firefox / WebKit CI does not exist. A launch post that says "within the published tolerance" must not be refuted by the first reader on a Mac.
 3. **Benchmarks as a page**: the real-hardware numbers of #77 live in issue comments. Put them (losses included) in `docs/benchmarks.md` with the machine and the commit, since the launch post links to it.
 4. **GitHub housekeeping**: close #77 and #84 (done), tick the epics #65 / #66, add `good first issue` labels, enable Discussions, set the repository description, topics and a social preview image.
-5. **Launch material**: a 20–30 s before / after screen recording of the playground (compare, film strip, Code button), the launch post (Claude can draft it), the Filerobot issue (the maintainer opens it) and the `konvaFilter` decision (needs a yes: new public API).
+5. **Launch material**: a 20–30 s before / after screen recording of the playground (compare, film strip, Code button), the launch post (Claude can draft it), the Filerobot issue (the maintainer opens it) (`konvaFilter` and the Filerobot example are done: #155 and `examples/filerobot-looks`).
 6. **Design partners**: nothing replaces a person using it; the `konva` and `nextjs-server-render` examples are the thing to send.
 
 ### Week-16 review
@@ -270,8 +270,8 @@ The split view exists. On top of it:
 3. Keep the week-16 review; add "Filerobot integration live" and "`.cube` exports used" as signals.
 
 ### Next, in this order (as of 4 Nov, end of day)
-1. **`konvaFilter(doc)` in `@rullino/konva`** (needs the maintainer's yes: new public API): a synchronous Konva filter `(imageData) => void` on the CPU fast path, colour steps only at first (pointwise / `perPixel`, baked with `bakeLut` when the whole document is colour-only); tests in Chromium with real Konva (`node.filters([...])`, `cache()`), mutation-checked; then measure preview and save at 1 and 12 MP.
-2. **Filerobot example** (`examples/filerobot-looks`): registers two or three rullino looks as `Konva.Filters.Rullino*` and loads one through `loadableDesignState`; driven by `pnpm test:pack` like the other examples.
+1. ~~**`konvaFilter(doc)` in `@rullino/konva`**~~ (done 4 Nov, #155; yes from the maintainer): a synchronous Konva filter `(imageData) => void` on the CPU fast path, colour steps only at first (pointwise / `perPixel`, baked with `bakeLut` when the whole document is colour-only); tests in Chromium with real Konva (`node.filters([...])`, `cache()`), mutation-checked; then measure preview and save at 1 and 12 MP.
+2. ~~**Filerobot example** (`examples/filerobot-looks`)~~ (done 4 Nov): registers two or three rullino looks as `Konva.Filters.Rullino*` and loads one through `loadableDesignState`; driven by `pnpm test:pack` like the other examples.
 3. **Upstream ask** (the maintainer opens it, not Claude): an issue on Filerobot for custom filters in the Filters tab, with the example as the motivation.
 4. **Playground compare, the rest**: A / B versions (two snapshots of the edit side by side or under the split), a history scrubber over the undo states, long press to compare on touch.
 5. Then decision 2 above (embeddable `<rullino-editor>`), with what 1–3 taught us about how editors embed rullino.
