@@ -346,6 +346,26 @@ try {
   await after(() => page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup'))));
   check(!(await status()).includes('preview'), `expected a full frame after release, status: ${await status()}`);
 
+  // Compare with a step: the before side shows the picture after the first step (exposure), so with
+  // an invert after it the two sides differ, and with the invert off they are the same.
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'invert'));
+  const compareChoices = await page.$$eval('#compare-with option', (os) => os.map((o) => o.textContent));
+  check(compareChoices.join('|') === 'Original|After 1. Exposure|After 2. Invert', `compare menu should list the original and each step, got ${compareChoices.join('|')}`);
+  await after(() => page.selectOption('#compare-with', { index: 1 }));
+  check((await page.textContent('#handle span')) === 'after 1. Exposure', `split label should name the compared step, got ${await page.textContent('#handle span')}`);
+  check((await differs()) > 0.5, `compared with the exposure step, the invert should differ, ${(await differs() * 100).toFixed(1)}%`);
+  await after(() => page.$eval('#strip li[data-step]:last-of-type input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
+  check((await differs()) < 0.01, `with the invert off, the before side (after exposure) should equal the result, ${(await differs() * 100).toFixed(1)}% differs`);
+  // Holding backslash shows the before side whole.
+  await page.keyboard.down('\\');
+  check(await page.$eval('#stage', (s) => s.classList.contains('holding')), 'holding \\ should show the before side whole');
+  await page.keyboard.up('\\');
+  check(!(await page.$eval('#stage', (s) => s.classList.contains('holding'))), 'releasing \\ should bring the split back');
+  // Back to the original and the exposure step alone.
+  await after(() => page.selectOption('#compare-with', ''));
+  await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
+  check((await differs()) > 0.3, `compared with the original again, exposure -1 EV should differ, ${(await differs() * 100).toFixed(1)}%`);
+
   // A .cube file loaded into a LUT step changes the image (an inverting LUT).
   const afterPixels = () => page.$eval('#after', (c) => Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data));
   await after(() => page.evaluate((id) => window.rullino.add(id), 'applyLut'));
