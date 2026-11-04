@@ -1,12 +1,16 @@
 # @rullino/filters
 
+[![npm](https://img.shields.io/npm/v/@rullino/filters.svg)](https://www.npmjs.com/package/@rullino/filters) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 [![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 
 **[Try it in the playground](https://stefanomasneri.com/rullino/)**
 
 The filters of [rullino](https://github.com/Stocastico/rullino): WebGPU compute shaders, each with a plain TypeScript CPU implementation that is the specification the GPU version is tested against. Built on [`@rullino/core`](../core/README.md).
 
-> Pre-alpha (0.x): the API may change between minor versions.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)).
+
+Docs: [Getting started](https://github.com/Stocastico/rullino/blob/main/docs/getting-started.md) · [Concepts](https://github.com/Stocastico/rullino/blob/main/docs/concepts.md) · [the edit document](https://github.com/Stocastico/rullino/blob/main/docs/edit-document.md) · [Troubleshooting](https://github.com/Stocastico/rullino/blob/main/docs/troubleshooting.md)
 
 **[API reference](https://stefanomasneri.com/rullino/docs/modules/_rullino_filters.html)** (generated from the sources)
 

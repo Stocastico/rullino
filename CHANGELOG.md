@@ -12,7 +12,16 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 ## [Unreleased]
 
 ### Added
+- **core**: `formatCube(lut)` writes a LUT as a `.cube` file (the inverse of `parseCube`). With the playground's **Export look (.cube)** (bakes the enabled colour steps of the chain into a 33³ LUT), a look made in rullino works in DaVinci Resolve, Premiere, OBS and phone apps.
+- **presets**: `bakeLut` accepts per-pixel steps such as `applyLut` (a baked look can contain a LUT), refuses masked steps and skips disabled ones.
+- Documentation: [Getting started](docs/getting-started.md), [Concepts](docs/concepts.md), the [edit document reference](docs/edit-document.md) (its JSON examples are parsed and rendered by a test) and [Troubleshooting](docs/troubleshooting.md); the root README now starts from the edit document and lists the packages. The `ts` blocks of `docs/*.md` are type-checked like the guides'.
+- Playground: compare with any step (**Compare with** menu) and hold `\` to see the original.
 - Example `examples/nextjs-server-render`: a Next.js app that previews an edit document in the browser with `@rullino/web` and renders it at full resolution in a route handler with `@rullino/node`; built and driven in `pnpm test:pack`.
+
+### Fixed
+- **node**: JPEG / WebP output with `quality` below 0.005 (including 0) threw "Expected integer between 1 and 100" from sharp; the quality is now at least 1.
+- **konva**: `set()` of an edit with a crop made the preview from the source at the node's size, so a crop showing half the picture was rendered at half the resolution and stretched; the source is now made large enough for the crop to fill the node. A failed preview render is no longer cached (every later `set()` used to fail with the same error until the node's size changed).
+- **web**: a renderer that was destroyed started a new worker when asked to render again, one nothing would stop; it now rejects with "the renderer was destroyed".
 
 ## [0.6.0]
 

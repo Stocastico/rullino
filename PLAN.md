@@ -208,6 +208,16 @@ Open issues to keep in view: [#127](https://github.com/Stocastico/rullino/issues
 - [ ] Launch post (preview / render mismatch, honest benchmarks), Show HN around the job, Konva / Fabric discussions, r/webdev, r/javascript, JavaScript Weekly, Frontend Focus.
 - [ ] After launch: issues answered within 48 h for a month, good-first-issue labels, monthly release, a talk proposal on CPU/GPU parity testing.
 
+### Before going public (checklist of 4 Nov, after the docs and debug session)
+
+Done in that session: integrator documentation (`docs/getting-started.md`, `concepts.md`, `edit-document.md`, `troubleshooting.md`, a documentation index, a root README that starts from the edit document), three bugs fixed (node JPEG / WebP quality 0, konva preview of a cropped edit and cached failure, web renderer after `destroy()`), a test over every filter at 1×1 / 1×N / N×1 sizes, a test that renders the JSON examples of the format reference. Open, in the order that matters for a launch:
+1. **0.7.0** with the above (CHANGELOG `[Unreleased]` is ready; `node scripts/set-version.mjs 0.7.0`, merge, the maintainer pushes the tag).
+2. **Real-hardware claim**: the tolerances were verified on software GPUs and one RTX 40. Run `pnpm report:parity` on a non-NVIDIA GPU (Apple silicon, Intel or AMD) and open the playground and `@rullino/web` in Safari and Firefox; Firefox / WebKit CI does not exist. A launch post that says "within the published tolerance" must not be refuted by the first reader on a Mac.
+3. **Benchmarks as a page**: the real-hardware numbers of #77 live in issue comments. Put them (losses included) in `docs/benchmarks.md` with the machine and the commit, since the launch post links to it.
+4. **GitHub housekeeping**: close #77 and #84 (done), tick the epics #65 / #66, add `good first issue` labels, enable Discussions, set the repository description, topics and a social preview image.
+5. **Launch material**: a 20–30 s before / after screen recording of the playground (compare, film strip, Code button), the launch post (Claude can draft it), the Filerobot issue (the maintainer opens it) and the `konvaFilter` decision (needs a yes: new public API).
+6. **Design partners**: nothing replaces a person using it; the `konva` and `nextjs-server-render` examples are the thing to send.
+
 ### Week-16 review
 Signals (targets are guesses, revise after the first partner calls): ≥ 1 production user not recruited, ≥ 3 design partners integrated, ≥ 10 outside issues / PRs, ≥ 15 public dependents; downloads as a trend against pixi-filters and Photon only. Decide: **grow** (WebGL2 tier if fallback speed is the top complaint, more adapters), **narrow** (Node-parity engine + adapters only) or **freeze** (reference implementation, no active development).
 
