@@ -38,8 +38,16 @@ For each failure write down: machine, OS and browser versions, what you did, a s
 
 ## 5. Before the launch post
 
-- [ ] Decide **konvaFilter** (new public API in `@rullino/konva`: yes or no) and the Filerobot example.
-- [ ] Open the **Filerobot issue** (custom filters in the Filters tab); the motivation is in [docs/design/filerobot.md](./docs/design/filerobot.md).
+- [x] **konvaFilter** and the Filerobot example are done (in `main`; they reach npm with 0.7.0).
+- [ ] Open the **Filerobot issue** (custom filters in the Filters tab) on https://github.com/scaleflex/filerobot-image-editor/issues, after 0.7.0 is on npm (the example needs it). Draft, to adapt in your own words:
+
+  > **Title:** Let apps add filters to the Filters tab
+  >
+  > Filters are looked up by name in `Konva.Filters` (`filterStrToClass`), so an app can already register its own Konva filter and load it through `loadableDesignState: { filter: 'MyLook' }` or set it with `updateStateFnRef`. What it cannot do is show it in the Filters tab: the list is the hard-coded `AVAILABLE_FILTERS`. Would you accept a config option such as `[TOOLS.FILTERS]: { filters: [{ label, filterFn }] }` merged into that list? It is a small change, and it lets apps offer their own looks (for example LUT-based ones) next to the built-in ones. I can send a PR.
+  >
+  > Working example (colour looks as Konva filters, loaded by name and switched at run time): https://github.com/Stocastico/rullino/tree/main/examples/filerobot-looks
+
+  The motivation and what was read are in [docs/design/filerobot.md](./docs/design/filerobot.md). Offer a PR only if you want to maintain it: a first contribution to someone else's repository speaks for you.
 - [ ] Record a 20-30 s screen capture of the playground (split view, Compare with a step, film strip, Code button).
 - [ ] Ask Claude for: `docs/benchmarks.md` (from the #77 comments), the launch post draft (Show HN, r/webdev, r/javascript), the list of 3-5 teams on Konva or Fabric to write to.
 - [ ] Reply policy: issues within 48 h for the first month (PLAN, Phase 3).

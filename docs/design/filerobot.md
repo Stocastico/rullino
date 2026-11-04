@@ -1,6 +1,6 @@
 # Filerobot spike: can rullino be its filter engine?
 
-Status: spike, 4 Nov 2026 (PLAN §6c, niche 1). Not built. Decisions at the end are proposals.
+Status: spike, 4 Nov 2026 (PLAN §6c, niche 1). Built the same day: `konvaFilter` in `@rullino/konva` (#155) and `examples/filerobot-looks`, which loads a rullino look by name from Filerobot's `loadableDesignState` and switches looks while the editor runs through `updateStateFnRef` (found in `useLoadMainSource.js`: it dispatches into the design state, so a filter function can be set from outside). Still open: the upstream request for custom filters in the Filters tab, which the maintainer opens.
 
 ## Why Filerobot
 
