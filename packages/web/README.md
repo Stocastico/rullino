@@ -1,8 +1,12 @@
 # @rullino/web
 
+[![npm](https://img.shields.io/npm/v/@rullino/web.svg)](https://www.npmjs.com/package/@rullino/web) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 Render [rullino](https://github.com/Stocastico/rullino) edit documents in the browser with one call: on **WebGPU** when the browser has it, otherwise on the CPU in a **Web Worker**, so the page never freezes. Both give the same result within the [published per-filter tolerance](https://github.com/Stocastico/rullino/blob/main/docs/parity.md), and the same as [`@rullino/node`](https://www.npmjs.com/package/@rullino/node) on the server.
 
-> 0.x: the API may change between minor versions.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)).
+
+Docs: [Getting started](https://github.com/Stocastico/rullino/blob/main/docs/getting-started.md) · [Concepts](https://github.com/Stocastico/rullino/blob/main/docs/concepts.md) · [the edit document](https://github.com/Stocastico/rullino/blob/main/docs/edit-document.md) · [Troubleshooting](https://github.com/Stocastico/rullino/blob/main/docs/troubleshooting.md)
 
 ## Install
 

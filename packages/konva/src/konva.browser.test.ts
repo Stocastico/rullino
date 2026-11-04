@@ -69,6 +69,37 @@ describe('attachEdit', () => {
     expect([(node.image() as HTMLCanvasElement).width, (node.image() as HTMLCanvasElement).height]).toEqual([400, 300]);
   });
 
+  it('renders a cropped edit at the size on screen, not at a fraction of it', async () => {
+    const { node, renderer } = await setup(200, 150);
+    const edit = await attachEdit(node, { renderer, pixelRatio: 1 });
+    const crop = { x: 0.25, y: 0.25, width: 0.5, height: 0.5 };
+    await edit.set({ ...brighter(0.5), geometry: { rotate: 0, flipH: false, flipV: false, straighten: 0, crop } });
+    // The crop is half the source (200 x 150 pixels of it) and fills the 200 x 150 node: the preview
+    // must be made from the source at full size, or it is a 100 x 75 picture stretched to twice that.
+    expect([(node.image() as HTMLCanvasElement).width, (node.image() as HTMLCanvasElement).height]).toEqual([200, 150]);
+  });
+
+  it('a turned crop counts the turned proportions', async () => {
+    const { node, renderer } = await setup(150, 200);
+    const edit = await attachEdit(node, { renderer, pixelRatio: 1 });
+    const crop = { x: 0, y: 0, width: 0.5, height: 1 };
+    await edit.set({ ...brighter(0.5), geometry: { rotate: 90, flipH: false, flipV: false, straighten: 0, crop } });
+    // Turned: 300 x 400, cropped to its left half: 150 x 400 of the source's pixels, shown at 150 x 200.
+    const shown = node.image() as HTMLCanvasElement;
+    expect(shown.height).toBe(200);
+    expect(shown.width).toBe(75);
+  });
+
+  it('recovers after a failed render instead of caching the failure', async () => {
+    const { node, renderer } = await setup();
+    const edit = await attachEdit(node, { renderer, pixelRatio: 1 });
+    vi.spyOn(renderer, 'apply').mockRejectedValueOnce(new Error('boom'));
+    await expect(edit.set(brighter(1))).rejects.toThrow('boom');
+    await edit.set(brighter(1));
+    expect(node.image()).toBeInstanceOf(HTMLCanvasElement);
+    expect((node.image() as HTMLCanvasElement).width).toBe(200);
+  });
+
   it('renders only the latest of quick successive edits', async () => {
     const { node, renderer } = await setup();
     const edit = await attachEdit(node, { renderer, pixelRatio: 1 });
