@@ -259,6 +259,13 @@ The split view exists. On top of it:
 2. Decide whether the "full editor UI" exclusion in 6b holds. Proposal: allow the **embeddable component** (niche 2), still no consumer editor (no layers, text, accounts, ads).
 3. Keep the week-16 review; add "Filerobot integration live" and "`.cube` exports used" as signals.
 
+### Next, in this order (as of 4 Nov, end of day)
+1. **`konvaFilter(doc)` in `@rullino/konva`** (needs the maintainer's yes: new public API): a synchronous Konva filter `(imageData) => void` on the CPU fast path, colour steps only at first (pointwise / `perPixel`, baked with `bakeLut` when the whole document is colour-only); tests in Chromium with real Konva (`node.filters([...])`, `cache()`), mutation-checked; then measure preview and save at 1 and 12 MP.
+2. **Filerobot example** (`examples/filerobot-looks`): registers two or three rullino looks as `Konva.Filters.Rullino*` and loads one through `loadableDesignState`; driven by `pnpm test:pack` like the other examples.
+3. **Upstream ask** (the maintainer opens it, not Claude): an issue on Filerobot for custom filters in the Filters tab, with the example as the motivation.
+4. **Playground compare, the rest**: A / B versions (two snapshots of the edit side by side or under the split), a history scrubber over the undo states, long press to compare on touch.
+5. Then decision 2 above (embeddable `<rullino-editor>`), with what 1–3 taught us about how editors embed rullino.
+
 Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
 
 ## 7. Open decisions
