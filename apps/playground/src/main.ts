@@ -51,6 +51,7 @@ import { decodeState, encodeState } from './share';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
 import { createDepthMapper } from './depth-estimate';
 import { statusText } from './status-text';
+import { compareLabel, compareOptions, isCompareKey, resolveCompare } from './compare';
 import { createObjectRemover, REMOVE_GROW } from './object-remove';
 import { createObjectSelector, isSoftwareAdapter } from './object-select';
 
@@ -70,6 +71,8 @@ const ui = {
   chain: $<HTMLDivElement>('chain'),
   compare: $<HTMLInputElement>('compare'),
   split: $<HTMLInputElement>('split'),
+  compareWith: $<HTMLSelectElement>('compare-with'),
+  beforeLabel: document.querySelector<HTMLSpanElement>('#handle span')!,
   stage: $<HTMLElement>('stage'),
   before: $<HTMLCanvasElement>('before'),
   after: $<HTMLCanvasElement>('after'),
@@ -169,6 +172,8 @@ interface Renderer {
    */
   setGeometry(geometry: Geometry, previewOnly?: boolean): Promise<[number, number]>;
   render(steps: Step[], preview: boolean): Promise<void>;
+  /** Draws the before canvas: the framed image after `steps` (the original when none is active). */
+  renderBefore(steps: Step[]): Promise<void>;
   /**
    * Runs the chain at the largest resolution available and encodes the result, shrunk (in linear
    * light) so its long side is at most `longSide` if given. Never enlarges.
@@ -187,6 +192,8 @@ function gpuRenderer(gpu: GpuContext): Renderer {
   const full = new Pipeline(gpu);
   const small = new Pipeline(gpu);
   const thumbs = new Pipeline(gpu);
+  /** The before side when it compares with a step: its own cache, so editing later steps reuses it. */
+  const beforePipe = new Pipeline(gpu);
   let textures: GPUTexture[] = [];
   let raw: { fullRes: GPUTexture; display: GPUTexture; preview: GPUTexture; fullScale: number; displayScale: number; previewScale: number } | undefined;
   let geometry: Geometry = IDENTITY_GEOMETRY;
@@ -228,6 +235,7 @@ function gpuRenderer(gpu: GpuContext): Renderer {
     const display = reframe(raw.display);
     const preview = raw.preview === raw.display ? display : reframe(raw.preview);
     full.setSource(display, { scale: raw.displayScale });
+    beforePipe.setSource(display, { scale: raw.displayScale });
     small.setSource(preview, { scale: raw.previewScale });
     for (const t of new Set([framedDisplay, framedPreview])) if (owned(t)) giveBack(t!);
     framedDisplay = display;
@@ -270,6 +278,13 @@ function gpuRenderer(gpu: GpuContext): Renderer {
     async render(steps, preview) {
       const out = (preview ? small : full).run(steps);
       await present(await readSrgb8(gpu, out), out.width, out.height);
+    },
+    async renderBefore(steps) {
+      if (!displayTex) return;
+      const out = activeSteps(steps).length ? beforePipe.run(steps) : displayTex;
+      ui.before.width = out.width;
+      ui.before.height = out.height;
+      beforeCtx.putImageData(new ImageData(await readSrgb8(gpu, out), out.width, out.height), 0, 0);
     },
     maskSource(w, h) {
       const key = `${w}x${h}`;
@@ -355,6 +370,13 @@ function cpuRenderer(): Renderer {
       const out = runChainCpu(steps, source, { scale });
       await present(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
     },
+    async renderBefore(steps) {
+      if (!source) return;
+      const out = runChainCpu(steps, source, { scale });
+      ui.before.width = out.width;
+      ui.before.height = out.height;
+      beforeCtx.putImageData(new ImageData(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height), 0, 0);
+    },
     async maskSource(w, h) {
       if (!source) throw new Error('no image loaded');
       return w === source.width && h === source.height ? source : downscaleCpu(source, w, h);
@@ -396,9 +418,33 @@ let busy = false;
 let dirty = false;
 let frames = 0;
 
+/** View only: the before side shows the picture after this step (undefined = the original). */
+let compareUid: string | undefined;
+const labelOf = (id: string) => byId.get(id)?.label ?? id;
+/** Keeps the "Compare with" menu and the split's label in step with the chain. */
+function syncCompare(): void {
+  compareUid = resolveCompare(chain, compareUid);
+  const options = compareOptions(chain, labelOf);
+  const signature = options.map((o) => `${o.value}:${o.label}`).join('|');
+  if (ui.compareWith.dataset.signature !== signature) {
+    ui.compareWith.replaceChildren(...options.map((o) => new Option(o.label, o.value)));
+    ui.compareWith.dataset.signature = signature;
+  }
+  ui.compareWith.value = compareUid ?? '';
+  ui.beforeLabel.textContent = compareLabel(chain, compareUid, labelOf);
+}
+/** Whether the before canvas shows a step (and so must follow edits) rather than the original. */
+let beforeShowsStep = false;
+async function drawBefore(): Promise<void> {
+  if (compareUid === undefined && !beforeShowsStep) return; // the original, drawn when the image was framed
+  beforeShowsStep = compareUid !== undefined;
+  await renderer.renderBefore(compareUid === undefined ? [] : toSteps(chain, compareUid));
+}
+
 async function render() {
   if (!loaded) return;
   recordHistory();
+  syncCompare();
   if (busy) return void (dirty = true);
   busy = true;
   do {
@@ -408,6 +454,8 @@ async function render() {
     try {
       const steps = toSteps(chain, soloUid);
       await busyWhile(renderer.render(steps, preview));
+      // The before side follows on release, not on every move of a drag.
+      if (!preview) await busyWhile(drawBefore());
       const n = activeSteps(steps).length;
       ui.status.textContent = statusText({ backend: gpuContext ? 'gpu' : 'cpu', reason: cpuReason, image: imageInfo, steps: n, solo: !!soloUid, preview, ms: performance.now() - t0 });
     } catch (e) {
@@ -850,6 +898,19 @@ const setSplit = (v: number) => {
   ui.split.value = String(t);
 };
 ui.split.addEventListener('input', () => setSplit(Number(ui.split.value)));
+ui.compareWith.addEventListener('change', () => {
+  compareUid = ui.compareWith.value || undefined;
+  void render();
+});
+// Hold backslash to see the before side over the whole image.
+window.addEventListener('keydown', (e) => {
+  if (!isCompareKey({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, target: e.target instanceof HTMLElement ? e.target : null })) return;
+  e.preventDefault();
+  ui.stage.classList.add('holding');
+});
+const release = () => ui.stage.classList.remove('holding');
+window.addEventListener('keyup', (e) => e.key === '\\' && release());
+window.addEventListener('blur', release);
 ui.compare.addEventListener('change', () => ui.stage.classList.toggle('single', !ui.compare.checked));
 ui.after.addEventListener('pointerdown', (e) => {
   if (!ui.compare.checked) return;
