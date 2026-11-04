@@ -69,6 +69,30 @@ export async function renderWithMyLut(image: LinearImage, cubeText: string): Pro
 
 `intensity` blends the LUT with the original in sRGB-encoded units, as `.cube` files expect. Whoever renders the document (a server, a worker) must be able to resolve `my-lut` too: pass the same `resolveLut` to `createRenderer`.
 
+## 5. Export a grade as a `.cube`
+
+The other way round: a grade made of rullino's colour adjustments, written as a `.cube` that video editors (DaVinci Resolve, Premiere), OBS or phone apps can load. `bakeLut` takes pointwise steps and per-pixel ones (`applyLut`, so a look's LUT step too); blurs, the vignette, grain and masked steps depend on more than a pixel's colour, so it refuses them. `formatCube` writes the result.
+
+```ts
+import { formatCube } from '@rullino/core';
+import { contrast, saturation, whiteBalance } from '@rullino/filters';
+import { bakeLut } from '@rullino/presets';
+
+export function warmGradeCube(): string {
+  const lut = bakeLut(
+    [
+      { filter: whiteBalance, params: { temperature: 0.2 } },
+      { filter: contrast, params: { amount: 0.15 } },
+      { filter: saturation, params: { amount: -0.1 } },
+    ],
+    { title: 'Warm grade' },
+  );
+  return formatCube(lut); // 33³ entries, sRGB-encoded in and out
+}
+```
+
+A LUT clamps to [0, 1], so HDR highlights do not survive it. The playground's **Export look (.cube)** button does this with the chain on screen and says which steps it left out.
+
 ## Next
 
 - [Preview and export in the browser](./preview-and-export.md), [the same edit on the server](./same-edit-on-the-server.md).

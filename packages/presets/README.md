@@ -25,7 +25,7 @@ const out = runChainCpu(steps, createImage(16, 16));
 console.log(out.width);
 ```
 
-`lookLut(look)` returns the baked 33³ LUT, and `bakeLut` bakes any chain of pointwise filters into one. A baked grade clamps HDR values to [0, 1] and differs from the live chain by less than 1/255 on average.
+`lookLut(look)` returns the baked 33³ LUT, and `bakeLut` bakes any chain of pointwise (or per-pixel, like `applyLut`) filters into one; `formatCube` from `@rullino/core` writes it as a `.cube` file. A baked grade clamps HDR values to [0, 1] and differs from the live chain by less than 1/255 on average.
 
 ## Looks as edit documents
 

@@ -14,6 +14,7 @@ import {
   histogramSrgb8,
   IDENTITY_GEOMETRY,
   defaultParams,
+  formatCube,
   parseChain,
   serializeChain,
   isIdentityGeometry,
@@ -35,7 +36,7 @@ import {
 } from '@rullino/core';
 import { autoAdjust, filters } from '@rullino/filters';
 import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
-import { lookLutRef, looks, lookSteps, resolveLookLut } from '@rullino/presets';
+import { bakeLut, lookLutRef, looks, lookSteps, resolveLookLut } from '@rullino/presets';
 import { createEffectBrowser } from './effect-browser';
 import { createFilmStrip } from './film-strip';
 import { effectiveMask, newStep, renderChain, SELECTION, withMask, withSelection, type ChainState } from './chain-ui';
@@ -51,6 +52,7 @@ import { decodeState, encodeState } from './share';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
 import { createDepthMapper } from './depth-estimate';
 import { statusText } from './status-text';
+import { cubeSteps } from './cube-export';
 import { compareLabel, compareOptions, isCompareKey, resolveCompare } from './compare';
 import { createObjectRemover, REMOVE_GROW } from './object-remove';
 import { createObjectSelector, isSoftwareAdapter } from './object-select';
@@ -84,6 +86,7 @@ const ui = {
   exportQuality: $<HTMLInputElement>('export-quality'),
   exportSize: $<HTMLInputElement>('export-size'),
   exportButton: $<HTMLButtonElement>('export'),
+  exportCube: $<HTMLButtonElement>('export-cube'),
   undo: $<HTMLButtonElement>('undo'),
   redo: $<HTMLButtonElement>('redo'),
   share: $<HTMLButtonElement>('share'),
@@ -630,6 +633,21 @@ function exportFile(): Promise<void> {
 // UI wiring.
 
 ui.exportButton.addEventListener('click', () => void exportFile());
+// The chain's colour steps as a 33³ .cube; steps a LUT cannot hold are left out, and said so.
+ui.exportCube.addEventListener('click', () => {
+  const { bake, skipped } = cubeSteps(toSteps(chain));
+  if (!bake.length) return announce('No colour steps to export: a .cube holds only colour adjustments.');
+  try {
+    const text = formatCube(bakeLut(bake, { title: `${imageName} (rullino)` }));
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: `${imageName}-look.cube` });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    announce(`Exported ${a.download}${skipped.length ? `; left out (a LUT cannot hold them): ${skipped.join(', ')}` : ''}`);
+  } catch (e) {
+    announce(`.cube export failed: ${(e as Error).message}`);
+    console.error(e);
+  }
+});
 ui.exportFormat.addEventListener('change', () => (ui.exportQuality.disabled = !['jpeg', 'webp'].includes(ui.exportFormat.value)));
 ui.exportQuality.disabled = true;
 

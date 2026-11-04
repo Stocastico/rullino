@@ -214,7 +214,7 @@ Signals (targets are guesses, revise after the first partner calls): ≥ 1 produ
 Not doing until then: new filters, node-graph editor, full editor UI, WebGL2, marketing to photographers, ML expansion. (Under review: an embeddable editor component, see §6c.)
 
 ### 0.2 creative effects (frozen until the week-16 review)
-Done: gradient map, dither / halftone extensions (except gooey and moiré), ASCII. Remaining, if the review says grow: other cell effects (LED, receipt, Lego, crochet), outlines / hatching (Moebius), fluted glass and caustics, anisotropic / Papari Kuwahara. Other candidates: bicubic / Lanczos resize, NLM denoise, clarity / dehaze, blend modes, drop shadow, `.cube` export, memory budget, Firefox / WebKit CI (Firefox / WebKit CI moves up if partners need it).
+Done: gradient map, dither / halftone extensions (except gooey and moiré), ASCII. Remaining, if the review says grow: other cell effects (LED, receipt, Lego, crochet), outlines / hatching (Moebius), fluted glass and caustics, anisotropic / Papari Kuwahara. Other candidates: bicubic / Lanczos resize, NLM denoise, clarity / dehaze, blend modes, drop shadow, memory budget, Firefox / WebKit CI (Firefox / WebKit CI moves up if partners need it).
 
 ### Later
 - Tier-C filters (Hough, Harris, FFT, NLM, …), film simulations, a WebGL2 backend if fallback users ask for it.
@@ -255,7 +255,7 @@ The split view exists. On top of it:
 - **History scrubber**: a slider over undo states, to see the edit evolve.
 
 ### Proposed next steps (for the user to accept or change)
-1. Now, inside the current plan: the compare UX above (playground), `.cube` export, a Filerobot spike (can its Adjust tab host a rullino render? how big is the adapter?).
+1. Now, inside the current plan: ~~the compare UX above~~ (compare with a step and hold `\` done 4 Nov, #148), ~~`.cube` export~~ (done 4 Nov: `formatCube`, `bakeLut` on per-pixel steps, the playground's **Export look (.cube)**), a Filerobot spike (can its Adjust tab host a rullino render? how big is the adapter?).
 2. Decide whether the "full editor UI" exclusion in 6b holds. Proposal: allow the **embeddable component** (niche 2), still no consumer editor (no layers, text, accounts, ads).
 3. Keep the week-16 review; add "Filerobot integration live" and "`.cube` exports used" as signals.
 
