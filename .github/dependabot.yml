@@ -13,6 +13,12 @@ updates:
       # Pinned on purpose: must match the Chromium build of the cloud sessions (see CLAUDE.md Decisions).
       - dependency-name: playwright
         update-types: [version-update:semver-major, version-update:semver-minor]
+      # apps/docs stays on TypeScript 5.9 (TypeDoc needs its compiler API); the root is on 7 already.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # The minimum Node version is 22.12: the types stay on the 22 line.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
