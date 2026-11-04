@@ -1,7 +1,7 @@
 import { createImage, createLut, linearToSrgb, runChainCpu, srgbToLinear, type Lut, type Step } from '@rullino/core';
 
 /**
- * Bakes a chain of pointwise steps into a 3D LUT over sRGB-encoded [0, 1]³ (the convention
+ * Bakes a chain of pointwise (or `perPixel`) steps without masks into a 3D LUT over sRGB-encoded [0, 1]³ (the convention
  * `applyLut` uses): every grid point goes through the CPU reference chain once. A look written as
  * readable adjustments then costs a single LUT lookup per pixel. Values outside [0, 1] are clamped
  * by the LUT, so HDR highlights do not survive a baked grade.
@@ -9,7 +9,9 @@ import { createImage, createLut, linearToSrgb, runChainCpu, srgbToLinear, type L
 export function bakeLut(steps: readonly Step[], options: { size?: number; title?: string } = {}): Lut {
   const size = options.size ?? 33;
   for (const s of steps) {
-    if (s.filter.kind !== 'pointwise') throw new Error(`bakeLut: "${s.filter.id}" is not pointwise; a LUT cannot hold a neighbourhood operation`);
+    if (s.enabled === false) continue;
+    if (!(s.filter.kind === 'pointwise' || s.filter.perPixel)) throw new Error(`bakeLut: "${s.filter.id}" does not work per pixel; a LUT cannot hold a neighbourhood operation or a position`);
+    if (s.mask) throw new Error(`bakeLut: "${s.filter.id}" has a mask; a LUT cannot hold a position`);
   }
   const n = size ** 3;
   const grid = createImage(n, 1);

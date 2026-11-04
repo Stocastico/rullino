@@ -1,8 +1,12 @@
 # @rullino/node
 
+[![npm](https://img.shields.io/npm/v/@rullino/node.svg)](https://www.npmjs.com/package/@rullino/node) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 Render [rullino](https://github.com/Stocastico/rullino) edit documents in Node: the **same WebGPU shaders** as the browser preview, through [Dawn](https://dawn.googlesource.com/dawn) (the `webgpu` package), with the CPU reference as fallback. Preview an edit live in the browser, render the final file on the server; GPU and CPU agree within the [published per-filter tolerance](https://github.com/Stocastico/rullino/blob/main/docs/parity.md).
 
-> 0.x: the API may change between minor versions.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)).
+
+Docs: [Getting started](https://github.com/Stocastico/rullino/blob/main/docs/getting-started.md) · [Concepts](https://github.com/Stocastico/rullino/blob/main/docs/concepts.md) · [the edit document](https://github.com/Stocastico/rullino/blob/main/docs/edit-document.md) · [Troubleshooting](https://github.com/Stocastico/rullino/blob/main/docs/troubleshooting.md)
 
 ## Install
 

@@ -195,7 +195,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 **Where we are (29 Oct, end of day; published: 0.5.0 of all seven packages).** Next, in this order:
 1. ~~**Node batch example**~~ (`examples/node-batch`, done 29 Oct): one file that renders an edit document onto a folder of photos with `@rullino/node`; `pnpm test:pack` runs it against the tarballs and checks the files and their size.
 2. ~~**Status line in plain words**~~ (done 29 Oct): the playground says "On the GPU (WebGPU) · River 2048×1365 · 3 steps · 370 ms", or "On the CPU (WebGPU unavailable: …)" (`status-text.ts`).
-3. ~~**Worker fallback example**~~ (`examples/worker-fallback`, done 29 Oct) and **Next.js server render example** (the remaining one-file example except Fabric).
+3. ~~**Worker fallback example**~~ (`examples/worker-fallback`, done 29 Oct) and ~~**Next.js server render example**~~ (`examples/nextjs-server-render`, done 3 Nov; Fabric is the one left).
 4. ~~Docs by job~~ (four guides, done 29 Oct) and ~~the migration notes~~ (30 Oct). Phase 2 is then only the optional adapters and examples below.
 5. Fabric only if Konva gets interest (watch npm downloads / issues of `@rullino/konva`).
 
@@ -208,16 +208,75 @@ Open issues to keep in view: [#127](https://github.com/Stocastico/rullino/issues
 - [ ] Launch post (preview / render mismatch, honest benchmarks), Show HN around the job, Konva / Fabric discussions, r/webdev, r/javascript, JavaScript Weekly, Frontend Focus.
 - [ ] After launch: issues answered within 48 h for a month, good-first-issue labels, monthly release, a talk proposal on CPU/GPU parity testing.
 
+### Before going public (checklist of 4 Nov, after the docs and debug session)
+
+Done in that session: integrator documentation (`docs/getting-started.md`, `concepts.md`, `edit-document.md`, `troubleshooting.md`, a documentation index, a root README that starts from the edit document), three bugs fixed (node JPEG / WebP quality 0, konva preview of a cropped edit and cached failure, web renderer after `destroy()`), a test over every filter at 1×1 / 1×N / N×1 sizes, a test that renders the JSON examples of the format reference. Open, in the order that matters for a launch:
+1. **0.7.0** with the above (CHANGELOG `[Unreleased]` is ready; `node scripts/set-version.mjs 0.7.0`, merge, the maintainer pushes the tag).
+2. **Real-hardware claim**: the tolerances were verified on software GPUs and one RTX 40. Run `pnpm report:parity` on a non-NVIDIA GPU (Apple silicon, Intel or AMD) and open the playground and `@rullino/web` in Safari and Firefox; Firefox / WebKit CI does not exist. A launch post that says "within the published tolerance" must not be refuted by the first reader on a Mac.
+3. **Benchmarks as a page**: the real-hardware numbers of #77 live in issue comments. Put them (losses included) in `docs/benchmarks.md` with the machine and the commit, since the launch post links to it.
+4. **GitHub housekeeping**: close #77 and #84 (done), tick the epics #65 / #66, add `good first issue` labels, enable Discussions, set the repository description, topics and a social preview image.
+5. **Launch material**: a 20–30 s before / after screen recording of the playground (compare, film strip, Code button), the launch post (Claude can draft it), the Filerobot issue (the maintainer opens it) and the `konvaFilter` decision (needs a yes: new public API).
+6. **Design partners**: nothing replaces a person using it; the `konva` and `nextjs-server-render` examples are the thing to send.
+
 ### Week-16 review
 Signals (targets are guesses, revise after the first partner calls): ≥ 1 production user not recruited, ≥ 3 design partners integrated, ≥ 10 outside issues / PRs, ≥ 15 public dependents; downloads as a trend against pixi-filters and Photon only. Decide: **grow** (WebGL2 tier if fallback speed is the top complaint, more adapters), **narrow** (Node-parity engine + adapters only) or **freeze** (reference implementation, no active development).
 
-Not doing until then: new filters, node-graph editor, full editor UI, WebGL2, marketing to photographers, ML expansion.
+Not doing until then: new filters, node-graph editor, full editor UI, WebGL2, marketing to photographers, ML expansion. (Under review: an embeddable editor component, see §6c.)
 
 ### 0.2 creative effects (frozen until the week-16 review)
-Done: gradient map, dither / halftone extensions (except gooey and moiré), ASCII. Remaining, if the review says grow: other cell effects (LED, receipt, Lego, crochet), outlines / hatching (Moebius), fluted glass and caustics, anisotropic / Papari Kuwahara. Other candidates: bicubic / Lanczos resize, NLM denoise, clarity / dehaze, blend modes, drop shadow, `.cube` export, memory budget, Firefox / WebKit CI (Firefox / WebKit CI moves up if partners need it).
+Done: gradient map, dither / halftone extensions (except gooey and moiré), ASCII. Remaining, if the review says grow: other cell effects (LED, receipt, Lego, crochet), outlines / hatching (Moebius), fluted glass and caustics, anisotropic / Papari Kuwahara. Other candidates: bicubic / Lanczos resize, NLM denoise, clarity / dehaze, blend modes, drop shadow, memory budget, Firefox / WebKit CI (Firefox / WebKit CI moves up if partners need it).
 
 ### Later
 - Tier-C filters (Hough, Harris, FFT, NLM, …), film simulations, a WebGL2 backend if fallback users ask for it.
+
+## 6c. Market and positioning (review of 4 Nov 2026, proposal: not decided yet)
+
+The question raised: now that the engine is complete (51 filters, GPU + CPU, workers, Node, on-device ML), should rullino become a **client-side online editor** with a beautiful UI (no backend), and which niches can we take from the competition?
+
+### Who is already there
+| Who | What they do well | Where we are better or could be |
+|---|---|---|
+| **img.ly CE.SDK** | Complete editor SDK (photo, video, design, templates), web + iOS + Android, polished UI, AI plugins | Price: quote-based, median buyer spend ~$17.5k / year (Vendr). Closed. No published CPU/GPU tolerance, no "same edit on the server" with a parity check. We cover only the photo-adjustment part of what they do. |
+| **Pintura** (pqina) | Embeddable image editor, good UX, crop / annotate / filters / redact, $179 per developer and up | Its adjustments are a handful of colour-matrix filters; no curves on OKLab, masks, LUTs, server render, ML. Closed. |
+| **Filerobot** (Scaleflex) | MIT, React + Konva, crop / annotate / resize / presets; free and widely used | Its filters are Konva's synchronous CPU filters: slow and basic. **It is built on Konva, and we already have `@rullino/konva`**: the cheapest distribution channel we have. |
+| **Photopea, Pixlr** | Photoshop-like layers, PSD, huge feature set, free with ads | Not worth attacking: decades of features, raster-only, no non-destructive grading worth the name. |
+| **"Privacy-first" indie editors** (CloakIMG, PhotoQuill on WebGPU, MiniPx, …) | Client-side, no upload, several launched in 2026 | "Runs in your browser" is no longer a differentiator: there is one a week. Most are thin wrappers over canvas filters. |
+| **Lightroom (web), Polarr** | Non-destructive grading, presets, sync | Subscription, cloud upload. Nothing open does Lightroom-quality grading in the browser with an exportable edit. |
+| **Magnific / Freepik** | Generative AI (upscale, relight, restyle); an editor workspace around it | Server-side, credit-based. Not our game; their editor UX (one panel, before / after) is worth copying, the generative core is not. |
+| **OpenReel, FreeCut** (browser video, MIT, WebCodecs + WebGPU, months old) | Timeline editing, export, basic colour (wheels, curves, LUT import) | They need a colour engine; we have one. Partners, not competitors. |
+
+### Assessment (opinion)
+- **A general online photo editor is the wrong target.** It is the most crowded segment, the moat is UI polish and years of features, and "client-side" is now table stakes. We would be one more privacy-first editor.
+- **Our real moat** is a combination nobody has: a versioned JSON edit document, previewed on the GPU in the browser, rendered on the server within a published tolerance, MIT, with on-device ML. That sells to **developers and products**, not to end users directly.
+- **An editor still has value**, as the shop window and as an embeddable component: the playground is 80% of one already (film strip, inspector, masks, geometry, looks, undo, share links, split view).
+
+### Niches, ranked (cost to us vs. chance to win)
+1. **Filerobot's filter engine** (cheap, high reach). Offer a rullino-backed Adjust / Filters tab for Filerobot (adapter or upstream PR through `@rullino/konva`). Filerobot users get curves, looks, masks, GPU speed; we get a real integration and users we did not recruit, which is the week-16 target.
+2. **Embeddable editor component** (`@rullino/editor`, medium cost): the playground's inspector + film strip + split as a framework-free web component (`<rullino-editor>`), outputting an edit document. Positioned against Pintura and the photo part of img.ly: MIT core, the same document rendered by `@rullino/node`. Monetisation, if ever wanted: paid support / a pro tier of UI, never the engine.
+3. **Look and LUT authoring** (cheap, distinctive): grade a photo, export the look as a `.cube` (`bakeLut` exists; `.cube` export is already on the candidates list), usable in DaVinci, Premiere, OBS, phones. Creators sell presets and LUTs; existing web LUT makers are toys or need a colour card. Also the bridge to video without a video editor.
+4. **Batch consistency for catalogues** (medium): same edit on hundreds of product / real-estate photos, in the browser (folder via File System Access, band workers) or on the server. Photoroom / Pixelcut charge per image for server AI; ours is deterministic, private, free to run. Perspective correction already covers real estate.
+5. **Reproducible edits / provenance** (speculative): the edit document is an exact record of what was done; attaching it to a C2PA manifest would suit newsrooms and insurance claims. Validate demand before building anything.
+6. **Video colour engine** (later, expensive to test): per-frame grading through WebCodecs for OpenReel-like editors. Risk: `VideoFrame` import loses the device on SwiftShader (see Traps), so CI cannot test it as is.
+
+### UX worth copying (cheap, now)
+The split view exists. On top of it:
+- ~~**Compare with any step**~~ (done 4 Nov): the split's "before" side is the original or the picture after a chosen step (**Compare with** menu), so you see what the later steps changed.
+- ~~**Hold to compare**~~ (done 4 Nov: hold `\`, as in Lightroom; a long press on touch is still open) and **A / B versions**: two snapshots of the edit (history already keeps immutable states) side by side or under the split.
+- **History scrubber**: a slider over undo states, to see the edit evolve.
+
+### Proposed next steps (for the user to accept or change)
+1. Now, inside the current plan: ~~the compare UX above~~ (compare with a step and hold `\` done 4 Nov, #148), ~~`.cube` export~~ (done 4 Nov: `formatCube`, `bakeLut` on per-pixel steps, the playground's **Export look (.cube)**), ~~a Filerobot spike~~ (done 4 Nov, [`docs/design/filerobot.md`](docs/design/filerobot.md): no extension point for tabs or the filter list; filters are synchronous Konva filters resolved by name, so the fit is a sync `konvaFilter(doc)` on the CPU fast path, plus an upstream ask for custom filters, which the maintainer opens).
+2. Decide whether the "full editor UI" exclusion in 6b holds. Proposal: allow the **embeddable component** (niche 2), still no consumer editor (no layers, text, accounts, ads).
+3. Keep the week-16 review; add "Filerobot integration live" and "`.cube` exports used" as signals.
+
+### Next, in this order (as of 4 Nov, end of day)
+1. **`konvaFilter(doc)` in `@rullino/konva`** (needs the maintainer's yes: new public API): a synchronous Konva filter `(imageData) => void` on the CPU fast path, colour steps only at first (pointwise / `perPixel`, baked with `bakeLut` when the whole document is colour-only); tests in Chromium with real Konva (`node.filters([...])`, `cache()`), mutation-checked; then measure preview and save at 1 and 12 MP.
+2. **Filerobot example** (`examples/filerobot-looks`): registers two or three rullino looks as `Konva.Filters.Rullino*` and loads one through `loadableDesignState`; driven by `pnpm test:pack` like the other examples.
+3. **Upstream ask** (the maintainer opens it, not Claude): an issue on Filerobot for custom filters in the Filters tab, with the example as the motivation.
+4. **Playground compare, the rest**: A / B versions (two snapshots of the edit side by side or under the split), a history scrubber over the undo states, long press to compare on touch.
+5. Then decision 2 above (embeddable `<rullino-editor>`), with what 1–3 taught us about how editors embed rullino.
+
+Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
 
 ## 7. Open decisions
 

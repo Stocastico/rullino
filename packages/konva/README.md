@@ -1,8 +1,12 @@
 # @rullino/konva
 
+[![npm](https://img.shields.io/npm/v/@rullino/konva.svg)](https://www.npmjs.com/package/@rullino/konva) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 Edit a [Konva](https://konvajs.org) `Konva.Image` with a [rullino](https://github.com/Stocastico/rullino) edit document: previews rendered on **WebGPU** (or the CPU in a Web Worker, through [`@rullino/web`](https://www.npmjs.com/package/@rullino/web)) at the size the node has on screen, and exports at full resolution.
 
-> 0.x: the API may change between minor versions.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)).
+
+Docs: [Getting started](https://github.com/Stocastico/rullino/blob/main/docs/getting-started.md) · [Concepts](https://github.com/Stocastico/rullino/blob/main/docs/concepts.md) · [the edit document](https://github.com/Stocastico/rullino/blob/main/docs/edit-document.md) · [Troubleshooting](https://github.com/Stocastico/rullino/blob/main/docs/troubleshooting.md)
 
 ## Install
 

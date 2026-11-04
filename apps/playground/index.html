@@ -71,11 +71,14 @@
           <label>Long side <input id="export-size" type="number" min="16" step="1" placeholder="original" /> px</label>
           <button id="export" type="button">Export full resolution</button>
           <p class="hint">JPEG is flattened onto white.</p>
+          <button id="export-cube" type="button" title="The colour steps of the chain as a 3D LUT for video and photo apps">Export look (.cube)</button>
         </section>
         <section>
           <h2>Compare</h2>
           <label><input id="compare" type="checkbox" checked /> Before / after</label>
           <label>Split <input id="split" type="range" min="0" max="1" step="0.001" value="0.5" /></label>
+          <label>Compare with <select id="compare-with"><option value="">Original</option></select></label>
+          <p class="hint">Hold <kbd>\</kbd> to see it over the whole image.</p>
         </section>
       </aside>
       <div id="workspace">

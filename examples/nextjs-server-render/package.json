@@ -1,0 +1,19 @@
+{
+  "name": "rullino-nextjs-server-render",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@rullino/node": "^0.6.0",
+    "@rullino/web": "^0.6.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.0",
+    "webgpu": "^0.6.2"
+  }
+}

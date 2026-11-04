@@ -1,5 +1,5 @@
-import { applyLutCpu, linearToSrgb, runChainCpu, srgbToLinear, createImage, type Step } from '@rullino/core';
-import { contrast, curves, gaussianBlur, invert, saturation } from '@rullino/filters';
+import { applyLutCpu, linearToSrgb, lutFromFunction, runChainCpu, srgbToLinear, createImage, type Step } from '@rullino/core';
+import { applyLut, contrast, curves, gaussianBlur, invert, saturation, vignette } from '@rullino/filters';
 import { describe, expect, it } from 'vitest';
 import { bakeLut } from './bake';
 
@@ -41,7 +41,20 @@ describe('bakeLut', () => {
     expect(Math.max(...errors)).toBeLessThan(0.025);
   });
 
-  it('only accepts pointwise steps (a LUT cannot hold a neighbourhood operation)', () => {
-    expect(() => bakeLut([{ filter: gaussianBlur }])).toThrow(/pointwise/);
+  it('only accepts pointwise and per-pixel steps (a LUT cannot hold a neighbourhood or a position)', () => {
+    expect(() => bakeLut([{ filter: gaussianBlur }])).toThrow(/per pixel/);
+    expect(() => bakeLut([{ filter: vignette }])).toThrow(/per pixel/);
+  });
+
+  it('bakes per-pixel multipass steps too: a LUT step followed by invert', () => {
+    const inverting = lutFromFunction(9, (r, g, b) => [1 - r, 1 - g, 1 - b]);
+    const lut = bakeLut([{ filter: applyLut, params: { look: inverting } }, { filter: invert }], { size: 9 });
+    for (const c of [[0.2, 0.5, 0.9], [0, 1, 0.25]] as const) applyLutCpu(lut, c[0], c[1], c[2]).forEach((v, i) => expect(v).toBeCloseTo(c[i]!, 4));
+  });
+
+  it('refuses masked steps (a mask is a position) and skips disabled ones', () => {
+    expect(() => bakeLut([{ filter: invert, mask: { kind: 'radial', center: [0.5, 0.5], radius: [0.2, 0.2], feather: 0.1 } }])).toThrow(/mask/);
+    const lut = bakeLut([{ filter: invert, enabled: false }], { size: 2 });
+    expect(Array.from(lut.data)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1]);
   });
 });

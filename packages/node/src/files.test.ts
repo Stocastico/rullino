@@ -39,6 +39,14 @@ describe('files through sharp', () => {
     expect(flat.data[(5 * 40 + 35) * 4]).toBeLessThan(10);
   });
 
+  it('accepts quality 0 (the lowest sharp offers is 1)', async () => {
+    for (const format of ['jpeg', 'webp'] as const) {
+      const out = await renderer.render(await halfTransparentPng(), { version: 2, steps: [], output: { format, quality: 0 } });
+      expect(out.format).toBe(format);
+      expect(out.bytes.length).toBeGreaterThan(0);
+    }
+  });
+
   it('applies the EXIF orientation of the input', async () => {
     const raw = new Uint8Array(4 * 2 * 4).fill(255);
     const rotated = await sharp(raw, { raw: { width: 4, height: 2, channels: 4 } }).jpeg().withMetadata({ orientation: 6 }).toBuffer();

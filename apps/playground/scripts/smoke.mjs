@@ -346,6 +346,26 @@ try {
   await after(() => page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup'))));
   check(!(await status()).includes('preview'), `expected a full frame after release, status: ${await status()}`);
 
+  // Compare with a step: the before side shows the picture after the first step (exposure), so with
+  // an invert after it the two sides differ, and with the invert off they are the same.
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'invert'));
+  const compareChoices = await page.$$eval('#compare-with option', (os) => os.map((o) => o.textContent));
+  check(compareChoices.join('|') === 'Original|After 1. Exposure|After 2. Invert', `compare menu should list the original and each step, got ${compareChoices.join('|')}`);
+  await after(() => page.selectOption('#compare-with', { index: 1 }));
+  check((await page.textContent('#handle span')) === 'after 1. Exposure', `split label should name the compared step, got ${await page.textContent('#handle span')}`);
+  check((await differs()) > 0.5, `compared with the exposure step, the invert should differ, ${(await differs() * 100).toFixed(1)}%`);
+  await after(() => page.$eval('#strip li[data-step]:last-of-type input[data-action=toggle]', (t) => { t.checked = false; t.dispatchEvent(new Event('change')); }));
+  check((await differs()) < 0.01, `with the invert off, the before side (after exposure) should equal the result, ${(await differs() * 100).toFixed(1)}% differs`);
+  // Holding backslash shows the before side whole.
+  await page.keyboard.down('\\');
+  check(await page.$eval('#stage', (s) => s.classList.contains('holding')), 'holding \\ should show the before side whole');
+  await page.keyboard.up('\\');
+  check(!(await page.$eval('#stage', (s) => s.classList.contains('holding'))), 'releasing \\ should bring the split back');
+  // Back to the original and the exposure step alone.
+  await after(() => page.selectOption('#compare-with', ''));
+  await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
+  check((await differs()) > 0.3, `compared with the original again, exposure -1 EV should differ, ${(await differs() * 100).toFixed(1)}%`);
+
   // A .cube file loaded into a LUT step changes the image (an inverting LUT).
   const afterPixels = () => page.$eval('#after', (c) => Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data));
   await after(() => page.evaluate((id) => window.rullino.add(id), 'applyLut'));
@@ -370,6 +390,21 @@ try {
   check(colourful < 0.01, `after the Noir look ${(colourful * 100).toFixed(1)}% of pixels still have colour`);
   // Back to the chain without the look's steps, so the checks below see a known chain.
   for (let i = 0; i < 3; i++) await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
+
+  // Export look (.cube): the chain is exposure -1 EV then the inverting LUT, so black maps to white
+  // and white to 1 − sRGB(0.5) ≈ 0.265; a vignette is left out (and said so).
+  await after(() => page.evaluate((id) => window.rullino.add(id), 'vignette'));
+  {
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#export-cube')]);
+    const lines = readFileSync(await download.path(), 'utf8').trimEnd().split('\n');
+    check(download.suggestedFilename() === 'Ramps & hues-look.cube', `expected 'Ramps & hues-look.cube', got ${download.suggestedFilename()}`);
+    check(lines.includes('LUT_3D_SIZE 33') && lines.filter((l) => /^[-\d.]+ [-\d.]+ [-\d.]+$/.test(l)).length === 33 ** 3, `.cube should hold 33³ entries, header: ${lines.slice(0, 3).join(' | ')}`);
+    const [first, last] = [lines.find((l) => /^[\d.]/.test(l)), lines.at(-1)].map((l) => l.split(' ').map(Number));
+    check(first.every((v) => Math.abs(v - 1) < 1e-3), `.cube: black should map to white (exposure, then invert), got ${first}`);
+    check(last.every((v) => Math.abs(v - 0.265) < 0.01), `.cube: white should map to 1 − sRGB(0.5) ≈ 0.265, got ${last}`);
+    check(/left out.*Vignette/.test(await page.textContent('#announce')), `the vignette should be reported as left out: ${await page.textContent('#announce')}`);
+  }
+  await after(() => page.click('#strip li[data-step]:last-of-type button[data-action=remove]'));
 
   // Export happens at full resolution, not at the 2048 px display size.
   await after(() =>

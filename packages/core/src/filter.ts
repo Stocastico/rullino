@@ -151,6 +151,12 @@ export interface MultipassFilterDef<S extends ParamSchema = ParamSchema> extends
    */
   readonly usesMask?: boolean;
   /**
+   * Each output pixel depends only on the same input pixel's colour: no neighbours, no position
+   * (a LUT lookup, say). Like a pointwise filter, it can then be baked into a 3D LUT (`bakeLut`).
+   * The registry test checks it for the built-in filters.
+   */
+  readonly perPixel?: boolean;
+  /**
    * Rows of context the CPU implementations read around a pixel, or `'global'`. Pointwise filters
    * read none. Without it the filter is treated as global (never wrong, never banded); every
    * built-in filter declares it (the registry test checks).

@@ -102,6 +102,23 @@ export function parseCube(text: string): Lut {
   return createLut(size, Float32Array.from(values), { ...(title !== undefined ? { title } : {}), domainMin, domainMax });
 }
 
+/**
+ * Writes a LUT as an Adobe/Resolve .cube file (the format `parseCube` reads): TITLE (double quotes
+ * in it become single ones), LUT_3D_SIZE, DOMAIN_MIN / DOMAIN_MAX unless they are [0, 1]³, then
+ * one RGB triple per line, red fastest, six decimals.
+ */
+export function formatCube(lut: Lut): string {
+  const num = (v: number) => String(Number(v.toFixed(6)) || 0);
+  const triple = (t: ArrayLike<number>) => Array.from(t, num).join(' ');
+  const lines: string[] = [];
+  if (lut.title !== undefined) lines.push(`TITLE "${lut.title.replace(/"/g, "'")}"`);
+  lines.push(`LUT_3D_SIZE ${lut.size}`);
+  const unit = lut.domainMin.every((v) => v === 0) && lut.domainMax.every((v) => v === 1);
+  if (!unit) lines.push(`DOMAIN_MIN ${triple(lut.domainMin)}`, `DOMAIN_MAX ${triple(lut.domainMax)}`);
+  for (let i = 0; i < lut.data.length; i += 3) lines.push(triple(lut.data.subarray(i, i + 3)));
+  return lines.join('\n') + '\n';
+}
+
 /** Reads a HaldCLUT image (level L: L³ x L³ pixels, L² entries per axis) from RGBA bytes. */
 export function parseHald(pixels: Uint8ClampedArray, width: number, height: number): Lut {
   const level = Math.round(Math.cbrt(width));

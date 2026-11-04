@@ -1,5 +1,7 @@
 # @rullino/core
 
+[![npm](https://img.shields.io/npm/v/@rullino/core.svg)](https://www.npmjs.com/package/@rullino/core) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 [![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 
 **[Try it in the playground](https://stefanomasneri.com/rullino/)**
@@ -8,7 +10,7 @@ The core of [rullino](https://github.com/Stocastico/rullino): GPU-first image pr
 
 It holds what every filter builds on: the parameter schema and `defineFilter()`, the cached filter-chain `Pipeline`, masks, geometry (crop, perspective, straighten), 3D LUTs, colour maths, and export to PNG (8/16-bit), JPEG and WebP. The filters themselves are in [`@rullino/filters`](../filters/README.md).
 
-> Pre-alpha (0.x): the API may change between minor versions. Only the package root is public; `@rullino/core/internal` is plumbing without any stability promise.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)). Only the package root is public; `@rullino/core/internal` is plumbing without any stability promise.
 
 **[API reference](https://stefanomasneri.com/rullino/docs/modules/_rullino_core.html)** (generated from the sources)
 

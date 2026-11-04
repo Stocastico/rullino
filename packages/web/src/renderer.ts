@@ -149,7 +149,9 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
   }
   const worker = !ctx && options.worker !== false && !options.filters ? workerBackend(threads, options.pool) : undefined;
 
+  let destroyed = false;
   const run = async (image: LinearImage | Rgba8Image, edit: unknown, scale: number | undefined, pixels: boolean): Promise<LinearImage | Rgba8Image> => {
+    if (destroyed) throw new Error('the renderer was destroyed');
     if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale });
     // Parsed here first: a bad document fails with its own message, and the LUTs it names are
     // resolved on this thread (the resolver is a function, which cannot go to the worker).
@@ -185,6 +187,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       return encodeImage(out, output);
     },
     destroy() {
+      destroyed = true;
       ctx?.device.destroy();
       worker?.terminate();
     },

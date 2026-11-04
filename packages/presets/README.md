@@ -1,12 +1,16 @@
 # @rullino/presets
 
+[![npm](https://img.shields.io/npm/v/@rullino/presets.svg)](https://www.npmjs.com/package/@rullino/presets) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 [![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 
 **[Try it in the playground](https://stefanomasneri.com/rullino/)**
 
 Photo looks for [rullino](https://github.com/Stocastico/rullino): each look is a recipe of ordinary filters (a colour grade baked once into a 3D LUT, plus vignette and grain), so there are no third-party LUT licences and a look is just a list of chain steps you can edit.
 
-> Pre-alpha (0.x): the API may change between minor versions.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)).
+
+Docs: [Getting started](https://github.com/Stocastico/rullino/blob/main/docs/getting-started.md) · [Concepts](https://github.com/Stocastico/rullino/blob/main/docs/concepts.md) · [the edit document](https://github.com/Stocastico/rullino/blob/main/docs/edit-document.md) · [Troubleshooting](https://github.com/Stocastico/rullino/blob/main/docs/troubleshooting.md)
 
 **[API reference](https://stefanomasneri.com/rullino/docs/modules/_rullino_presets.html)** (generated from the sources)
 
@@ -25,7 +29,7 @@ const out = runChainCpu(steps, createImage(16, 16));
 console.log(out.width);
 ```
 
-`lookLut(look)` returns the baked 33³ LUT, and `bakeLut` bakes any chain of pointwise filters into one. A baked grade clamps HDR values to [0, 1] and differs from the live chain by less than 1/255 on average.
+`lookLut(look)` returns the baked 33³ LUT, and `bakeLut` bakes any chain of pointwise (or per-pixel, like `applyLut`) filters into one; `formatCube` from `@rullino/core` writes it as a `.cube` file. A baked grade clamps HDR values to [0, 1] and differs from the live chain by less than 1/255 on average.
 
 ## Looks as edit documents
 

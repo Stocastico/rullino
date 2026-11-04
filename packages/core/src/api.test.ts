@@ -10,7 +10,7 @@ describe('@rullino/core public API', () => {
     'applyLutCpu', 'blendMasked', 'compareImages', 'createGpuContext', 'createImage', 'createLut',
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
     'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
-    'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
+    'formatCube', 'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
     'isIdentityGeometry', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
     'maskImage', 'maskValue', 'migrateChain', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseHald',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',

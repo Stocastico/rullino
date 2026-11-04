@@ -70,6 +70,9 @@ figure { margin: 0; padding: 24px; display: grid; justify-items: center; align-i
 }
 #before { clip-path: inset(0 calc(100% - var(--split, 50%)) 0 0); }
 #stage.single #before, #stage.single #handle { display: none; }
+/* Holding the compare key shows the before side whole, also in single view. */
+#stage.holding #before { display: block; clip-path: none; }
+#stage.holding #handle { display: none; }
 #handle { grid-area: 1 / 1; place-self: stretch; pointer-events: none; position: relative; }
 #handle::before { content: ''; position: absolute; top: 0; bottom: 0; left: var(--split, 50%); width: 1px; background: var(--accent); }
 #handle span { position: absolute; top: 8px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgb(0 0 0 / 0.55); }

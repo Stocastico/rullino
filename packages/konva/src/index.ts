@@ -42,6 +42,7 @@ export async function attachEdit(node: Konva.Image, options: AttachEditOptions =
         ? renderer.apply(full, { version: 2, steps: [] })
         : renderer.apply(full, { version: 2, steps: [], output: { longSide } });
       preview = { longSide, image };
+      image.catch(() => preview?.image === image && (preview = undefined)); // a failure is not kept: the next set() tries again
     }
     return preview.image;
   };
@@ -56,7 +57,9 @@ export async function attachEdit(node: Konva.Image, options: AttachEditOptions =
     const scale = node.getAbsoluteScale();
     const ratio = options.pixelRatio ?? globalThis.devicePixelRatio ?? 1;
     const onScreen = Math.max(node.width() * Math.abs(scale.x), node.height() * Math.abs(scale.y)) * ratio;
-    const src = await previewFor(Math.max(1, Math.min(Math.round(onScreen), Math.max(full.width, full.height))));
+    // A crop shows only part of the source on the node: the source must be that much larger.
+    const wanted = onScreen * croppedFactor(edit, full.width, full.height);
+    const src = await previewFor(Math.max(1, Math.min(Math.round(wanted), Math.max(full.width, full.height))));
     const out = await renderer.pixels(src, withoutOutput(edit), { scale: src.width / full.width });
     if (detached) return;
     [canvas.width, canvas.height] = [out.width, out.height];
@@ -98,6 +101,18 @@ export async function attachEdit(node: Konva.Image, options: AttachEditOptions =
       if (own) renderer.destroy();
     },
   };
+}
+
+/**
+ * How many times larger than the node the source must be so that the document's crop still fills it
+ * (the turn counted; straighten and perspective ignored). 1 without a crop.
+ */
+function croppedFactor(edit: any, w: number, h: number): number {
+  const g = edit?.geometry;
+  const c = g?.crop;
+  if (!(c?.width > 0 && c?.height > 0)) return 1;
+  const [u, v] = g.rotate % 180 === 90 ? [h, w] : [w, h];
+  return Math.max(w, h) / Math.max(c.width * u, c.height * v);
 }
 
 /** The document without its `output`, which only applies to exports. */

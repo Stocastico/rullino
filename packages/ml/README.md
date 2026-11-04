@@ -1,5 +1,7 @@
 # @rullino/ml
 
+[![npm](https://img.shields.io/npm/v/@rullino/ml.svg)](https://www.npmjs.com/package/@rullino/ml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+
 [![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 
 **[Try it in the playground](https://stefanomasneri.com/rullino/)**
@@ -14,7 +16,9 @@ Optional machine-learning tools for [rullino](https://github.com/Stocastico/rull
 
 The weights are **not bundled**: `fetchModel` downloads a pinned revision from Hugging Face on first use and caches it in the browser (Cache API). Licences and sources are in [THIRD_PARTY_NOTICES.md](https://github.com/Stocastico/rullino/blob/main/THIRD_PARTY_NOTICES.md).
 
-> Pre-alpha (0.x): the API may change between minor versions.
+> 0.x: the API may change between minor versions (see the [changelog](https://github.com/Stocastico/rullino/blob/main/CHANGELOG.md)).
+
+Docs: [Getting started](https://github.com/Stocastico/rullino/blob/main/docs/getting-started.md) · [Concepts](https://github.com/Stocastico/rullino/blob/main/docs/concepts.md) · [the edit document](https://github.com/Stocastico/rullino/blob/main/docs/edit-document.md) · [Troubleshooting](https://github.com/Stocastico/rullino/blob/main/docs/troubleshooting.md)
 
 **[API reference](https://stefanomasneri.com/rullino/docs/modules/_rullino_ml.html)** (generated from the sources)
 
