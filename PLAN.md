@@ -250,8 +250,8 @@ The question raised: now that the engine is complete (51 filters, GPU + CPU, wor
 
 ### UX worth copying (cheap, now)
 The split view exists. On top of it:
-- **Compare with any step**: the split's "before" side can be any frame of the film strip (not only the original), so you see what one step changed; "up to here" already computes those prefixes.
-- **Hold to compare** (a key or long press shows the original) and **A / B versions**: two snapshots of the edit (history already keeps immutable states) side by side or under the split.
+- ~~**Compare with any step**~~ (done 4 Nov): the split's "before" side is the original or the picture after a chosen step (**Compare with** menu), so you see what the later steps changed.
+- ~~**Hold to compare**~~ (done 4 Nov: hold `\`, as in Lightroom; a long press on touch is still open) and **A / B versions**: two snapshots of the edit (history already keeps immutable states) side by side or under the split.
 - **History scrubber**: a slider over undo states, to see the edit evolve.
 
 ### Proposed next steps (for the user to accept or change)
