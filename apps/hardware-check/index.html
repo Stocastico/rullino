@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>rullino hardware check</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #fafaf8; --fg: #1c1c1a; --muted: #6b6b66; --line: #d9d9d3; --ok: #1a7f37; --bad: #b42318; --accent: #2b59c3; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #16161a; --fg: #ececea; --muted: #9a9a94; --line: #34343a; --ok: #4ac26b; --bad: #ff7b72; --accent: #7aa2ff; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+    main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+    h2 { font-size: 1.1rem; margin: 2rem 0 .5rem; }
+    p, li { color: var(--muted); }
+    button { font: inherit; padding: .55rem 1rem; border-radius: .5rem; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; margin: 0 .5rem .5rem 0; }
+    button.secondary { background: transparent; color: var(--accent); }
+    button:disabled { opacity: .5; cursor: default; }
+    pre { background: color-mix(in srgb, var(--fg) 6%, transparent); padding: .75rem; border-radius: .5rem; overflow-x: auto; font-size: .85rem; white-space: pre-wrap; word-break: break-word; }
+    table { border-collapse: collapse; width: 100%; font-size: .85rem; display: block; overflow-x: auto; }
+    th, td { border-bottom: 1px solid var(--line); padding: .3rem .5rem; text-align: left; white-space: nowrap; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+    progress { width: 100%; }
+    #status { min-height: 1.5rem; color: var(--fg); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>rullino hardware check</h1>
+  <p>Checks how far <strong>this browser's GPU</strong> is from rullino's CPU reference for every filter (about a minute; the page stays usable), and how long an export takes here. Nothing is uploaded: the numbers stay on this page until you copy them.</p>
+
+  <h2>1. This device</h2>
+  <pre id="env">…</pre>
+
+  <h2>2. Parity: GPU against CPU</h2>
+  <button id="run-parity">Run the parity check</button>
+  <progress id="progress" value="0" max="1" hidden></progress>
+  <div id="status" aria-live="polite"></div>
+  <div id="parity"></div>
+
+  <h2>3. Speed</h2>
+  <p>A typical chain (exposure, contrast, blur, unsharp mask) on a 1 MP and a 12 MP picture, on the GPU and on the CPU (workers). The CPU run at 12 MP can take tens of seconds on an old machine.</p>
+  <button id="run-speed" class="secondary">Run the speed check</button>
+  <div id="speed"></div>
+
+  <h2>4. Send me the result</h2>
+  <button id="copy" class="secondary" disabled>Copy the report</button>
+  <button id="download" class="secondary" disabled>Download as a file</button>
+  <p>Paste the copied text into the issue "Parity on real GPUs", with the device's name (for example "MacBook Pro 2015, Intel, macOS 12, Safari").</p>
+</main>
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

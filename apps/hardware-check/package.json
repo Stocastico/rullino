@@ -1,0 +1,21 @@
+{
+  "name": "@rullino/hardware-check",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A page that checks, in any browser on any device, how far its GPU is from the CPU references and how fast an export is. No install: it is deployed next to the playground (…/check/).",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@rullino/core": "workspace:*",
+    "@rullino/filters": "workspace:*",
+    "@rullino/web": "workspace:*"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "vite": "8.3.5"
+  }
+}
