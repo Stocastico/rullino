@@ -4,19 +4,16 @@ Things only the maintainer can do before going public. Delete the file when it i
 
 ## 1. Test on real hardware (the "within the published tolerance" claim)
 
-The tolerances are verified on software GPUs and one RTX 40 (Windows, Chrome). Needed: one run per machine below, results kept in a file named `parity-<machine>.md`, attached to a comment on a new issue "Parity on real GPUs" (Claude then decides per filter, as for the RTX).
+The tolerances are verified on software GPUs and one RTX 40 (Windows, Chrome). Needed: one run per machine/browser below. **Nothing to install**: open **https://stefanomasneri.com/rullino/check/** (live after the PR with the page is merged and the Pages deploy has run), press the three buttons in order (device is described on load; "Run the parity check", about a minute; "Run the speed check"), then **Copy the report** (or **Download as a file** if copying fails) and paste it as a comment on a new issue "Parity on real GPUs", with the machine's name and macOS version. Claude then decides per filter, as for the RTX.
 
-On each machine: `git clone`, `pnpm install` (Node >= 22.12, pnpm 10), `pnpm exec playwright install chromium` if needed.
+- [ ] **Mac M1**: Chrome, Safari, Firefox (three runs; WebGPU in Safari needs a recent macOS, in Firefox a recent version).
+- [ ] **Mac Intel (10 years old)**: Safari and Chrome. It may have no WebGPU at all (old macOS / old GPU): then the page says "WebGPU: NOT AVAILABLE", and that *is* the result; still press "Run the speed check" (the CPU numbers at 12 MP matter most here) and copy the report.
+- [ ] **Windows laptop**: Firefox, and Chrome if its GPU is not the RTX.
+- [ ] A **phone** (iOS Safari, Android Chrome): same page; the speed check at 12 MP may be heavy, stop it if the page gets stuck and say so.
+- [ ] **The playground itself** on each of the above (https://stefanomasneri.com/rullino/): load a sample, add 3 effects (a curve, a blur, a look), try Compare, Export. Is the status "On the GPU" or "On the CPU (reason)"? Anything black, slow or broken? A share link or the **Code** button's JSON goes with each problem.
+- [ ] Optional, only on a machine that has Node 22 and pnpm: `pnpm report:parity` gives the same numbers as the page (the page is the easy way).
 
-- [ ] **Mac M1** (Apple GPU), Chrome: `pnpm report:parity`; then `pnpm test:browser` and note which tests fail.
-- [ ] **Mac M1**, Safari (WebGPU needs a recent macOS; Develop menu > Feature Flags if it is off): open the [playground](https://stefanomasneri.com/rullino/), load a sample, add 3 effects (a curve, a blur, a look), try Compare, Export. Note: does it say "On the GPU" or "On the CPU (reason)"? Anything black, slow, or broken?
-- [ ] **Mac M1**, Firefox: same playground check.
-- [ ] **Mac Intel (10 years old)**, Chrome and Safari: same playground check. It will probably be the CPU fallback or a weak GPU; the interesting thing is how slow a 12 MP export is (use a big photo) and whether it freezes the page.
-- [ ] **Windows laptop**, Firefox (and Chrome if the GPU differs from the RTX): playground check; if it has an Intel or AMD GPU, `pnpm report:parity` too.
-- [ ] A **phone** (iOS Safari, Android Chrome): open the playground once. Does the page work at all?
-- [ ] Optional, if you have a minute: `pnpm bench:web` on the M1 (prints a URL to open in its browser) for a second set of benchmark numbers.
-
-For each failure write down: machine, OS and browser versions, what you did, a screenshot or the share link (the playground's Share button) or the **Code** button's JSON.
+For each failure write down: machine, OS and browser versions, what you did, a screenshot.
 
 ## 2. GitHub settings (only you can)
 

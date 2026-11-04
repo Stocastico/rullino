@@ -38,6 +38,9 @@ jobs:
       - run: pnpm --filter @rullino/playground build
       # The API reference goes next to the playground (dist/docs); it must come after the Vite build, which empties dist/.
       - run: pnpm build:docs
+      # The hardware check page (…/check/): built on its own and copied in after the Vite build above, which empties dist/.
+      - run: pnpm --filter @rullino/hardware-check build
+      - run: cp -r apps/hardware-check/dist apps/playground/dist/check
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

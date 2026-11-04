@@ -62,6 +62,8 @@ jobs:
       - run: pnpm test:e2e
       # The same build served from a sub-path, as on GitHub Pages: no root-absolute URLs, no 404s.
       - run: pnpm test:e2e:base
+      # The hardware check page (built by `pnpm build`): runs the parity check on two filters and the speed check in headless Chromium.
+      - run: pnpm --filter @rullino/hardware-check smoke
       # Timings are not asserted (shared runners vary); this only checks that the benchmark runs.
       - run: pnpm bench
       # The CPU benchmark is bundled before it runs: check the bundle builds and runs (one filter).
