@@ -39,6 +39,27 @@ export async function edit(node: ImageNode): Promise<Blob> {
 
 Documents come from `serializeChain` in `@rullino/core`, the playground's share links or `lookEdit` in `@rullino/presets`.
 
+## As a plain Konva filter
+
+Konva filters are synchronous, so GPU rendering is not possible in one; `konvaFilter(doc)` gives you the part that can run there: **colour edits** (exposure, curves, saturation, white balance, LUTs and the built-in looks: steps that turn each pixel's colour into another, without masks). The whole document is baked once into a 33³ colour LUT, and every pixel then costs one lookup, so it works wherever Konva filters do: `node.filters([...])` + `node.cache()`, or by name in tools that look filters up in `Konva.Filters` (such as Filerobot's `loadableDesignState`).
+
+```ts
+import { konvaFilter } from '@rullino/konva';
+
+type ImageNode = Parameters<typeof import('@rullino/konva').attachEdit>[0]; // a Konva.Image
+
+export function applyNoir(node: ImageNode): void {
+  const noir = konvaFilter({ version: 2, steps: [{ filter: 'applyLut', params: { look: { ref: 'look:noir' } } }] });
+  node.filters([noir]);
+  node.cache(); // Konva runs the filter on the node's pixels
+}
+```
+
+- It throws when the document needs more than a colour edit (a blur, a vignette, a mask, a crop or turn), instead of doing less. Use `attachEdit` for those.
+- Compared with the full renderers the result differs by less than one level on average (a few levels near the edge of the colour gamut): the bake is a 33³ grid, and values above 1 (HDR) are clamped.
+- Speed, measured in a cloud container: the bake takes about 0.3 s when the filter is created; applying it costs about 45 ms per megapixel (a 12 MP photo in about half a second), on the main thread.
+- `Konva.Filters.MyLook = konvaFilter(doc)` registers it by name. `filters` and `resolveLut` options replace the built-in filter registry and the `look:<id>` LUTs.
+
 ## License
 
 MIT.

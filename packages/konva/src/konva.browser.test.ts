@@ -1,7 +1,7 @@
 import { createRenderer, type Renderer } from '@rullino/web';
 import Konva from 'konva';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { attachEdit } from './index';
+import { attachEdit, konvaFilter } from './index';
 
 /** A 400 x 300 source: a horizontal grey ramp, opaque. */
 function source(): HTMLCanvasElement {
@@ -125,5 +125,24 @@ describe('attachEdit', () => {
   it('needs an image to edit', async () => {
     const { renderer } = await setup();
     await expect(attachEdit(new Konva.Image({ image: undefined }), { renderer })).rejects.toThrow(/image/);
+  });
+
+  it('konvaFilter is a plain Konva filter: node.filters() and cache() apply it, and clearing the cache removes it', async () => {
+    const { node, original } = await setup(400, 300);
+    const red = (c: HTMLCanvasElement, x: number, y: number) => c.getContext('2d')!.getImageData(x, y, 1, 1).data[0]!;
+    const before = red(original, 200, 150);
+    // Konva calls it with the node's ImageData; filters registered by name are looked up the same way.
+    (Konva.Filters as Record<string, unknown>).RullinoBrighter = konvaFilter(brighter(1));
+    node.filters([(Konva.Filters as unknown as Record<string, (d: ImageData) => void>).RullinoBrighter!]);
+    node.cache();
+    const after = red(node.toCanvas({ pixelRatio: 1 }) as HTMLCanvasElement, 200, 150);
+    expect(after).toBeGreaterThan(before + 20);
+    // The same pixels as the filter applied by hand to the source.
+    const data = original.getContext('2d')!.getImageData(0, 0, 400, 300);
+    konvaFilter(brighter(1))(data);
+    expect(Math.abs(after - data.data[(150 * 400 + 200) * 4]!)).toBeLessThanOrEqual(1);
+    node.clearCache();
+    node.filters([]);
+    expect(red(node.toCanvas({ pixelRatio: 1 }) as HTMLCanvasElement, 200, 150)).toBe(before);
   });
 });
