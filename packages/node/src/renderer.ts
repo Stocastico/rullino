@@ -155,7 +155,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       if (format === 'png') return done(new Uint8Array(await (await encodeImage(out, output)).arrayBuffer()));
       const sharp = await loadSharp(`${format.toUpperCase()} output`);
       const encoder = sharp(exportSamples(out, output) as Uint8ClampedArray, { raw: { width: out.width, height: out.height, channels: 4 } });
-      const quality = output.quality === undefined ? undefined : Math.round(output.quality * 100);
+      const quality = output.quality === undefined ? undefined : Math.max(1, Math.round(output.quality * 100)); // sharp takes 1-100
       const file = format === 'jpeg' ? encoder.jpeg(quality === undefined ? {} : { quality }) : encoder.webp(quality === undefined ? {} : { quality });
       return done(new Uint8Array(await file.toBuffer()));
     },
