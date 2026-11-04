@@ -249,5 +249,12 @@ describe('createRenderer({ threads }) (browser)', () => {
     setTimeout(() => r.destroy(), 20);
     await expect(pending).rejects.toThrow(/destroyed|failed/);
   });
+
+  it('a destroyed renderer rejects new renders instead of starting a worker nobody stops', async () => {
+    const r = await make({ backend: 'cpu' });
+    r.destroy();
+    await expect(r.apply(src, edit)).rejects.toThrow(/destroyed/);
+    await expect(r.pixels(src, edit)).rejects.toThrow(/destroyed/);
+  });
 });
 

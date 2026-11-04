@@ -24,7 +24,7 @@ describe('degenerate sizes', () => {
     for (const [w, h] of sizes) {
       it(`${f.id} ${w}x${h}`, () => {
         for (const [name, params] of parityCases(f.params)) {
-          const step = [{ filter: f, params, ...(f.usesMask ? { mask: brush } : {}) }] as never;
+          const step = [{ filter: f, params, ...(f.kind === 'multipass' && f.usesMask ? { mask: brush } : {}) }] as never;
           const ref = runChainCpu(step, noise(w, h));
           const fast = runChainCpu(step, noise(w, h), { fast: true });
           for (const out of [ref, fast]) {
