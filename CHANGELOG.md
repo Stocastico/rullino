@@ -11,6 +11,9 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+### Changed
+- Playground without WebGPU (Firefox, Safari, older machines): the CPU fallback now renders in `@rullino/web`'s worker with the fast paths instead of the reference on the main thread, so the page stays usable (Kuwahara on a 1024 px picture: 3.2 s frozen → 1.2 s in the background). Chains that cannot travel to a worker (a LUT file loaded by hand, an ML patch or depth map) still render on the main thread, with the fast paths. New e2e `pnpm test:e2e:cpu` runs the built playground in a browser with no WebGPU.
+
 ## [0.7.0]
 
 Documentation for integrators, a synchronous Konva filter for colour edits, `.cube` export and three bug fixes.
