@@ -66,7 +66,7 @@ createServer(async (req, res) => {
 }).listen(3000);
 ```
 
-For a whole folder, see [`examples/node-batch`](https://github.com/Stocastico/rullino/tree/main/examples/node-batch).
+For a whole folder without writing code, `npx rullino render --edit edit.json photos/ -o out/` (see [`@rullino/node`'s README](../../packages/node/README.md#from-the-command-line)); as a script, see [`examples/node-batch`](https://github.com/Stocastico/rullino/tree/main/examples/node-batch).
 
 ## What matches, and what does not
 

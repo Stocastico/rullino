@@ -12,10 +12,14 @@ const walk = (dir) => readdirSync(dir).sort().flatMap((n) => (statSync(join(dir,
 const gz = (files) => gzipSync(Buffer.concat(files.map((f) => readFileSync(f))), { level: 9 }).length;
 
 const measured = {};
-for (const name of Object.keys(budget).filter((k) => k.startsWith('packages/'))) {
+for (const name of Object.keys(budget).filter((k) => k.startsWith('packages/') && k !== 'packages/node-cli')) {
   const dist = join(repo, name, 'dist');
   if (!existsSync(dist)) throw new Error(`${dist} does not exist: run pnpm build first`);
-  measured[name] = gz(walk(dist).filter((f) => f.endsWith('.js')));
+  // The `rullino` command (bin.js, cli.js) is measured apart: importing the library never loads it.
+  const js = walk(dist).filter((f) => f.endsWith('.js'));
+  const isCli = (f) => /[\\/](bin|cli)\.js$/.test(f);
+  measured[name] = gz(js.filter((f) => !isCli(f)));
+  if (name === 'packages/node') measured['packages/node-cli'] = gz(js.filter(isCli));
 }
 const assets = join(repo, 'apps/playground/dist/assets');
 if (!existsSync(assets)) throw new Error(`${assets} does not exist: run pnpm build first`);

@@ -85,7 +85,7 @@ export async function renderFile(input: string, edit: unknown, output: string): 
 }
 ```
 
-The document that previewed in the browser is the document you pass here, and the file agrees with the preview within each filter's [published tolerance](./parity.md). More in [the same edit on the server](./guides/same-edit-on-the-server.md), including an HTTP endpoint and `threads` for CPU-only machines; [`examples/node-batch`](https://github.com/Stocastico/rullino/tree/main/examples/node-batch) renders a folder of photos and [`examples/nextjs-server-render`](https://github.com/Stocastico/rullino/tree/main/examples/nextjs-server-render) is a Next.js app that previews in the browser and renders on the server.
+The document that previewed in the browser is the document you pass here, and the file agrees with the preview within each filter's [published tolerance](./parity.md). More in [the same edit on the server](./guides/same-edit-on-the-server.md), including an HTTP endpoint and `threads` for CPU-only machines; `npx rullino render --edit edit.json photos/ -o out/` renders a folder without any code, [`examples/node-batch`](https://github.com/Stocastico/rullino/tree/main/examples/node-batch) does it as a script and [`examples/nextjs-server-render`](https://github.com/Stocastico/rullino/tree/main/examples/nextjs-server-render) is a Next.js app that previews in the browser and renders on the server.
 
 ## On a Konva canvas
 

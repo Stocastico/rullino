@@ -4,7 +4,7 @@
 //   2. imports them under plain Node ESM and runs the CPU path,
 //   3. bundles them with Vite and runs a GPU filter in headless Chromium, compared with the CPU one,
 //   4. builds examples/konva-editor against them and moves its exposure slider,
-//   5. runs examples/node-batch on a folder of photos and checks the files it writes,
+//   5. runs examples/node-batch on a folder of photos and checks the files it writes, then the `rullino` command of the node tarball on the same photos,
 //   6. builds examples/worker-fallback and drives it on the CPU worker backend,
 //   7. builds examples/nextjs-server-render with Next.js, starts it and drives preview + server render in Chromium,
 //   8. builds examples/filerobot-looks (Filerobot Image Editor with konvaFilter looks) and switches looks in it.
@@ -144,6 +144,14 @@ console.log(JSON.stringify(out));
   check(sizes === '1600x1200,1600x1200', `node-batch example output sizes: ${sizes}`);
   check(/2 photos/.test(batchLog), `node-batch example log: ${batchLog.trim()}`);
   console.log(`pack-smoke: node-batch example ${batchLog.trim().split('\n').pop()}`);
+
+  // 5b. The `rullino` command the @rullino/node tarball installs (node_modules/.bin), on the same photos.
+  const cli = join(project, 'node_modules', '.bin', process.platform === 'win32' ? 'rullino.cmd' : 'rullino');
+  const cliLog = run(cli, ['render', '--edit', 'edit.json', 'photos', '-o', 'cli-out', '--backend', 'cpu'], batch);
+  const cliWritten = existsSync(join(batch, 'cli-out')) ? readdirSync(join(batch, 'cli-out')).sort() : [];
+  check(cliWritten.join() === 'one.jpg,two.jpg' && /2 photos/.test(cliLog), `rullino command wrote ${cliWritten.join() || 'nothing'}: ${cliLog.trim()}`);
+  check(run(cli, ['looks'], batch).split('\n').includes('golden'), 'rullino looks does not list the golden look');
+  console.log(`pack-smoke: rullino command ${cliLog.trim().split('\n').pop()}`);
 
   // 3. Bundle with Vite and run a GPU filter in Chromium.
   writeFileSync(join(project, 'index.html'), '<!doctype html><html><body><script type="module" src="./main.js"></script></body></html>');

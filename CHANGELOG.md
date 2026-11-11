@@ -11,6 +11,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+### Added
+- Documentation: [Benchmarks](docs/benchmarks.md), the real-hardware numbers (GPU against PixiJS, wasm-vips and Photon; the CPU backend on worker threads) with the machine, the code each came from, the losses and the limits.
+- **node**: the `rullino` command (`npx rullino render --edit edit.json photos/ -o out/`, `--look <id>`, `rullino looks`): renders an edit document or a built-in look onto files and folders, with `--format`, `--quality`, `--long-side`, `--backend` and `--threads`. It never overwrites an input and reports a bad document once, before reading any photo. Exit codes: 0 ok, 1 a photo failed, 2 usage. `pnpm test:pack` runs it from the installed tarball.
+
 ### Changed
 - Playground without WebGPU (Firefox, Safari, older machines): the CPU fallback now renders in `@rullino/web`'s worker with the fast paths instead of the reference on the main thread, so the page stays usable (Kuwahara on a 1024 px picture: 3.2 s frozen → 1.2 s in the background). Chains that cannot travel to a worker (a LUT file loaded by hand, an ML patch or depth map) still render on the main thread, with the fast paths. New e2e `pnpm test:e2e:cpu` runs the built playground in a browser with no WebGPU.
 
