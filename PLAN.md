@@ -274,7 +274,8 @@ The split view exists. On top of it:
 2. ~~**Filerobot example** (`examples/filerobot-looks`)~~ (done 4 Nov): registers two or three rullino looks as `Konva.Filters.Rullino*` and loads one through `loadableDesignState`; driven by `pnpm test:pack` like the other examples.
 3. **Upstream ask** (the maintainer opens it, not Claude): an issue on Filerobot for custom filters in the Filters tab, with the example as the motivation.
 4. **Playground compare, the rest**: A / B versions (two snapshots of the edit side by side or under the split), a history scrubber over the undo states, long press to compare on touch.
-5. Then decision 2 above (embeddable `<rullino-editor>`), with what 1–3 taught us about how editors embed rullino.
+5. (Added 11 Nov: ~~**`rullino` CLI**~~ in `@rullino/node`, `npx rullino render --edit edit.json photos/ -o out/`, done.)
+6. Then decision 2 above (embeddable `<rullino-editor>`), with what 1–3 taught us about how editors embed rullino.
 
 Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
 

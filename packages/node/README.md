@@ -62,6 +62,19 @@ createServer(async (req, res) => {
 }).listen(3000);
 ```
 
+### From the command line
+
+Installing `@rullino/node` also installs a `rullino` command: no script needed to render an edit onto photos.
+
+```sh
+npm install @rullino/node sharp            # sharp reads the photos; add webgpu for the GPU
+npx rullino render --edit edit.json photos/ -o out/              # a document from the playground's Code button
+npx rullino render --look golden photo.jpg -o out/ --format jpeg --quality 0.9 --long-side 2048
+npx rullino looks                                                 # the built-in looks
+```
+
+`--format`, `--quality` and `--long-side` override the document's `output`; `--backend auto|gpu|cpu` and `--threads <n|auto>` choose where it runs. Folders are read without descending into sub-folders. It never overwrites an input, and a bad document is reported once, before any photo is read. Exit code 0 when every photo rendered, 1 when one failed, 2 for a usage error.
+
 ### A folder of photos
 
 [`examples/node-batch`](https://github.com/Stocastico/rullino/tree/main/examples/node-batch) renders one edit document onto every photo in a folder (`node batch.mjs edit.json photos out`).
