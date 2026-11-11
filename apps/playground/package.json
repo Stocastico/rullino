@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:cpu": "node scripts/smoke-cpu.mjs",
     "smoke:ml": "node scripts/smoke-ml.mjs",
     "smoke:base": "node scripts/smoke-base.mjs"
   },
@@ -16,6 +17,7 @@
     "@rullino/filters": "workspace:*",
     "@rullino/ml": "workspace:*",
     "@rullino/presets": "workspace:*",
+    "@rullino/web": "workspace:*",
     "onnxruntime-web": "1.31.1"
   },
   "devDependencies": {
