@@ -115,6 +115,9 @@ importers:
       '@rullino/presets':
         specifier: workspace:*
         version: link:../../packages/presets
+      '@rullino/web':
+        specifier: workspace:*
+        version: link:../../packages/web
       onnxruntime-web:
         specifier: 1.31.1
         version: 1.31.1

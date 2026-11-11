@@ -9,6 +9,8 @@ const tag = version.includes('-') ? '@next' : '';
 export default defineConfig({
   // Relative base so the build works from any path (e.g. GitHub Pages project site).
   base: './',
+  // Vite's dependency pre-bundling breaks `new URL('./worker.js', import.meta.url)` inside packages.
+  optimizeDeps: { exclude: ['@rullino/web'] },
   plugins: [
     {
       name: 'rullino-version',

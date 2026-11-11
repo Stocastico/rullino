@@ -35,6 +35,7 @@ import {
   type Step,
 } from '@rullino/core';
 import { autoAdjust, filters } from '@rullino/filters';
+import { createRenderer as createWebRenderer, type Renderer as WebRenderer } from '@rullino/web';
 import { growMask, type OrtModule, type SamPoint } from '@rullino/ml';
 import { bakeLut, lookLutRef, looks, lookSteps, resolveLookLut } from '@rullino/presets';
 import { createEffectBrowser } from './effect-browser';
@@ -347,17 +348,40 @@ function gpuRenderer(gpu: GpuContext): Renderer {
 function cpuRenderer(): Renderer {
   let raw: LinearImage | undefined;
   let source: LinearImage | undefined;
+  let framing: Geometry | undefined;
   let scale = 1;
+  // The CPU backend of @rullino/web: a worker (and band workers) renders, so the page stays usable.
+  let web: Promise<WebRenderer> | undefined;
+  const worker = () => (web ??= createWebRenderer({ backend: 'cpu', resolveLut: resolveLookLut }));
+  /**
+   * The chain as an edit document for the worker, or undefined when it cannot travel (a LUT file
+   * loaded by hand, an ML patch or depth map): those steps render on the main thread.
+   */
+  const documentFor = (steps: Step[]): unknown | undefined => {
+    try {
+      return serializeChain(steps, { ...(framing && !isIdentityGeometry(framing) ? { geometry: framing } : {}), lutRef: lookLutRef });
+    } catch {
+      return undefined;
+    }
+  };
   const frame = async (g: Geometry): Promise<[number, number]> => {
     if (!raw) throw new Error('no image loaded');
+    framing = g;
     source = isIdentityGeometry(g) ? raw : applyGeometryCpu(raw, g);
     ui.before.width = source.width;
     ui.before.height = source.height;
     beforeCtx.putImageData(new ImageData(encodeSrgb8(source) as Uint8ClampedArray<ArrayBuffer>, source.width, source.height), 0, 0);
     return [source.width, source.height];
   };
+  /** 8-bit pixels of the framed image after `steps`. */
+  const pixels = async (steps: Step[]): Promise<ImageData> => {
+    const doc = documentFor(steps);
+    if (doc !== undefined) return (await worker()).pixels(raw!, doc, { scale });
+    const out = runChainCpu(steps, source!, { scale, fast: true });
+    return new ImageData(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
+  };
   return {
-    name: 'CPU reference',
+    name: 'CPU',
     async load(image, g) {
       // Canvas resize happens in sRGB; acceptable for the fallback path.
       const [w, h] = fitWithin(image.width, image.height, CPU_SIDE);
@@ -370,15 +394,15 @@ function cpuRenderer(): Renderer {
     setGeometry: frame,
     async render(steps) {
       if (!source) return;
-      const out = runChainCpu(steps, source, { scale });
-      await present(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
+      const out = await pixels(steps);
+      await present(out.data as Uint8ClampedArray<ArrayBuffer>, out.width, out.height);
     },
     async renderBefore(steps) {
       if (!source) return;
-      const out = runChainCpu(steps, source, { scale });
+      const out = await pixels(steps);
       ui.before.width = out.width;
       ui.before.height = out.height;
-      beforeCtx.putImageData(new ImageData(encodeSrgb8(out) as Uint8ClampedArray<ArrayBuffer>, out.width, out.height), 0, 0);
+      beforeCtx.putImageData(out, 0, 0);
     },
     async maskSource(w, h) {
       if (!source) throw new Error('no image loaded');
@@ -388,12 +412,14 @@ function cpuRenderer(): Renderer {
       if (!source) throw new Error('no image loaded');
       const [w, h] = fitWithin(source.width, source.height, maxSide);
       const tiny = downscaleCpu(source, w, h);
-      return chains.map((steps) => new ImageData(encodeSrgb8(runChainCpu(steps, tiny, { scale: (scale * w) / source!.width })) as Uint8ClampedArray<ArrayBuffer>, w, h));
+      return chains.map((steps) => new ImageData(encodeSrgb8(runChainCpu(steps, tiny, { scale: (scale * w) / source!.width, fast: true })) as Uint8ClampedArray<ArrayBuffer>, w, h));
     },
     async export(steps, options, longSide, g) {
       if (!raw) throw new Error('no image loaded');
       // The CPU fallback only ever has the reduced image.
-      const out = runChainCpu(steps, isIdentityGeometry(g) ? raw : applyGeometryCpu(raw, g), { scale });
+      framing = g;
+      const doc = documentFor(steps);
+      const out = doc !== undefined ? await (await worker()).apply(raw, doc, { scale }) : runChainCpu(steps, isIdentityGeometry(g) ? raw : applyGeometryCpu(raw, g), { scale, fast: true });
       const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
       return encodeImage(w === out.width ? out : downscaleCpu(out, w, h), options);
     },
