@@ -8,7 +8,7 @@ Symptoms first, then the cause and the fix. If yours is not here, [open an issue
 
 | `reason` mentions... | Cause and fix |
 |---|---|
-| no `navigator.gpu` / WebGPU not available | The browser has no WebGPU. Nothing to fix; the CPU fallback is the product here. |
+| no `navigator.gpu` / WebGPU not available | The browser has no WebGPU. Nothing to fix; the CPU fallback is the product here. It is slower (a 12 MP chain takes seconds, and `@rullino/web` uses 4 workers from 4 cores): see the [benchmarks](./benchmarks.md#cpu-the-backend-without-a-gpu). The playground shows a reduced image in this case. |
 | a secure context | WebGPU only exists on `https://` pages and on `localhost`. Serve your page over HTTPS. |
 | no adapter | The browser supports WebGPU but found no usable GPU (a blocklisted driver, a headless or virtual machine). Update the driver; in Chromium, `chrome://gpu` shows what it decided. |
 | the `webgpu` package could not be loaded (Node) | Run `npm install webgpu` next to `@rullino/node`. Without it the Node renderer uses the CPU. |

@@ -30,13 +30,16 @@ For each failure write down: machine, OS and browser versions, what you did, a s
 
 ## 4. Release 0.7.0
 
-- [ ] Merge the PR "Docs for integrators + fixes" (Claude opens it).
-- [ ] Merge the release PR (`node scripts/set-version.mjs 0.7.0` and the CHANGELOG section; Claude prepares it when you say go).
+- [x] The PR "Docs for integrators + fixes" and the release PR (#158, version 0.7.0 and its CHANGELOG section) are merged.
 - [ ] From your machine: `git fetch && git tag v0.7.0 origin/main && git push origin v0.7.0`, then watch the `release` workflow.
 - [ ] Check on npm that all 7 packages show 0.7.0 and the READMEs render (badges, links).
 - [ ] In a clean folder: `npm init -y && npm i @rullino/web` and run the getting-started snippet.
 
+- [ ] Then ask Claude for **0.8.0** (or 0.7.1): `main` already has the playground's CPU fallback in a worker (#160), the `rullino` command (#161) and `docs/benchmarks.md`, none of them on npm yet. Without it `npx rullino` does not exist for visitors.
+
 ## 5. Before the launch post
+
+- [x] `docs/benchmarks.md` is written (from the #77 comments and `packages/web/bench/results.txt`). If you re-run `pnpm bench:web` / `pnpm bench:threads:web` on a newer release, tell Claude to update the numbers.
 
 - [x] **konvaFilter** and the Filerobot example are done (in `main`; they reach npm with 0.7.0).
 - [ ] Open the **Filerobot issue** (custom filters in the Filters tab) on https://github.com/scaleflex/filerobot-image-editor/issues, after 0.7.0 is on npm (the example needs it). Draft, to adapt in your own words:
@@ -49,5 +52,5 @@ For each failure write down: machine, OS and browser versions, what you did, a s
 
   The motivation and what was read are in [docs/design/filerobot.md](./docs/design/filerobot.md). Offer a PR only if you want to maintain it: a first contribution to someone else's repository speaks for you.
 - [ ] Record a 20-30 s screen capture of the playground (split view, Compare with a step, film strip, Code button).
-- [ ] Ask Claude for: `docs/benchmarks.md` (from the #77 comments), the launch post draft (Show HN, r/webdev, r/javascript), the list of 3-5 teams on Konva or Fabric to write to.
+- [ ] Ask Claude for: the launch post draft (Show HN, r/webdev, r/javascript), the list of 3-5 teams on Konva or Fabric to write to.
 - [ ] Reply policy: issues within 48 h for the first month (PLAN, Phase 3).
