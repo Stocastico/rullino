@@ -12,6 +12,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 ## [Unreleased]
 
 ### Added
+- Documentation: [Benchmarks](docs/benchmarks.md), the real-hardware numbers (GPU against PixiJS, wasm-vips and Photon; the CPU backend on worker threads) with the machine, the code each came from, the losses and the limits.
 - **node**: the `rullino` command (`npx rullino render --edit edit.json photos/ -o out/`, `--look <id>`, `rullino looks`): renders an edit document or a built-in look onto files and folders, with `--format`, `--quality`, `--long-side`, `--backend` and `--threads`. It never overwrites an input and reports a bad document once, before reading any photo. Exit codes: 0 ok, 1 a photo failed, 2 usage. `pnpm test:pack` runs it from the installed tarball.
 
 ### Changed
