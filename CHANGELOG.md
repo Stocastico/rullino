@@ -11,6 +11,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.7.0]
+
+Documentation for integrators, a synchronous Konva filter for colour edits, `.cube` export and three bug fixes.
+
 ### Added
 - **konva**: `konvaFilter(doc)`, a synchronous Konva filter from an edit document, for colour edits (exposure, curves, saturation, LUTs, the looks; no masks, geometry or neighbourhood steps, which it refuses with a message): the document is baked once into a 33³ LUT and each pixel costs one lookup (about 45 ms per megapixel), so `node.filters([...])` + `cache()` and tools that look filters up by name in `Konva.Filters` (Filerobot) can use rullino. `@rullino/konva` now depends on `@rullino/filters` and `@rullino/presets` directly.
 - Example `examples/filerobot-looks`: Filerobot Image Editor with rullino looks as Konva filters (`konvaFilter`), loaded by name from its design state and switched while it runs; built and driven in `pnpm test:pack`.
