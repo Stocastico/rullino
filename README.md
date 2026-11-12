@@ -77,7 +77,7 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 | Package | What it is | You need it when |
 |---|---|---|
 | [`@rullino/web`](./packages/web/README.md) | Browser renderer: WebGPU, else the CPU in Web Workers (with band threads) | you render edits in a web page |
-| [`@rullino/node`](./packages/node/README.md) | Node renderer: the same shaders on Dawn, else the CPU (worker threads); files in and out through `sharp` | you render on a server or in a script |
+| [`@rullino/node`](./packages/node/README.md) | Node renderer and the `rullino` command: the same shaders on Dawn, else the CPU (worker threads); files in and out through `sharp` | you render on a server, in a script or from a shell |
 | [`@rullino/konva`](./packages/konva/README.md) | `attachEdit(node)`: a `Konva.Image` edited with documents, previews at screen size, full-resolution export | you build on Konva |
 | [`@rullino/core`](./packages/core/README.md) | The engine: edit documents, `Pipeline`, masks, geometry, LUTs, colour maths, export, `defineFilter` | you want the low-level API or to write filters |
 | [`@rullino/filters`](./packages/filters/README.md) | 51 filters, each a WGSL shader plus a TypeScript reference | you pick filters yourself (the renderers include them) |
@@ -103,7 +103,7 @@ Image processing in the browser is well served by general tools; what is missing
 | Fabric.js, Konva | Canvas libraries with built-in filters | Object model first, filters second |
 | small WebGPU filter repos | Demos and single-purpose tools (for example LUT-only) | Not published as general libraries, as far as we could find |
 
-rullino is modern, typed, composable and GPU-first, with zero runtime dependencies: every filter is a WebGPU compute shader **and** a plain TypeScript reference, tested against each other; filters chain into fused shaders; masks, geometry, 3D LUTs and export are part of the same model. The trade-off is that it needs WebGPU (no WebGL fallback). *Comparison last checked in October 2026; corrections welcome.*
+rullino is modern, typed, composable and GPU-first, with zero runtime dependencies: every filter is a WebGPU compute shader **and** a plain TypeScript reference, tested against each other; filters chain into fused shaders; masks, geometry, 3D LUTs and export are part of the same model. The trade-off is that the fast path needs WebGPU (no WebGL fallback): without it the CPU implementation renders the same document in a worker, seconds instead of milliseconds for a 12 MP photo (see the [benchmarks](./docs/benchmarks.md)). *Comparison last checked in October 2026; corrections welcome.*
 
 ## Design highlights
 
@@ -117,7 +117,7 @@ rullino is modern, typed, composable and GPU-first, with zero runtime dependenci
 
 - **Start here**: [Getting started](./docs/getting-started.md) · [Concepts](./docs/concepts.md) · [The edit document](./docs/edit-document.md) · [Troubleshooting](./docs/troubleshooting.md).
 - **Guides by job**: [preview and export in the browser](./docs/guides/preview-and-export.md) · [the same edit on the server](./docs/guides/same-edit-on-the-server.md) · [looks and LUTs in your editor](./docs/guides/looks-in-your-editor.md) · [remove an object on-device](./docs/guides/remove-an-object.md) · [migrating from glfx.js and tui.image-editor](./docs/guides/migrating-from-glfx-and-tui.md).
-- **Reference**: [filters](./docs/filters.md) (parameters, ranges, defaults; generated from the schemas) · [parity table](./docs/parity.md) (how far GPU and CPU may differ, per filter) · [API](https://stefanomasneri.com/rullino/docs/) (generated from the sources) · the edit document's [JSON Schema](./packages/core/edit.schema.json).
+- **Reference**: [filters](./docs/filters.md) (parameters, ranges, defaults; generated from the schemas) · [parity table](./docs/parity.md) (how far GPU and CPU may differ, per filter) · [benchmarks](./docs/benchmarks.md) (real-hardware numbers, losses included) · [API](https://stefanomasneri.com/rullino/docs/) (generated from the sources) · the edit document's [JSON Schema](./packages/core/edit.schema.json).
 - **Examples**: [Konva photo editor](https://github.com/Stocastico/rullino/tree/main/examples/konva-editor) ([StackBlitz](https://stackblitz.com/github/Stocastico/rullino/tree/main/examples/konva-editor?file=main.js)), [Next.js: preview in the browser, render on the server](https://github.com/Stocastico/rullino/tree/main/examples/nextjs-server-render), [Node batch](https://github.com/Stocastico/rullino/tree/main/examples/node-batch), [CPU fallback in a worker](https://github.com/Stocastico/rullino/tree/main/examples/worker-fallback). Their `ts` examples and the documentation's are type-checked against the sources.
 - **Project**: [PLAN.md](./PLAN.md) (design and roadmap) · [CLAUDE.md](./CLAUDE.md) (conventions and the reasoning behind decisions) · [CHANGELOG.md](./CHANGELOG.md) · [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md).
 

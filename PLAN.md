@@ -211,7 +211,7 @@ Open issues to keep in view: [#127](https://github.com/Stocastico/rullino/issues
 ### Before going public (checklist of 4 Nov, after the docs and debug session)
 
 Done in that session: integrator documentation (`docs/getting-started.md`, `concepts.md`, `edit-document.md`, `troubleshooting.md`, a documentation index, a root README that starts from the edit document), three bugs fixed (node JPEG / WebP quality 0, konva preview of a cropped edit and cached failure, web renderer after `destroy()`), a test over every filter at 1×1 / 1×N / N×1 sizes, a test that renders the JSON examples of the format reference. Open, in the order that matters for a launch:
-1. **0.7.0** with the above (CHANGELOG `[Unreleased]` is ready; `node scripts/set-version.mjs 0.7.0`, merge, the maintainer pushes the tag).
+1. **0.7.0** with the above: ~~version and CHANGELOG merged~~ (11 Nov, #158); the maintainer pushes the tag. Merged since, for the next release: the playground's CPU fallback in a worker (#160, closes #96), the `rullino` command and `docs/benchmarks.md` (#161).
 2. **Real-hardware claim**: the tolerances were verified on software GPUs and one RTX 40. Run `pnpm report:parity` on a non-NVIDIA GPU (Apple silicon, Intel or AMD) and open the playground and `@rullino/web` in Safari and Firefox; Firefox / WebKit CI does not exist. A launch post that says "within the published tolerance" must not be refuted by the first reader on a Mac.
 3. ~~**Benchmarks as a page**~~ (done 11 Nov: [`docs/benchmarks.md`](docs/benchmarks.md), machine, code version and losses included).
 4. **GitHub housekeeping**: close #77 and #84 (done), tick the epics #65 / #66, add `good first issue` labels, enable Discussions, set the repository description, topics and a social preview image.
