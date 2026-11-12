@@ -11,18 +11,13 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.7.0]
+
+Documentation for integrators, the `rullino` command, a synchronous Konva filter for colour edits, `.cube` export, a playground that works without WebGPU, and three bug fixes.
+
 ### Added
 - Documentation: [Benchmarks](docs/benchmarks.md), the real-hardware numbers (GPU against PixiJS, wasm-vips and Photon; the CPU backend on worker threads) with the machine, the code each came from, the losses and the limits.
 - **node**: the `rullino` command (`npx rullino render --edit edit.json photos/ -o out/`, `--look <id>`, `rullino looks`): renders an edit document or a built-in look onto files and folders, with `--format`, `--quality`, `--long-side`, `--backend` and `--threads`. It never overwrites an input and reports a bad document once, before reading any photo. Exit codes: 0 ok, 1 a photo failed, 2 usage. `pnpm test:pack` runs it from the installed tarball.
-
-### Changed
-- Playground without WebGPU (Firefox, Safari, older machines): the CPU fallback now renders in `@rullino/web`'s worker with the fast paths instead of the reference on the main thread, so the page stays usable (Kuwahara on a 1024 px picture: 3.2 s frozen → 1.2 s in the background). Chains that cannot travel to a worker (a LUT file loaded by hand, an ML patch or depth map) still render on the main thread, with the fast paths. New e2e `pnpm test:e2e:cpu` runs the built playground in a browser with no WebGPU.
-
-## [0.7.0]
-
-Documentation for integrators, a synchronous Konva filter for colour edits, `.cube` export and three bug fixes.
-
-### Added
 - **konva**: `konvaFilter(doc)`, a synchronous Konva filter from an edit document, for colour edits (exposure, curves, saturation, LUTs, the looks; no masks, geometry or neighbourhood steps, which it refuses with a message): the document is baked once into a 33³ LUT and each pixel costs one lookup (about 45 ms per megapixel), so `node.filters([...])` + `cache()` and tools that look filters up by name in `Konva.Filters` (Filerobot) can use rullino. `@rullino/konva` now depends on `@rullino/filters` and `@rullino/presets` directly.
 - Example `examples/filerobot-looks`: Filerobot Image Editor with rullino looks as Konva filters (`konvaFilter`), loaded by name from its design state and switched while it runs; built and driven in `pnpm test:pack`.
 - **core**: `formatCube(lut)` writes a LUT as a `.cube` file (the inverse of `parseCube`). With the playground's **Export look (.cube)** (bakes the enabled colour steps of the chain into a 33³ LUT), a look made in rullino works in DaVinci Resolve, Premiere, OBS and phone apps.
@@ -30,6 +25,9 @@ Documentation for integrators, a synchronous Konva filter for colour edits, `.cu
 - Documentation: [Getting started](docs/getting-started.md), [Concepts](docs/concepts.md), the [edit document reference](docs/edit-document.md) (its JSON examples are parsed and rendered by a test) and [Troubleshooting](docs/troubleshooting.md); the root README now starts from the edit document and lists the packages. The `ts` blocks of `docs/*.md` are type-checked like the guides'.
 - Playground: compare with any step (**Compare with** menu) and hold `\` to see the original.
 - Example `examples/nextjs-server-render`: a Next.js app that previews an edit document in the browser with `@rullino/web` and renders it at full resolution in a route handler with `@rullino/node`; built and driven in `pnpm test:pack`.
+
+### Changed
+- Playground without WebGPU (Firefox, Safari, older machines): the CPU fallback now renders in `@rullino/web`'s worker with the fast paths instead of the reference on the main thread, so the page stays usable (Kuwahara on a 1024 px picture: 3.2 s frozen → 1.2 s in the background). Chains that cannot travel to a worker (a LUT file loaded by hand, an ML patch or depth map) still render on the main thread, with the fast paths. New e2e `pnpm test:e2e:cpu` runs the built playground in a browser with no WebGPU.
 
 ### Fixed
 - **node**: JPEG / WebP output with `quality` below 0.005 (including 0) threw "Expected integer between 1 and 100" from sharp; the quality is now at least 1.
