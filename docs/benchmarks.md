@@ -66,26 +66,27 @@ What this means in practice:
 
 - **A CPU preview of a 12 MP photo takes seconds, not tens of milliseconds.** The browser fallback shows a reduced image and the Node renderer is meant to use the GPU through Dawn (0.3–1.4 s warm per 12 MP chain on a GPU-less runner with lavapipe, 12–14 s for the unoptimised reference).
 - `@rullino/web` uses 4 workers by default on a machine reporting at least 4 cores (images above about 2 MP). `@rullino/node` stays at 1 thread: a server scales with processes (`threads` is opt-in).
-- Not measured: phones, Intel / AMD GPUs (Apple M1: see below).
+- Not measured: Android phones, Intel / AMD GPUs (Apple M1 and an iPhone: see below).
 
-## Apple M1 (hardware check page)
+## Apple silicon (hardware check page)
 
-The [hardware check](https://stefanomasneri.com/rullino/check/) page on a MacBook with an Apple M1 (8 cores), 12 Nov 2026, code of **0.7.0**. The speed check renders the whole chain each time through `@rullino/web`'s `pixels` (8-bit image in, upload, exposure + contrast + Gaussian blur σ 3 + unsharp mask, 8-bit pixels back): it is not the one-parameter change of the sections above, so compare these numbers with each other, not with those.
+The [hardware check](https://stefanomasneri.com/rullino/check/) page on a MacBook with an Apple M1 (8 cores, 12 Nov 2026) and on an iPhone (iOS 18.7, 4 cores reported, 15 Nov 2026), code of **0.7.0**. The speed check renders the whole chain each time through `@rullino/web`'s `pixels` (8-bit image in, upload, exposure + contrast + Gaussian blur σ 3 + unsharp mask, 8-bit pixels back): it is not the one-parameter change of the sections above, so compare these numbers with each other, not with those.
 
-| Backend | Chrome 157 | Safari 26.6 |
-|---|---|---|
-| GPU, 1 MP: first / next | 25 / 12–14 ms | 436 / 11 ms |
-| GPU, 12 MP: first / next | 229 / 57–70 ms | 219 / 72–75 ms |
-| CPU (4 band workers), 1 MP | 563 ms | 475 ms |
-| CPU (4 band workers), 12 MP | 1.83 s | 1.65 s |
+| Backend | M1, Chrome 157 | M1, Safari 26.6 | iPhone, Safari |
+|---|---|---|---|
+| GPU, 1 MP: first / next | 25 / 12–14 ms | 436 / 11 ms | 36 / 16–18 ms |
+| GPU, 12 MP: first / next | 229 / 57–70 ms | 219 / 72–75 ms | 314 / 124–131 ms |
+| CPU, 1 MP | 563 ms | 475 ms | 1.14 s |
+| CPU (4 band workers), 12 MP | 1.83 s | 1.65 s | 2.13 s |
 
 - Both browsers run WebGPU on Metal, so the GPU numbers after the first run are the same machine twice; Safari's slow first render is the compilation of the shaders the first time they are used.
-- A full 12 MP render in about 60–75 ms on a 2020 laptop GPU, and under 2 s on its CPU without any GPU.
-- Parity on this GPU: every filter within the [published tolerance for real GPUs](./parity.md#on-real-gpus), the largest differences at 70–80% of it.
+- A full 12 MP render in about 60–75 ms on a 2020 laptop GPU and about 125 ms on the phone; on the CPU without any GPU, under 2 s on the laptop and about 2 s on the phone. The CPU's 1 MP figure includes starting the worker (below 2 MP no band workers start), which is why it is not a twelfth of the 12 MP one.
+- The phone reports a 683 MB maximum GPU buffer (the M1 in Chrome 4096 MB): large images there need the tiled rendering planned for 0.8.
+- Parity: on the M1 every filter within the [published tolerance for real GPUs](./parity.md#on-real-gpus), the largest differences at 70–80% of it; on the iPhone every filter within the tighter software tolerances.
 
 ## Limits of these numbers
 
-- **One GPU on one machine for the comparison with other libraries** (plus a container for the CPU scaling, and the M1 above for rullino alone). A launch claim that "rullino is as fast as PixiJS" holds for this setup only; the [hardware check](https://stefanomasneri.com/rullino/check/) page exists so other machines can add theirs.
+- **One GPU on one machine for the comparison with other libraries** (plus a container for the CPU scaling, and the Apple machines above for rullino alone). A launch claim that "rullino is as fast as PixiJS" holds for this setup only; the [hardware check](https://stefanomasneri.com/rullino/check/) page exists so other machines can add theirs.
 - **The comparison is approximate by nature.** The libraries cannot run the same maths; |Δ| makes "closest" measurable, and a library that skips a step visibly does less work. rullino is exact by definition of the benchmark.
 - **Readback-bound**: the harness reads results back to memory for every library. An app that draws the GPU result straight to a canvas would see a different picture for the GPU libraries.
 - **PixiJS timings varied** between runs (22 to 56 ms for the same chain at 12 MP).
