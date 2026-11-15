@@ -1,6 +1,6 @@
 # Road to 1.0 — the open photo-development engine, and the web tools built on it
 
-> **Status: proposal, revised 15 Nov 2026 after a market check**, for the maintainer to accept or change. Nothing here is decided until it is ticked in [PLAN.md](../../PLAN.md) §8 and recorded in the Decisions table of [CLAUDE.md](../../CLAUDE.md). The first draft (same day) put a local Lightroom-like app and full composition at the centre; §2 explains why that changed.
+> **Status: accepted direction (15 Nov 2026), revised after a market check; the decisions of the maintainer are in §9.** Nothing here is decided until it is ticked in [PLAN.md](../../PLAN.md) §8 and recorded in the Decisions table of [CLAUDE.md](../../CLAUDE.md). The first draft (same day) put a local Lightroom-like app and full composition at the centre; §2 explains why that changed.
 
 **Tracking**: umbrella [#165](https://github.com/Stocastico/rullino/issues/165) · epics 0.8 [#166](https://github.com/Stocastico/rullino/issues/166) · 0.9 [#167](https://github.com/Stocastico/rullino/issues/167) · 0.10 [#206](https://github.com/Stocastico/rullino/issues/206) · 0.11 [#168](https://github.com/Stocastico/rullino/issues/168) · 0.12 [#170](https://github.com/Stocastico/rullino/issues/170) · 0.13 [#171](https://github.com/Stocastico/rullino/issues/171) · 1.0 [#173](https://github.com/Stocastico/rullino/issues/173) · after 1.0 [#207](https://github.com/Stocastico/rullino/issues/207). RFCs (argued before code): v3 graph [#174](https://github.com/Stocastico/rullino/issues/174), colour management [#181](https://github.com/Stocastico/rullino/issues/181), plugins [#196](https://github.com/Stocastico/rullino/issues/196). Good first issues: [#201](https://github.com/Stocastico/rullino/issues/201), [#202](https://github.com/Stocastico/rullino/issues/202), [#203](https://github.com/Stocastico/rullino/issues/203).
 
@@ -40,7 +40,7 @@ Why job pages: people search for a job ("batch apply a preset to a folder", "rem
 
 ## 4. The constraint: client only
 
-The one non-negotiable requirement (maintainer, 15 Nov): **everything runs on the user's machine** — browser, Node, CLI. Allowed off-device, and only where it costs nothing or close to it: GitHub Pages (site, docs, tools), Hugging Face (model weights at pinned revisions), a static JSON gallery index in a repository, optionally one free-tier Cloudflare Worker for short links of documents (never images). Never: uploads, accounts, server rendering as a service, telemetry, ads, a database. **No generative AI** (maintainer, 15 Nov): not the goal, and the models are huge, rarely permissively licensed and slow on-device.
+The one non-negotiable requirement (maintainer, 15 Nov): **everything runs on the user's machine** — browser, Node, CLI. Allowed off-device, and only where it costs nothing or close to it: GitHub Pages (site, docs, tools), Hugging Face (model weights at pinned revisions), a static JSON gallery index in a repository, one free-tier Cloudflare Worker for short links of documents (never images; agreed, §9). Never: uploads, accounts, server rendering as a service, telemetry, ads, a database. **No generative AI** (maintainer, 15 Nov): not the goal, and the models are huge, rarely permissively licensed and slow on-device.
 
 ## 5. Releases
 
@@ -51,10 +51,11 @@ About 5–8 weeks each at the maintainer's pace; dates are not promised. **Visib
 - **Edit document v3** as a graph of named inputs and nodes (RFC [#174](https://github.com/Stocastico/rullino/issues/174)), deliberately small: what merging brackets, overlays and alignment need, not a layer editor. v2 lifts exactly. DAG executor on every backend ([#175](https://github.com/Stocastico/rullino/issues/175)).
 - Tiled GPU rendering beyond the texture limit and `memoryBudget` ([#176](https://github.com/Stocastico/rullino/issues/176)); property-based tests and Firefox / WebKit CI ([#177](https://github.com/Stocastico/rullino/issues/177)).
 - **rullino tools, step 1** ([#178](https://github.com/Stocastico/rullino/issues/178)): the four job pages above, installable and offline.
+- Short links of edit documents through one free-tier Cloudflare Worker ([#208](https://github.com/Stocastico/rullino/issues/208)), with the fragment link as fallback.
 
 ### 0.9 — Pixels in, pixels out ([#167](https://github.com/Stocastico/rullino/issues/167))
 - `@rullino/codecs`: PNG / JPEG / TIFF in pure TS, fuzzed ([#179](https://github.com/Stocastico/rullino/issues/179)). Browsers and sharp decode JPEG differently; an own decoder makes the input identical everywhere and makes `sharp` optional.
-- Metadata kept on export, the edit document inside the file as XMP ([#180](https://github.com/Stocastico/rullino/issues/180)).
+- Metadata kept on export by default, with an option to strip them (all, or GPS and personal fields), the edit document inside the file as XMP ([#180](https://github.com/Stocastico/rullino/issues/180)).
 - Colour management and an optional wide-gamut working space (RFC [#181](https://github.com/Stocastico/rullino/issues/181)); the sRGB path stays bit-for-bit unchanged.
 - HDR: float input, Ultra HDR / ISO 21496-1 gain maps read and written, tone mapping ([#182](https://github.com/Stocastico/rullino/issues/182)).
 
@@ -62,7 +63,7 @@ About 5–8 weeks each at the maintainer's pace; dates are not promised. **Visib
 - `<rullino-editor>` ([#195](https://github.com/Stocastico/rullino/issues/195)): a framework-free web component, document in, document out, themable and accessible, with React / Vue / Svelte / Konva wrappers documented. Positioned against Pintura and img.ly's photo editor: MIT, and the same document renders on the server.
 - Interop hub: Lightroom XMP preset import with an approximation report ([#198](https://github.com/Stocastico/rullino/issues/198)), `.3dl` ([#202](https://github.com/Stocastico/rullino/issues/202)), `.acv` ([#203](https://github.com/Stocastico/rullino/issues/203)), `.cube` both ways; conversions in the CLI and as a tool page.
 - One integration example per audience (product photos, a CMS / DAM plugin, an editor using rullino as its engine).
-- **Adoption gate**: RAW (0.11) starts only once at least 3 outside developers integrate or seriously try the library (issues, PRs, dependents). If not, the pitch is the problem, not missing features: rethink before investing months in demosaicing.
+- **Adoption gate** (agreed, §9): RAW (0.11) starts only once at least 3 outside developers integrate or seriously try the library (issues, PRs, dependents). If not, the pitch is the problem, not missing features: rethink before investing months in demosaicing.
 
 ### 0.11 — RAW development ([#168](https://github.com/Stocastico/rullino/issues/168))
 - `@rullino/raw`: DNG in pure TS (phones, converted files); **proprietary formats (CR3, NEF, ARW, RAF…) through an official, optional `@rullino/libraw` adapter** over a LibRaw WASM build (LGPL, its own package and `.wasm`, so the core stays MIT and zero-dependency) ([#183](https://github.com/Stocastico/rullino/issues/183)). Without these formats photographers do not even try.
@@ -112,11 +113,11 @@ All keep the rules: zero runtime dependencies in the MIT packages, heavy third-p
 - **PSD compatibility, generative AI, accounts, cloud sync, server rendering as a service.**
 - **Breadth that skips the moat**: every capability stays inside the edit document and the parity contract; a feature that exists only in a UI, or only on the GPU, is a regression of what makes rullino different.
 
-## 9. Open questions for the maintainer
+## 9. Decisions of the maintainer (15 Nov 2026)
 
-1. GPS / personal metadata on export: strip or keep by default?
-2. Optional Cloudflare Worker for short links: yes / no?
-3. Spec licence: MIT or CC BY 4.0?
-4. The adoption gate at 0.10 (≥ 3 outside developers before RAW): agreed?
+1. **Metadata are kept by default** on export (EXIF, XMP, IPTC, ICC, GPS included), with an option to strip them (all, or only GPS and personal fields) in the libraries, the CLI and the tools. The web-ready export tool sets it to strip, and says so.
+2. **Short links: yes**, through one Cloudflare Worker on the free tier: edit documents only (never images), size-capped, content-addressed; links in the URL fragment keep working without it.
+3. **Licences: MIT for all code; CC BY 4.0 for the specification text** and other non-code content written for the project (docs prose stays MIT with the repository unless it is part of the spec).
+4. **Adoption gate agreed**: RAW (0.11) starts once at least 3 outside developers integrate or seriously try the library.
 
 Sources of the market check (15 Nov 2026): [LightCraft](https://lightcraft.run/guides/edit-raw-photos-online), [OpticRaw](https://opticraw.com/lightroom-alternative), [Lumen](https://lumen.mr-development.de/en), [RawLite](https://rawlite.app/), [photopico](https://photopico.pages.dev/), [pg0/raw-viewer](https://github.com/pg0/raw-viewer), [Safelight](https://discuss.pixls.us/t/introducing-safelight-a-free-open-source-raw-editor-built-like-an-ide/58615), [OpenLight](https://21st.dev/community/apps/openlight), [Polarr Next](https://petapixel.com/2024/02/14/polarr-next-is-a-web-based-ai-powered-photo-editor-made-for-pros), [Graphite](https://graphite.art/features/), [img.ly PhotoEditor SDK for server](https://docs.photoeditorsdk.com/guides/server/), [Image Sequencer](https://github.com/jcads/image-sequencer), [libraw-wasm](https://github.com/colorhythm/libraw-wasm).
