@@ -6,7 +6,7 @@ Things only the maintainer can do before going public. Delete the file when it i
 
 Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.0.md), revised the same day after a market check: the library is the headline, the web part is "rullino tools", job pages on top of it, not another editor), the umbrella issue [#165](https://github.com/Stocastico/rullino/issues/165), the epics (#166, #167, #206, #168, #170, #171, #173, and #207 for what moved after 1.0; #169 and #172 closed as deferred), the work items with RFCs (#174, #181, #196; #187 deferred), three good first issues (#201–#203), the RFC issue form and the wiki pages (`docs/wiki/`). What only you can do:
 
-1. [ ] **Upload the M1 reports** (Chrome, Safari, Firefox) as comments on a new issue "Parity on real GPUs: Mac M1" (see section 1). Claude then decides per filter, as for the RTX; it is the first item of 0.8.
+1. [x] ~~Upload the M1 reports~~ (Chrome and Safari, 15 Nov): every filter within the real-GPU tolerances, no change needed. Firefox on the M1 is still missing (section 1).
 2. [x] ~~Answer the open questions~~ (15 Nov: metadata kept by default with a strip option, Cloudflare Worker yes, MIT for code + CC BY 4.0 for the spec text, the adoption gate before RAW).
    - [ ] When the short-links issue (#208) is next: a free **Cloudflare account**, a Workers KV namespace, and an API token with "Edit Cloudflare Workers" for the deploy (Claude writes the Worker and a `wrangler.toml`; the token goes in the repository's Actions secrets as `CLOUDFLARE_API_TOKEN`, never in a file). Optionally a subdomain such as `r.stefanomasneri.com`.
 3. [ ] **Merge the PR #205** with the proposal (or ask for changes there).
@@ -23,7 +23,8 @@ Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.
 
 The tolerances are verified on software GPUs and one RTX 40 (Windows, Chrome). Needed: one run per machine/browser below. **Nothing to install**: open **https://stefanomasneri.com/rullino/check/** (live after the PR with the page is merged and the Pages deploy has run), press the three buttons in order (device is described on load; "Run the parity check", about a minute; "Run the speed check"), then **Copy the report** (or **Download as a file** if copying fails) and paste it as a comment on a new issue "Parity on real GPUs", with the machine's name and macOS version. Claude then decides per filter, as for the RTX.
 
-- [ ] **Mac M1**: Chrome, Safari, Firefox (three runs; WebGPU in Safari needs a recent macOS, in Firefox a recent version).
+- [x] ~~**Mac M1**: Chrome, Safari~~ (15 Nov, within the real-GPU tolerances).
+- [ ] **Mac M1, Firefox** (needs a recent version for WebGPU; if the page says WebGPU is not available, that is the result: run the speed check anyway).
 - [ ] **Mac Intel (10 years old)**: Safari and Chrome. It may have no WebGPU at all (old macOS / old GPU): then the page says "WebGPU: NOT AVAILABLE", and that *is* the result; still press "Run the speed check" (the CPU numbers at 12 MP matter most here) and copy the report.
 - [ ] **Windows laptop**: Firefox, and Chrome if its GPU is not the RTX.
 - [ ] A **phone** (iOS Safari, Android Chrome): same page; the speed check at 12 MP may be heavy, stop it if the page gets stuck and say so.
