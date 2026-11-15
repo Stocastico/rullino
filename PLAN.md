@@ -279,6 +279,23 @@ The split view exists. On top of it:
 
 Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
 
+## 8. Road to 1.0 (proposal of 15 Nov 2026)
+
+The maintainer's new direction (15 Nov): set promotion aside for now and **expand rullino from a filter library into a complete client-side imaging platform**, with one hard requirement: everything runs on the user's machine (browser, Node, CLI); anything off-device must be free or nearly free to host. The full proposal, with reasons, risks and the client-only check of every item, is [docs/design/road-to-1.0.md](docs/design/road-to-1.0.md); tracking in [#165](https://github.com/Stocastico/rullino/issues/165).
+
+| Release | Theme | Epic |
+|---|---|---|
+| 0.8 | Foundations: edit document v3 as a graph (RFC #174), DAG executor, tiled GPU rendering + memory budget, hardening, studio step 1 (PWA, folder library, batch) | [#166](https://github.com/Stocastico/rullino/issues/166) |
+| 0.9 | Pixels in, pixels out: `@rullino/codecs`, metadata, colour management + wide gamut (RFC #181), HDR and gain maps | [#167](https://github.com/Stocastico/rullino/issues/167) |
+| 0.10 | RAW development: `@rullino/raw` (DNG in pure TS, GPU demosaic, camera profiles, lens corrections) | [#168](https://github.com/Stocastico/rullino/issues/168) |
+| 0.11 | Composition: layers and blend modes (RFC #187), deterministic text, shapes, templates | [#169](https://github.com/Stocastico/rullino/issues/169) |
+| 0.12 | Intelligence: smart masks, upscale / denoise, pyramids (exposure fusion, focus stacking), alignment | [#170](https://github.com/Stocastico/rullino/issues/170) |
+| 0.13 | Platform: `<rullino-editor>`, plugin API (RFC #196) + filter kit, community gallery, Lightroom XMP import, CLI++, `@rullino/mcp` | [#171](https://github.com/Stocastico/rullino/issues/171) |
+| 0.14 | Video (experimental, does not block 1.0) | [#172](https://github.com/Stocastico/rullino/issues/172) |
+| 1.0 | Stable: specification + conformance suite, semver promise, API audit, quality bars | [#173](https://github.com/Stocastico/rullino/issues/173) |
+
+If accepted, it supersedes the "no new filters / no full editor UI" limits of §6b and §6c (the RAW, HDR, composition and pyramid filters are the new breadth); the rules of CLAUDE.md (CPU reference, parity, banded = whole, zero runtime dependencies, heavy third-party code injected) apply to all of it. Open questions for the maintainer are listed at the end of the proposal and in #165.
+
 ## 7. Open decisions
 
 - ~~Library name~~ → **rullino**, npm scope `@rullino` (org to be registered).

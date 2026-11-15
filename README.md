@@ -86,7 +86,11 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 
 All packages share one version number, are ESM only and have **no runtime dependencies**.
 
-> **Status: 0.x.** The API may still change between minor versions (changes are in the [changelog](./CHANGELOG.md)); `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without a stability promise. Input is 8-bit sRGB (what the browser decodes); 16-bit PNG is supported as output. Not done: 16-bit / HDR input, analysis filters such as Hough, video input. See [PLAN.md](./PLAN.md).
+> **Status: 0.x.** The API may still change between minor versions (changes are in the [changelog](./CHANGELOG.md)); `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without a stability promise. Input is 8-bit sRGB (what the browser decodes); 16-bit PNG is supported as output. Not done yet: 16-bit / HDR / RAW input, layers and text, analysis filters such as Hough, video input; all on the [road to 1.0](./docs/design/road-to-1.0.md).
+
+## Roadmap
+
+rullino is growing from a filter library into a **client-side imaging platform**: edit document v3 as a graph, RAW / 16-bit / HDR input with colour management, layers, text and templates, smart masks and computational photography, a local-first web app (*rullino studio*), an embeddable editor, plugins and a written specification with a conformance suite; everything runs on your machine. Proposal: [Road to 1.0](./docs/design/road-to-1.0.md); tracking issue [#165](https://github.com/Stocastico/rullino/issues/165), one epic per release. Comments and RFC feedback welcome; [good first issues](https://github.com/Stocastico/rullino/labels/good%20first%20issue) are labelled.
 
 ## Why
 
@@ -119,7 +123,7 @@ rullino is modern, typed, composable and GPU-first, with zero runtime dependenci
 - **Guides by job**: [preview and export in the browser](./docs/guides/preview-and-export.md) · [the same edit on the server](./docs/guides/same-edit-on-the-server.md) · [looks and LUTs in your editor](./docs/guides/looks-in-your-editor.md) · [remove an object on-device](./docs/guides/remove-an-object.md) · [migrating from glfx.js and tui.image-editor](./docs/guides/migrating-from-glfx-and-tui.md).
 - **Reference**: [filters](./docs/filters.md) (parameters, ranges, defaults; generated from the schemas) · [parity table](./docs/parity.md) (how far GPU and CPU may differ, per filter) · [benchmarks](./docs/benchmarks.md) (real-hardware numbers, losses included) · [API](https://stefanomasneri.com/rullino/docs/) (generated from the sources) · the edit document's [JSON Schema](./packages/core/edit.schema.json).
 - **Examples**: [Konva photo editor](https://github.com/Stocastico/rullino/tree/main/examples/konva-editor) ([StackBlitz](https://stackblitz.com/github/Stocastico/rullino/tree/main/examples/konva-editor?file=main.js)), [Next.js: preview in the browser, render on the server](https://github.com/Stocastico/rullino/tree/main/examples/nextjs-server-render), [Node batch](https://github.com/Stocastico/rullino/tree/main/examples/node-batch), [CPU fallback in a worker](https://github.com/Stocastico/rullino/tree/main/examples/worker-fallback). Their `ts` examples and the documentation's are type-checked against the sources.
-- **Project**: [PLAN.md](./PLAN.md) (design and roadmap) · [CLAUDE.md](./CLAUDE.md) (conventions and the reasoning behind decisions) · [CHANGELOG.md](./CHANGELOG.md) · [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md).
+- **Project**: [PLAN.md](./PLAN.md) (design and roadmap) · [Road to 1.0](./docs/design/road-to-1.0.md) · [CLAUDE.md](./CLAUDE.md) (conventions and the reasoning behind decisions) · [CHANGELOG.md](./CHANGELOG.md) · [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md).
 
 ## Development
 
