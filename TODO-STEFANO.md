@@ -17,7 +17,7 @@ Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.
 8. [ ] **Pin** #165 (issue page > "Pin issue") so visitors see the roadmap first.
 9. [ ] **A Project board** (optional; Projects > New > Roadmap layout, add the `roadmap-1.0` issues, group by label). Claude cannot create Projects.
 10. [ ] **Old epics**: #66 (distribution) and #67 (launch) are on hold by your choice; close them as "not planned" with a link to #165, or leave them open. Say which and Claude does it.
-11. [ ] **Release 0.7.0 and then 0.8.0** as in section 4: the CLI and the CPU fallback of the playground are still not on npm.
+11. [ ] **Release 0.8.0** (0.7.0 is out since 12 Nov): the CLI and the playground's CPU fallback are on `main` but not on npm yet. Claude prepares the version PR; you push the tag.
 
 ## 1. Test on real hardware (the "within the published tolerance" claim)
 
@@ -48,7 +48,7 @@ For each failure write down: machine, OS and browser versions, what you did, a s
 ## 4. Release 0.7.0
 
 - [x] The PR "Docs for integrators + fixes" and the release PR (#158, version 0.7.0 and its CHANGELOG section) are merged.
-- [ ] From your machine: `git fetch && git tag v0.7.0 origin/main && git push origin v0.7.0`, then watch the `release` workflow.
+- [x] ~~Tag `v0.7.0` pushed~~ (GitHub release of 12 Nov).
 - [ ] Check on npm that all 7 packages show 0.7.0 and the READMEs render (badges, links).
 - [ ] In a clean folder: `npm init -y && npm i @rullino/web` and run the getting-started snippet.
 
