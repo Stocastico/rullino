@@ -28,7 +28,7 @@ The tolerances are verified on software GPUs and one RTX 40 (Windows, Chrome). N
 - [ ] **Mac Intel (10 years old)**: Safari and Chrome. It may have no WebGPU at all (old macOS / old GPU): then the page says "WebGPU: NOT AVAILABLE", and that *is* the result; still press "Run the speed check" (the CPU numbers at 12 MP matter most here) and copy the report.
 - [ ] **Windows laptop**: Firefox, and Chrome if its GPU is not the RTX.
 - [x] ~~**iPhone**, Safari~~ (15 Nov: every filter within the software tolerances).
-- [ ] An **Android phone**, Chrome: same page; the speed check at 12 MP may be heavy, stop it if the page gets stuck and say so.
+- [x] ~~An **Android phone**, Chrome~~ (15 Nov, Arm Mali: every filter within the software tolerances).
 - [ ] **The playground itself** on each of the above (https://stefanomasneri.com/rullino/): load a sample, add 3 effects (a curve, a blur, a look), try Compare, Export. Is the status "On the GPU" or "On the CPU (reason)"? Anything black, slow or broken? A share link or the **Code** button's JSON goes with each problem.
 - [ ] Optional, only on a machine that has Node 22 and pnpm: `pnpm report:parity` gives the same numbers as the page (the page is the easy way).
 
