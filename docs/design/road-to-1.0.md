@@ -1,192 +1,122 @@
-# Road to 1.0 — from a filter library to a client-side imaging platform
+# Road to 1.0 — the open photo-development engine, and the web tools built on it
 
-> **Status: proposal (15 Nov 2026), for the maintainer to accept or change.** Nothing here is decided until it is ticked in [PLAN.md](../../PLAN.md) §8 and recorded in the Decisions table of [CLAUDE.md](../../CLAUDE.md). Each release below has an epic issue on GitHub (label `roadmap-1.0`), and each work item a sub-issue under it.
+> **Status: proposal, revised 15 Nov 2026 after a market check**, for the maintainer to accept or change. Nothing here is decided until it is ticked in [PLAN.md](../../PLAN.md) §8 and recorded in the Decisions table of [CLAUDE.md](../../CLAUDE.md). The first draft (same day) put a local Lightroom-like app and full composition at the centre; §2 explains why that changed.
 
-**Tracking**: umbrella [#165](https://github.com/Stocastico/rullino/issues/165) · epics 0.8 [#166](https://github.com/Stocastico/rullino/issues/166) · 0.9 [#167](https://github.com/Stocastico/rullino/issues/167) · 0.10 [#168](https://github.com/Stocastico/rullino/issues/168) · 0.11 [#169](https://github.com/Stocastico/rullino/issues/169) · 0.12 [#170](https://github.com/Stocastico/rullino/issues/170) · 0.13 [#171](https://github.com/Stocastico/rullino/issues/171) · 0.14 [#172](https://github.com/Stocastico/rullino/issues/172) · 1.0 [#173](https://github.com/Stocastico/rullino/issues/173). RFCs (argued before code): v3 graph [#174](https://github.com/Stocastico/rullino/issues/174), colour management [#181](https://github.com/Stocastico/rullino/issues/181), layers and blend modes [#187](https://github.com/Stocastico/rullino/issues/187), plugins [#196](https://github.com/Stocastico/rullino/issues/196). Good first issues: [#201](https://github.com/Stocastico/rullino/issues/201), [#202](https://github.com/Stocastico/rullino/issues/202), [#203](https://github.com/Stocastico/rullino/issues/203).
+**Tracking**: umbrella [#165](https://github.com/Stocastico/rullino/issues/165) · epics 0.8 [#166](https://github.com/Stocastico/rullino/issues/166) · 0.9 [#167](https://github.com/Stocastico/rullino/issues/167) · 0.10 [#206](https://github.com/Stocastico/rullino/issues/206) · 0.11 [#168](https://github.com/Stocastico/rullino/issues/168) · 0.12 [#170](https://github.com/Stocastico/rullino/issues/170) · 0.13 [#171](https://github.com/Stocastico/rullino/issues/171) · 1.0 [#173](https://github.com/Stocastico/rullino/issues/173) · after 1.0 [#207](https://github.com/Stocastico/rullino/issues/207). RFCs (argued before code): v3 graph [#174](https://github.com/Stocastico/rullino/issues/174), colour management [#181](https://github.com/Stocastico/rullino/issues/181), plugins [#196](https://github.com/Stocastico/rullino/issues/196). Good first issues: [#201](https://github.com/Stocastico/rullino/issues/201), [#202](https://github.com/Stocastico/rullino/issues/202), [#203](https://github.com/Stocastico/rullino/issues/203).
 
 ## 1. Where we are (0.7.0)
 
 The engine is complete for what it set out to be: 51 filters, each a WGSL shader and a TypeScript reference held to a published tolerance; a versioned JSON edit document (chain + masks + geometry + output); renderers for the browser (WebGPU, else CPU workers) and Node (Dawn, else worker threads), a CLI, a Konva adapter, three on-device ML tools, `.cube` export, a playground that works without WebGPU.
 
-What it is **not** yet:
+Not yet: RAW, 16-bit, HDR or colour-managed input; metadata on export; more than one image per edit; images beyond one texture; an embeddable editor; a web page that does a job for someone who is not a developer.
 
-- **Input is 8-bit sRGB only.** No RAW, no 16-bit or HDR input, no colour management (embedded ICC profiles are ignored), no metadata (EXIF / XMP are dropped on export). A photographer's first file is a RAW or an iPhone HEIC/HDR photo, and we cannot read it.
-- **An edit is a single linear chain on a single image.** No layers, no second image, no text, no blend modes, no branches. Everything that combines pictures (a watermark, a collage, an HDR merge, a focus stack, a social card) is out of reach.
-- **Images are bounded by one texture** (8192 or 16384 px a side, and the GPU's memory). A 100 MP stitched panorama does not render on the GPU.
-- **The ML is three tools**, not a system: no subject / sky / people masks, no upscaling, no denoising.
-- **The playground is a developer demo**, not something a person can live in: no library of photos, no batch, no offline install.
-- **The document format is a JS-library artefact**, not a specification someone else could implement.
+## 2. Market check (15 Nov 2026): what is covered, what is not
 
-## 2. The goal of 1.0
+**Covered, crowded**: a free, private, in-browser photo or RAW editor. In 2026 there are a dozen: LightCraft (open source, Rust/WASM, library + RAW developer, self-hostable), Safelight, pg0/raw-viewer (WebGL2), OpenLight (WebGPU, MIT), OpticRaw (it already imports Lightroom XMP presets), photopico (LibRaw in the browser), Lumen, RawLite, plus Photopea and Polarr Next. Composition (layers, text, templates) is covered by Photopea, Canva, Polotno and Graphite. A photographer cannot tell a correct colour pipeline from a careless one, so "a better local editor" would read as "another local editor".
 
-> **rullino 1.0 is an open, client-side imaging platform: a specified, versioned edit format for non-destructive photo development and composition — from RAW to HDR output, with layers, text, masks and on-device ML — rendered identically (within a published tolerance) in any modern browser, in Node and from the command line, with a local-first web app anyone can use offline, and nothing on a server.**
+**Not covered**: an **open engine** that takes one edit document and renders it the same (within a published tolerance) in the browser, in Node and from the command line. The closest is img.ly's PhotoEditor SDK for server, commercial and expensive; open projects (Image Sequencer, Ente's photo-editor-sdk) have neither the format nor the parity. Every editor listed above writes its own shaders and stops at its own UI. This is also what the 4 Nov review (PLAN §6c) concluded: the moat is the document + parity + server render, not the UI.
 
-Five pillars:
+**Conclusion**: two products on one engine, with the engine as the headline and the web part as its front door, not as a competitor of the dozen editors.
 
-1. **Develop anything**: RAW (DNG first), 16-bit, HDR and wide-gamut input, colour-managed end to end, metadata kept.
-2. **Compose anything**: the edit document becomes a graph — layers, blend modes, several inputs, text, shapes, templates with variables.
-3. **Understand the picture**: smart masks (subject, sky, people, background), upscaling, denoising, computational photography (exposure fusion, focus stacking, alignment).
-4. **A product, not only a library**: *rullino studio*, a local-first PWA (library, culling, develop, compose, batch export), the embeddable `<rullino-editor>`, a plugin API, a static community gallery of looks.
-5. **A specification**: edit format v3 written down, with a conformance suite any implementation can run, and a stability promise.
+## 3. Two products, one engine
 
-## 3. The constraint: client only
+### 3.1 The library — the open photo-development engine
 
-The one non-negotiable requirement (maintainer, 15 Nov): **everything runs on the user's machine** — browser, Node, CLI. Each item below has a "client-only check". Allowed off-device, and only where it costs nothing or close to it:
+> One edit document (JSON, specified), previewed on the GPU in the browser, rendered the same in Node and from the CLI; codecs, colour management, HDR, RAW, masks, interop with Lightroom presets and LUTs, an embeddable editor. MIT, zero runtime dependencies, nothing on a server.
 
-| What | Where | Cost |
-|---|---|---|
-| The web app, docs, API reference, hardware check | GitHub Pages (already) | free |
-| ML model weights | Hugging Face at pinned revisions (already), Cache API on the client | free |
-| Community gallery of looks / templates / plugins | a JSON index in this repository (or a `rullino-gallery` repo), built to Pages; submissions by pull request | free |
-| *Optional*: short share links for edit documents (never images) | one Cloudflare Worker + KV, free tier (100k reads / day) | free → a few €/year with a domain |
+Who it is for: developers of products with photo features (e-commerce and marketplaces, real estate, CMS and DAM plugins, print services, photo-sharing apps, Konva / Filerobot users), and makers of editors and tools who would rather not write a colour pipeline (including the indie editors above).
 
-Never: image upload, accounts, server-side rendering as a service, telemetry, ads, a database. Collaboration that needs a server (live co-editing) is out of scope for 1.0; edit documents travel as files and links.
+### 3.2 rullino tools — the front door
 
-## 4. Releases
+Not a general editor. **Pages that each do one job completely and locally**, each ending with "the same in your code" (snippet + edit document + a link to the playground):
 
-Each release is a theme of about 5–8 weeks of work (the maintainer's pace, not a promise of dates; roughly 9–12 months to 1.0). Order follows dependencies: the graph and tiles before what needs them, colour management before RAW, the format frozen last. **The studio grows with every release** (§4b), so there is something people can use from 0.8 on, not only at the end.
+- apply a look or an edit to a whole folder (preview a few, export all, band workers);
+- make a LUT from a grade (`.cube` for DaVinci, Premiere, OBS, phones);
+- web-ready export (resize, sharpen for screens, JPEG / WebP, metadata and GPS dropped, a folder at once);
+- compare two renders (difference map, within a tolerance or not);
+- later, as the library grows: Lightroom preset → LUT / look, a product-photo set made consistent, RAW batch develop.
 
-### 0.8 — Foundations: the graph, big images, hardening
+Why job pages: people search for a job ("batch apply a preset to a folder", "remove GPS from photos", "Lightroom preset to LUT"), not for an editor. Each page is a reason to arrive, and each shows a developer what the library does. The playground stays as the full workspace and developer demo. A dedicated website (domain, landing page) only if the tools get traction; until then GitHub Pages.
 
-*Why first*: composition, HDR merge, text and large panoramas all need a document that is a graph and a renderer that is not bounded by one texture. Doing this before features means features are written once.
+## 4. The constraint: client only
 
-- **Ship what is on `main`**: the CLI, the playground's CPU fallback, the benchmarks page (they are not on npm yet). Real-hardware parity from the M1 runs (Chrome / Safari / Firefox) decided per filter, as for the RTX.
-- **Edit document v3, RFC then executor.** An RFC in `docs/design/edit-document-v3.md` (open for comments in Discussions) before any code. Proposed shape: named `inputs`, a list of `nodes` (each a chain, a blend, a layer stack or a generator) with explicit `from` references, one `output` node; a v2 document is the special case "one input, one chain" and `migrateChain` lifts it exactly. Core gets a DAG executor that reuses `Pipeline` per chain node and caches per node key (the incremental recompute already works per stage). CPU reference, GPU and banded CPU executors all take graphs; parity and "banded = whole" tests extended to graphs.
-- **Tiled GPU rendering** for images beyond the texture limit or the memory budget: tiles with halos from each filter's `reach` (the CPU band planner, generalised to two dimensions), `'global'` filters through their `twoPhase` statistics (already done for bands), output assembled on the CPU or streamed to the encoder. Target: a 200 MP image renders on a laptop GPU, bit-for-bit equal to the untiled render where the untiled one fits.
-- **Memory budget**: renderers take `{ memoryBudget }`, the planner picks tile size from it; texture-pool limits from it.
-- **Hardening**: property-based tests (fast-check) over the document parser and the planners; a fuzz job for every decoder from 0.9 on (untrusted files are the new attack surface); Firefox CI where Playwright's Firefox exposes WebGPU, otherwise the CPU path in Firefox and WebKit at least.
+The one non-negotiable requirement (maintainer, 15 Nov): **everything runs on the user's machine** — browser, Node, CLI. Allowed off-device, and only where it costs nothing or close to it: GitHub Pages (site, docs, tools), Hugging Face (model weights at pinned revisions), a static JSON gallery index in a repository, optionally one free-tier Cloudflare Worker for short links of documents (never images). Never: uploads, accounts, server rendering as a service, telemetry, ads, a database. **No generative AI** (maintainer, 15 Nov): not the goal, and the models are huge, rarely permissively licensed and slow on-device.
 
-*Client-only check*: nothing new off-device.
-*Risks*: v3 is the single most important design decision before 1.0; it must be argued in public and allowed to take weeks. Tiled GPU rendering multiplies passes: measure on real hardware, keep untiled as the fast path.
+## 5. Releases
 
-### 0.9 — Pixels in, pixels out: codecs, colour management, HDR, metadata
+About 5–8 weeks each at the maintainer's pace; dates are not promised. **Visibility runs in parallel** (§7): every release goes to npm with notes, and the tools go live as they are built.
 
-*Why*: "within tolerance between browser and Node" is only as true as the decoded input. Browsers and sharp decode JPEG differently (IDCT, chroma upsampling); our own decoder makes the input identical everywhere, removes `sharp` as a requirement in Node, and opens 16-bit and HDR.
+### 0.8 — Foundations + the first tools ([#166](https://github.com/Stocastico/rullino/issues/166))
+- 0.7.0 and 0.8.0 on npm (`main` already has the CLI, the playground's CPU fallback, the benchmarks); the M1 parity numbers decided per filter.
+- **Edit document v3** as a graph of named inputs and nodes (RFC [#174](https://github.com/Stocastico/rullino/issues/174)), deliberately small: what merging brackets, overlays and alignment need, not a layer editor. v2 lifts exactly. DAG executor on every backend ([#175](https://github.com/Stocastico/rullino/issues/175)).
+- Tiled GPU rendering beyond the texture limit and `memoryBudget` ([#176](https://github.com/Stocastico/rullino/issues/176)); property-based tests and Firefox / WebKit CI ([#177](https://github.com/Stocastico/rullino/issues/177)).
+- **rullino tools, step 1** ([#178](https://github.com/Stocastico/rullino/issues/178)): the four job pages above, installable and offline.
 
-- **`@rullino/codecs`** (zero dependencies, pure TS with fast paths, each decoder fuzzed): PNG decode (8 / 16 bit, palette, interlace), JPEG decode (baseline + progressive) and encode (baseline, quality, 4:4:4 / 4:2:0), TIFF read / write (8 / 16 / 32-bit float, uncompressed + deflate + LZW), plus a decoder plug-in point for formats we will not write ourselves (AVIF, HEIC, JPEG XL: the app injects the browser's decoder or a WASM build, as ORT is injected today).
-- **Metadata**: EXIF / XMP / IPTC / ICC read and written back on export (orientation applied, GPS optionally stripped — the default is a choice for the RFC: privacy says strip), the edit document optionally embedded as XMP so a JPEG carries its own recipe.
-- **Colour management**: ICC v2 / v4 matrix-TRC and LUT-based profiles parsed in pure TS; embedded profiles converted into the working space on input, output profiles written (sRGB, Display P3, Adobe RGB, Rec. 2020). **A wide-gamut working space** (linear Rec. 2020 primaries) as an option of the document (`workingSpace`), with gamut mapping to the output in OKLCh. Every filter is audited for hard-coded sRGB / Rec. 709 assumptions (luminance weights, OKLab matrices) and parity-tested in both spaces.
-- **HDR**: float input (EXR read — zip / piz / none, or a WASM decoder injected; Radiance HDR), Ultra HDR / ISO 21496-1 gain-map JPEGs read **and written** (an SDR base + gain map: shows HDR where supported, SDR elsewhere), HDR display in the studio (`toneMapping: 'extended'` canvases), tone-mapping operators as filters (filmic / AgX-like curves, local tone mapping = the "brilliance" of tier B).
+### 0.9 — Pixels in, pixels out ([#167](https://github.com/Stocastico/rullino/issues/167))
+- `@rullino/codecs`: PNG / JPEG / TIFF in pure TS, fuzzed ([#179](https://github.com/Stocastico/rullino/issues/179)). Browsers and sharp decode JPEG differently; an own decoder makes the input identical everywhere and makes `sharp` optional.
+- Metadata kept on export, the edit document inside the file as XMP ([#180](https://github.com/Stocastico/rullino/issues/180)).
+- Colour management and an optional wide-gamut working space (RFC [#181](https://github.com/Stocastico/rullino/issues/181)); the sRGB path stays bit-for-bit unchanged.
+- HDR: float input, Ultra HDR / ISO 21496-1 gain maps read and written, tone mapping ([#182](https://github.com/Stocastico/rullino/issues/182)).
 
-*Client-only check*: all in-process; injected decoders run on the client.
-*Risks*: a colour-managed working space touches every filter: this is the largest refactor of the road and must keep the sRGB path bit-for-bit unchanged. JPEG decoding is a security surface: fuzz in CI from the first commit.
+### 0.10 — Embeddable editor and interop: the adoption channel ([#206](https://github.com/Stocastico/rullino/issues/206))
+- `<rullino-editor>` ([#195](https://github.com/Stocastico/rullino/issues/195)): a framework-free web component, document in, document out, themable and accessible, with React / Vue / Svelte / Konva wrappers documented. Positioned against Pintura and img.ly's photo editor: MIT, and the same document renders on the server.
+- Interop hub: Lightroom XMP preset import with an approximation report ([#198](https://github.com/Stocastico/rullino/issues/198)), `.3dl` ([#202](https://github.com/Stocastico/rullino/issues/202)), `.acv` ([#203](https://github.com/Stocastico/rullino/issues/203)), `.cube` both ways; conversions in the CLI and as a tool page.
+- One integration example per audience (product photos, a CMS / DAM plugin, an editor using rullino as its engine).
+- **Adoption gate**: RAW (0.11) starts only once at least 3 outside developers integrate or seriously try the library (issues, PRs, dependents). If not, the pitch is the problem, not missing features: rethink before investing months in demosaicing.
 
-### 0.10 — RAW development
+### 0.11 — RAW development ([#168](https://github.com/Stocastico/rullino/issues/168))
+- `@rullino/raw`: DNG in pure TS (phones, converted files); **proprietary formats (CR3, NEF, ARW, RAF…) through an official, optional `@rullino/libraw` adapter** over a LibRaw WASM build (LGPL, its own package and `.wasm`, so the core stays MIT and zero-dependency) ([#183](https://github.com/Stocastico/rullino/issues/183)). Without these formats photographers do not even try.
+- The RAW pipeline as filters with CPU references and parity: levels, white balance, GPU demosaic, highlight reconstruction, camera matrices, DCP, DNG opcodes ([#184](https://github.com/Stocastico/rullino/issues/184)); lens corrections and raw denoising ([#185](https://github.com/Stocastico/rullino/issues/185)); a CC0 RAW test set ([#186](https://github.com/Stocastico/rullino/issues/186)).
+- Tool page: RAW batch develop.
 
-*Why*: this is the distinctive one. Nothing open develops RAW files in the browser with a non-destructive, exportable recipe; Lightroom web uploads them. It needs 0.9's 16-bit / wide-gamut pipeline.
+### 0.12 — Masks and computational photography, non-generative ([#170](https://github.com/Stocastico/rullino/issues/170))
+- A licence-first model survey ([#191](https://github.com/Stocastico/rullino/issues/191)), then smart masks (subject, background, sky, people) stored with the recipe that made them so batches recompute them ([#192](https://github.com/Stocastico/rullino/issues/192)); upscale and denoise.
+- Pyramids as a core pass primitive: exposure fusion, focus stacking, clarity, dehaze ([#193](https://github.com/Stocastico/rullino/issues/193)); alignment of brackets and stacks ([#194](https://github.com/Stocastico/rullino/issues/194)).
+- Tool page: make a product-photo set consistent (white balance, exposure, clean background).
 
-- **`@rullino/raw`**: a DNG reader in pure TS (uncompressed, lossless JPEG / LJ92, deflate; tiles; DNG 1.7's JPEG XL through the injected decoder of 0.9), so phone RAWs (iPhone ProRAW, Pixel, most Androids) and every converted RAW work out of the box. Proprietary formats (CR3, NEF, ARW, RAF…) through an **injected** decoder (a LibRaw WASM build chosen by the app: LGPL code stays out of our MIT packages).
-- **The RAW pipeline as filters with CPU references and parity**: black / white level, linearisation tables, white balance in camera space, **demosaicing on the GPU** (bilinear as the reference, then a quality algorithm in the RCD / AMaZE class; X-Trans later), highlight reconstruction, camera → working space through the DNG colour matrices (dual-illuminant interpolation by CCT), DCP profiles (hue / sat maps, look tables), DNG opcode lists (WarpRectilinear for lens distortion, GainMap for vignetting — phones ship them).
-- **Lens corrections without DNG opcodes**: distortion / vignetting / CA models as filters; the lensfun database (CC BY-SA data) fetched on demand, never bundled.
-- **Raw denoising**: a classic one first (wavelet / NLM, tier C already), the ML one in 0.12.
-- **Develop defaults** that make a RAW look like the camera's JPEG on first open (base curve + profile), so a user is never shown a flat image.
+### 0.13 — Platform ([#171](https://github.com/Stocastico/rullino/issues/171))
+- Plugin API and `@rullino/filter-kit` (RFC [#196](https://github.com/Stocastico/rullino/issues/196)); community gallery as a static index ([#197](https://github.com/Stocastico/rullino/issues/197)); CLI `watch`, sidecars, `validate`, `diff`, `info`, and `@rullino/mcp` ([#199](https://github.com/Stocastico/rullino/issues/199)).
+- A simple overlay node (image or solid, position, scale, opacity, normal / multiply / screen) for watermarks and logos on batches.
 
-*Client-only check*: everything local; lensfun data from GitHub on demand, cached.
-*Risks*: demosaicing quality is judged by eye against Lightroom / darktable: build a small public test set (CC0 RAWs) and compare. Memory: a 50 MP RAW in 16-bit floats is 400 MB; tiles from 0.8 are required.
+### 1.0 — Stable ([#173](https://github.com/Stocastico/rullino/issues/173))
+- The v3 format written as a specification, with a conformance suite any implementation can run ([#204](https://github.com/Stocastico/rullino/issues/204)).
+- API audit and a stability policy: semver, every future reader reads v3, deprecations warn for a minor release ([#200](https://github.com/Stocastico/rullino/issues/200)).
+- Real-hardware parity on at least two GPU vendors in Chrome, Safari and Firefox; budgets; accessibility audit of the editor and the tools.
 
-### 0.11 — Composition: layers, blending, text, templates
+### After 1.0, not promised ([#207](https://github.com/Stocastico/rullino/issues/207))
+Full composition (layer stacks and blend modes #187, text #188, shapes #189, templates #190), video grading through WebCodecs, panorama stitching. Reopen if users ask.
 
-*Why*: "more than filters". It turns the edit document into something that can make a watermark, a collage, an Open Graph card or a product shot on a new background, the same in the browser and the CLI.
-
-- **Layer stacks as v3 nodes**: image layers (another input, an ML patch, a solid, a gradient), adjustment layers (a chain over everything below, with a mask), groups; per layer: affine transform (position, scale, rotation, anchor), opacity, mask, **blend modes** (normal, multiply, screen, overlay, soft light, hard light, colour dodge / burn, difference, colour, luminosity, hue, saturation; defined in linear light with the perceptual ones in OKLab — written down in the spec, because editors disagree).
-- **Text, deterministic everywhere**: an OpenType reader in pure TS (TrueType `glyf` first, CFF later, variable fonts' axes), glyph outlines filled by the existing `fillShape` rasteriser at any size, so a text layer renders the same in Chrome, Safari and Node. Simple scripts shaped by us (kerning, ligatures through GSUB basics); **complex scripts through an injected shaper** (harfbuzzjs, MIT, WASM). Fonts are inputs of the document (a file, or a Google Fonts family fetched on the client).
-- **Shapes and strokes**: rectangles, ellipses, polygons, paths (SVG path syntax), fills and strokes, drop shadow / glow / outline as layer styles.
-- **Templates**: `variables` in the document (`{{title}}`, `{{photo}}`, colour and number variables bound to params), so one template renders a thousand social cards: `rullino render --template card.json --set title="…" photo.jpg`, or a CSV of rows.
-- **Frames, borders, collages** as templates in the gallery, not as code.
-- **Layout**: a document can be a canvas of its own size (not the input's), for collages and cards.
-
-*Client-only check*: fonts are user files or fetched from a CDN by the client; no server rasteriser.
-*Risks*: text is a deep hole (shaping, bidi, line breaking): 1.0 ships single-paragraph text with wrapping, left / centre / right; rich text later. Blend-mode definitions must be in the spec before code.
-
-### 0.12 — Intelligence and computational photography
-
-*Why*: masks are where an editor saves the user's time, and several pictures together beat one.
-
-- **Smart masks** as mask kinds of the document (computed on the client, cached, re-computed on another image): subject, background, sky, people / skin / hair, by **text prompt** if a permissively licensed model fits. Masks are stored as rasters plus the recipe that made them (model id, revision, prompt), so a batch re-runs them per photo.
-- **Generative-free ML tools**: upscaling ×2 / ×4, denoising (including raw-domain), face detection for auto-masks and auto-crop, matting for clean cut-outs (hair), auto-straighten (horizon by Hough, tier C, or a model), learned auto-enhance only with a licence that allows it.
-- **Model registry**: every model a `ModelFile` with hash, size, licence and the backend it runs best on; `@rullino/ml` grows a small scheduler (one ORT session at a time, cancellation, progress), and a model is a plug-in (the plugin API of 0.13) so the community can add one.
-- **Multi-resolution passes in core** (Gaussian / Laplacian pyramids as a pass primitive), which unlock: **exposure fusion** (Mertens) and HDR merge of brackets, **focus stacking**, frequency separation, local contrast / clarity / dehaze done properly.
-- **Alignment**: feature detection (FAST / ORB-like) + RANSAC homography, on the GPU with a CPU reference, for handheld brackets and stacks; panorama stitching (cylindrical projection + multiband blending) as the stretch goal.
-
-*Client-only check*: all inference on ORT WASM / WebGPU; weights from Hugging Face.
-*Risks*: **licences**. Every candidate model's code *and* weights must be permissive (Apache-2.0 / MIT / BSD) and recorded in `THIRD_PARTY_NOTICES.md` before it is wired in; several popular ones (RMBG, some Depth Anything sizes) are non-commercial and excluded. Size: models are tens of MB, always lazy, always optional.
-
-### 0.13 — Platform: editor, plugins, gallery, interop, automation
-
-- **`<rullino-editor>`**: the studio's develop / compose UI as a framework-free web component (inspector, film strip / layers panel, masks, geometry, compare), input an image and a document, output a document; themable with CSS custom properties; keyboard and screen-reader accessible. Konva / React / Vue wrappers are a few lines each.
-- **Plugin API**: a plugin is an npm package or an ES module URL exporting filters, mask generators, codecs, models, templates. `@rullino/filter-kit` gives plugin authors our parity harness (CPU reference vs WGSL, tolerance, mutation hints) so third-party filters meet the same bar. Documents name plugins with a version; a renderer that lacks one says which.
-- **Community gallery**: looks, templates, LUTs, plugins, as a JSON index in a repository, previews rendered by CI, browsed from the studio; submissions are pull requests (review = the licence check). Free on Pages.
-- **Interop**: import **Lightroom / Camera Raw XMP presets** (the basic, tone curve, HSL, colour grading, split toning, grain, vignette, effects panels mapped onto our filters, with a report of what was approximated) — millions of presets exist; `.cube` / `.3dl` / Hald in and out (`.cube` out exists); Photoshop `.acv` curves; export a document as a darktable style or an RT `.pp3` where a mapping exists (later).
-- **CLI, the rest**: `rullino watch` (a folder in, renders on change), sidecars (`photo.jpg.rullino.json` next to the photo, picked up automatically), `rullino validate` / `rullino diff a.png b.png --tolerance` / `rullino info` (metadata, profile), templates with CSV rows, `rullino studio` (serves the PWA locally on a folder).
-- **`@rullino/mcp`**: a local MCP server over the CLI (stdio, no network), so AI assistants can develop and compose photos on the user's machine through edit documents. Cheap once the CLI and the spec exist.
-
-*Client-only check*: plugins are loaded by the client from npm / a URL; the gallery is static.
-*Risks*: a plugin is third-party code running in the page: document the trust model (same as any npm dependency), never auto-load plugins named by a document without the user's consent.
-
-### 0.14 — Video (experimental, does not block 1.0)
-
-- Per-frame grading of video in the browser through **WebCodecs** (decode → the same document on each frame → encode), MP4 / WebM demuxing and muxing (own minimal muxer or an injected library), temporal effects (grain that moves, stabilised vignettes), LUT-based previews at full frame rate.
-- Node: no WebCodecs there; frames in and out of the CLI (`ffmpeg` pipes, the user's own binary) is the most we do.
-- *Risk*: `VideoFrame` imports lose the device on SwiftShader (see Traps), so CI cannot test the GPU path as is: the CPU path and frame-by-frame tests first. This is why it is experimental.
-
-### 1.0 — Stable
-
-1.0 is a promise, not a feature list:
-
-- **Specification**: `spec/` with edit document v3 written as a standard (every node, param, blend mode, colour space and their exact maths — the CPU references *are* the normative definitions), versioned independently of the packages.
-- **Conformance suite**: inputs + documents + reference outputs + tolerances, runnable by any implementation (ours run it in CI on every backend; a Python or Rust reader could run it too).
-- **Stability**: semver from 1.0 on for every public root; every future reader reads v3 documents; deprecations last at least one minor release with a warning; `./internal` stays unstable.
-- **API audit** like M5.1: everything exported is something we want to keep for years.
-- **Quality bars**: real-hardware parity on at least NVIDIA, Apple, AMD or Intel, in Chrome, Safari and Firefox; performance budgets per release checked by the bench; size budgets per package; accessibility audit of the editor and studio; decoders fuzzed; docs for every pillar (guides by job, a "from Lightroom" guide).
-
-### After 1.0 (1.x, not promised)
-
-Panorama stitching if not in 0.12, video out of experimental, peer-to-peer sharing of documents (WebRTC, needs only a free signalling service), rich text, a WebGL2 backend only if users without WebGPU and with slow CPUs ask, more RAW formats in pure TS.
-
-## 4b. Two tracks that run through every release
-
-### Studio (the app people use)
-
-The playground evolves into **rullino studio** instead of a second app being written (proposal; the developer panels stay behind `?dev`). A PWA, installable, works offline:
-
-- 0.8: install / offline; open a folder (File System Access, OPFS elsewhere) as a **library**: thumbnails, EXIF, ratings, flags, filter and sort; edits stored as sidecars or in OPFS; copy / paste / sync an edit across a selection; batch export with band workers.
-- 0.9: open 16-bit / HDR / wide-gamut files, show HDR, keep metadata; histogram per channel in the working space.
-- 0.10: open RAW, develop module.
-- 0.11: compose module (layers, text, templates).
-- 0.12: smart-mask buttons, upscale / denoise on export, merge (HDR / focus).
-- 0.13: the editor is `<rullino-editor>`; gallery browser; XMP preset import.
-
-### Engine quality (every release)
-
-Each new filter or node follows the existing rules (CPU reference, WGSL, parity, banded = whole, mutation check); performance and size budgets updated with reasons; real-hardware numbers rerun with the hardware check page.
-
-## 5. New packages (proposal)
+## 6. New packages
 
 | Package | Release | Notes |
 |---|---|---|
-| `@rullino/codecs` | 0.9 | PNG / JPEG / TIFF / EXR / ICC / EXIF / XMP; injected decoders for AVIF / HEIC / JXL |
-| `@rullino/raw` | 0.10 | DNG + RAW pipeline filters; injected LibRaw for proprietary formats |
-| `@rullino/text` | 0.11 | OpenType reader + layout; injected shaper for complex scripts |
-| `@rullino/editor` | 0.13 | `<rullino-editor>` web component |
+| `@rullino/codecs` | 0.9 | PNG / JPEG / TIFF / EXR, ICC / EXIF / XMP; injected decoders for AVIF / HEIC / JXL |
+| `@rullino/editor` | 0.10 | `<rullino-editor>` |
+| `@rullino/raw` | 0.11 | DNG + the RAW pipeline filters |
+| `@rullino/libraw` | 0.11 | optional LGPL adapter for proprietary RAW formats, outside the MIT core |
 | `@rullino/filter-kit` | 0.13 | parity harness for plugin authors |
 | `@rullino/mcp` | 0.13 | local MCP server over the CLI |
-| `@rullino/video` | 0.14 (exp.) | WebCodecs pipeline |
 
-All keep the rules: zero runtime dependencies, heavy third-party code injected by the caller, ESM, one version number.
+All keep the rules: zero runtime dependencies in the MIT packages, heavy third-party code injected or isolated in its own optional package, ESM, one version number.
 
-## 6. What I recommend *not* doing (opinion)
+## 7. Visibility, in parallel
 
-- **No PSD compatibility, no vector illustration, no Photoshop clone.** Photopea already is one, and its moat is ten years of features. Our layers exist to *compose photos reproducibly*, not to edit arbitrary documents.
-- **No generative AI** (inpainting with diffusion, relighting, "AI expand"): models are hundreds of MB to GBs, the good ones are not permissively licensed, and on-device speed is poor. MI-GAN-class removal stays.
-- **No accounts, no cloud sync, no server rendering as a service**, even "just for convenience": the constraint is the product.
-- **Do not let breadth erase the moat.** Every new capability must stay inside the edit document and the parity contract; a feature that only exists in the studio UI, or only on the GPU, is a regression of what makes rullino different.
-- **A word of caution** on the change of direction itself: the 6b plan froze breadth because the library had no users. Building the platform first is a legitimate bet (a studio people can use is also the best launch material), but the risk is a year of work nobody sees. Mitigation: ship each release to npm and Pages, and keep the studio usable at every step.
+- A release per milestone at least, with notes and one thing to try (`npx rullino …`, a tool page).
+- The launch message is the developer one: *one JSON edit, previewed on WebGPU in the browser, rendered the same on the server, with a published tolerance table*. Show HN, r/webdev, r/javascript, JavaScript Weekly; the Filerobot issue; the tool pages for photographers' communities, each with one clear job.
+- Watch: npm downloads, dependents, outside issues and PRs, tool page visits (from GitHub Pages' traffic only; no analytics script).
 
-## 7. Open questions for the maintainer
+## 8. What I recommend not doing (opinion)
 
-1. Accept the direction and the release order? (In particular: RAW before composition, or the other way round?)
-2. Evolve the playground into the studio, or keep the playground as a developer demo and build the studio separately?
-3. Default for GPS / personal metadata on export: strip (privacy) or keep (fidelity)?
-4. The optional Cloudflare Worker for short links: yes, or links stay in the URL fragment only?
-5. Video in 0.14 as experimental, or after 1.0?
-6. Spec licence: MIT like the code, or CC BY 4.0 for the text?
+- **Another general browser editor** as the headline: a crowded genre in 2026 (§2).
+- **Full composition and video before 1.0**: covered elsewhere, and they do not strengthen what only rullino offers.
+- **PSD compatibility, generative AI, accounts, cloud sync, server rendering as a service.**
+- **Breadth that skips the moat**: every capability stays inside the edit document and the parity contract; a feature that exists only in a UI, or only on the GPU, is a regression of what makes rullino different.
+
+## 9. Open questions for the maintainer
+
+1. GPS / personal metadata on export: strip or keep by default?
+2. Optional Cloudflare Worker for short links: yes / no?
+3. Spec licence: MIT or CC BY 4.0?
+4. The adoption gate at 0.10 (≥ 3 outside developers before RAW): agreed?
+
+Sources of the market check (15 Nov 2026): [LightCraft](https://lightcraft.run/guides/edit-raw-photos-online), [OpticRaw](https://opticraw.com/lightroom-alternative), [Lumen](https://lumen.mr-development.de/en), [RawLite](https://rawlite.app/), [photopico](https://photopico.pages.dev/), [pg0/raw-viewer](https://github.com/pg0/raw-viewer), [Safelight](https://discuss.pixls.us/t/introducing-safelight-a-free-open-source-raw-editor-built-like-an-ide/58615), [OpenLight](https://21st.dev/community/apps/openlight), [Polarr Next](https://petapixel.com/2024/02/14/polarr-next-is-a-web-based-ai-powered-photo-editor-made-for-pros), [Graphite](https://graphite.art/features/), [img.ly PhotoEditor SDK for server](https://docs.photoeditorsdk.com/guides/server/), [Image Sequencer](https://github.com/jcads/image-sequencer), [libraw-wasm](https://github.com/colorhythm/libraw-wasm).

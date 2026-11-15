@@ -6,9 +6,9 @@
 
 **Are browser and server results identical?** Within a published tolerance per filter, not bit for bit: GPUs keep intermediates in float16, and some filters make hard decisions. See the [parity table](https://github.com/Stocastico/rullino/blob/main/docs/parity.md).
 
-**Can I read RAW / HEIC / 16-bit files?** Not yet: input is 8-bit sRGB today. RAW (DNG first), 16-bit and HDR are on the [[Roadmap]] (0.9, 0.10).
+**Can I read RAW / HEIC / 16-bit files?** Not yet: input is 8-bit sRGB today. 16-bit and HDR come in 0.9, RAW in 0.11 (see the [[Roadmap]]).
 
-**Layers, text, collages?** Planned for 0.11 (edit document v3).
+**Layers, text, collages?** Not before 1.0: other tools do them well. 0.13 adds a simple overlay (watermarks, logos on batches).
 
 **Can I use it commercially?** Yes, MIT. Models keep their own (permissive) licences: [THIRD_PARTY_NOTICES.md](https://github.com/Stocastico/rullino/blob/main/THIRD_PARTY_NOTICES.md).
 

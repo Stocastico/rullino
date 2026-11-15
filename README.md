@@ -86,11 +86,11 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 
 All packages share one version number, are ESM only and have **no runtime dependencies**.
 
-> **Status: 0.x.** The API may still change between minor versions (changes are in the [changelog](./CHANGELOG.md)); `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without a stability promise. Input is 8-bit sRGB (what the browser decodes); 16-bit PNG is supported as output. Not done yet: 16-bit / HDR / RAW input, layers and text, analysis filters such as Hough, video input; all on the [road to 1.0](./docs/design/road-to-1.0.md).
+> **Status: 0.x.** The API may still change between minor versions (changes are in the [changelog](./CHANGELOG.md)); `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without a stability promise. Input is 8-bit sRGB (what the browser decodes); 16-bit PNG is supported as output. Not done yet: 16-bit / HDR / RAW input, metadata on export, analysis filters such as Hough; see the [road to 1.0](./docs/design/road-to-1.0.md).
 
 ## Roadmap
 
-rullino is growing from a filter library into a **client-side imaging platform**: edit document v3 as a graph, RAW / 16-bit / HDR input with colour management, layers, text and templates, smart masks and computational photography, a local-first web app (*rullino studio*), an embeddable editor, plugins and a written specification with a conformance suite; everything runs on your machine. Proposal: [Road to 1.0](./docs/design/road-to-1.0.md); tracking issue [#165](https://github.com/Stocastico/rullino/issues/165), one epic per release. Comments and RFC feedback welcome; [good first issues](https://github.com/Stocastico/rullino/labels/good%20first%20issue) are labelled.
+Toward 1.0, two products on one engine: **the library**, the open photo-development engine (one edit document previewed in the browser and rendered the same in Node and from the CLI, with codecs, colour management, HDR, RAW, masks, Lightroom-preset and LUT interop and an embeddable editor), and **rullino tools**, web pages that each do one job on your machine (apply a look to a folder, make a LUT, web-ready export) and show the same in code. Everything runs locally; no generative AI. Proposal: [Road to 1.0](./docs/design/road-to-1.0.md); tracking issue [#165](https://github.com/Stocastico/rullino/issues/165). Comments and RFC feedback welcome; [good first issues](https://github.com/Stocastico/rullino/labels/good%20first%20issue) are labelled.
 
 ## Why
 

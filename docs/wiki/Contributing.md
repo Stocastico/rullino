@@ -6,4 +6,4 @@
 4. Tests first (red, then green). For a shader, break it on purpose and check the parity test fails.
 5. Bigger ideas: an RFC issue (form "RFC") or a thread in Discussions.
 
-Ways to help without code: RAW files under CC0 for the test set ([#186](https://github.com/Stocastico/rullino/issues/186)), parity reports from your GPU and browser ([hardware check](https://stefanomasneri.com/rullino/check/)), looks and templates for the gallery (0.13).
+Ways to help without code: RAW files under CC0 for the test set ([#186](https://github.com/Stocastico/rullino/issues/186)), parity reports from your GPU and browser ([hardware check](https://stefanomasneri.com/rullino/check/)), looks for the gallery (0.13), and the first people to try the tool pages and the library in a real project: tell us what is missing.
