@@ -36,7 +36,7 @@ The chains are exposure + curves + 3D LUT, blur + unsharp mask, and levels + vig
 First run, before `#99` (so rullino's numbers were slower than today's; the ranking did not change), change latency at 12 MP:
 
 | chain | rullino WebGPU | wasm-vips | Photon |
-|---|---|---|---|
+|---|---|---|---|---|
 | exposure + curves + LUT | 36 ms | 320 ms ¹ | 676 ms ² |
 | blur + unsharp | 37 ms | 1806 ms | 1949 ms ² |
 | levels + vignette + grain | 37 ms | 1260 ms | 51 ms ² |
@@ -66,23 +66,23 @@ What this means in practice:
 
 - **A CPU preview of a 12 MP photo takes seconds, not tens of milliseconds.** The browser fallback shows a reduced image and the Node renderer is meant to use the GPU through Dawn (0.3–1.4 s warm per 12 MP chain on a GPU-less runner with lavapipe, 12–14 s for the unoptimised reference).
 - `@rullino/web` uses 4 workers by default on a machine reporting at least 4 cores (images above about 2 MP). `@rullino/node` stays at 1 thread: a server scales with processes (`threads` is opt-in).
-- Not measured: Android phones, Intel / AMD GPUs (Apple M1 and an iPhone: see below).
+- Not measured: Intel / AMD GPUs (Apple M1, an iPhone and an Android phone: see below).
 
-## Apple silicon (hardware check page)
+## Apple silicon and phones (hardware check page)
 
-The [hardware check](https://stefanomasneri.com/rullino/check/) page on a MacBook with an Apple M1 (8 cores, 12 Nov 2026) and on an iPhone (iOS 18.7, 4 cores reported, 15 Nov 2026), code of **0.7.0**. The speed check renders the whole chain each time through `@rullino/web`'s `pixels` (8-bit image in, upload, exposure + contrast + Gaussian blur σ 3 + unsharp mask, 8-bit pixels back): it is not the one-parameter change of the sections above, so compare these numbers with each other, not with those.
+The [hardware check](https://stefanomasneri.com/rullino/check/) page on a MacBook with an Apple M1 (8 cores, 12 Nov 2026) an iPhone (iOS 18.7, 4 cores reported, 15 Nov 2026) and an Android phone with an Arm Mali (Valhall) GPU (Android 10, 8 cores, 15 Nov 2026), code of **0.7.0**. The speed check renders the whole chain each time through `@rullino/web`'s `pixels` (8-bit image in, upload, exposure + contrast + Gaussian blur σ 3 + unsharp mask, 8-bit pixels back): it is not the one-parameter change of the sections above, so compare these numbers with each other, not with those.
 
-| Backend | M1, Chrome 157 | M1, Safari 26.6 | iPhone, Safari |
+| Backend | M1, Chrome 157 | M1, Safari 26.6 | iPhone, Safari | Android (Mali), Chrome 157 |
 |---|---|---|---|
-| GPU, 1 MP: first / next | 25 / 12–14 ms | 436 / 11 ms | 36 / 16–18 ms |
-| GPU, 12 MP: first / next | 229 / 57–70 ms | 219 / 72–75 ms | 314 / 124–131 ms |
-| CPU, 1 MP | 563 ms | 475 ms | 1.14 s |
-| CPU (4 band workers), 12 MP | 1.83 s | 1.65 s | 2.13 s |
+| GPU, 1 MP: first / next | 25 / 12–14 ms | 436 / 11 ms | 36 / 16–18 ms | 126 / 51 ms |
+| GPU, 12 MP: first / next | 229 / 57–70 ms | 219 / 72–75 ms | 314 / 124–131 ms | 1172 / 222–300 ms |
+| CPU, 1 MP | 563 ms | 475 ms | 1.14 s | 1.00 s |
+| CPU (4 band workers), 12 MP | 1.83 s | 1.65 s | 2.13 s | 4.71 s |
 
 - Both browsers run WebGPU on Metal, so the GPU numbers after the first run are the same machine twice; Safari's slow first render is the compilation of the shaders the first time they are used.
-- A full 12 MP render in about 60–75 ms on a 2020 laptop GPU and about 125 ms on the phone; on the CPU without any GPU, under 2 s on the laptop and about 2 s on the phone. The CPU's 1 MP figure includes starting the worker (below 2 MP no band workers start), which is why it is not a twelfth of the 12 MP one.
+- A full 12 MP render in about 60–75 ms on a 2020 laptop GPU about 125 ms on the iPhone and 220–300 ms on the Android phone; on the CPU without any GPU, under 2 s on the laptop, about 2 s on the iPhone and 4.7 s on the Android phone. The CPU's 1 MP figure includes starting the worker (below 2 MP no band workers start), which is why it is not a twelfth of the 12 MP one.
 - The phone reports a 683 MB maximum GPU buffer (the M1 in Chrome 4096 MB): large images there need the tiled rendering planned for 0.8.
-- Parity: on the M1 every filter within the [published tolerance for real GPUs](./parity.md#on-real-gpus), the largest differences at 70–80% of it; on the iPhone every filter within the tighter software tolerances.
+- Parity: on the M1 every filter within the [published tolerance for real GPUs](./parity.md#on-real-gpus), the largest differences at 70–80% of it; on both phones every filter within the tighter software tolerances (halftone on the Android phone: 0.2% of channels off at a dot edge, against the 2% its tolerance allows).
 
 ## Limits of these numbers
 
