@@ -2,6 +2,23 @@
 
 Things only the maintainer can do before going public. Delete the file when it is empty (it is a working list, not documentation). Written 4 Nov 2026; the plan behind it is "Before going public" in [PLAN.md](./PLAN.md).
 
+## 0. Road to 1.0 (added 15 Nov 2026) — in this order
+
+Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.0.md), revised the same day after a market check: the library is the headline, the web part is "rullino tools", job pages on top of it, not another editor), the umbrella issue [#165](https://github.com/Stocastico/rullino/issues/165), the epics (#166, #167, #206, #168, #170, #171, #173, and #207 for what moved after 1.0; #169 and #172 closed as deferred), the work items with RFCs (#174, #181, #196; #187 deferred), three good first issues (#201–#203), the RFC issue form and the wiki pages (`docs/wiki/`). What only you can do:
+
+1. [ ] **Upload the M1 reports** (Chrome, Safari, Firefox) as comments on a new issue "Parity on real GPUs: Mac M1" (see section 1). Claude then decides per filter, as for the RTX; it is the first item of 0.8.
+2. [x] ~~Answer the open questions~~ (15 Nov: metadata kept by default with a strip option, Cloudflare Worker yes, MIT for code + CC BY 4.0 for the spec text, the adoption gate before RAW).
+   - [ ] When the short-links issue (#208) is next: a free **Cloudflare account**, a Workers KV namespace, and an API token with "Edit Cloudflare Workers" for the deploy (Claude writes the Worker and a `wrangler.toml`; the token goes in the repository's Actions secrets as `CLOUDFLARE_API_TOKEN`, never in a file). Optionally a subdomain such as `r.stefanomasneri.com`.
+3. [ ] **Merge the PR #205** with the proposal (or ask for changes there).
+4. [ ] **Enable Discussions** (Settings > General > Features > Discussions), with the categories *Announcements*, *Q&A*, *Ideas*, *RFCs* (open format), *Show and tell*. Then ask Claude to write the first posts (welcome + how to ask; one thread per RFC pointing at its issue). Claude cannot enable it, and the tools it has cannot post discussions until it exists.
+5. [ ] **Initialise the wiki**: Wiki tab > "Create the first page" > save anything. Then from your machine: `node scripts/publish-wiki.mjs --dry-run`, then `node scripts/publish-wiki.mjs`. (Claude cannot push to `rullino.wiki.git`.)
+6. [ ] **Milestones** (Issues > Milestones > New; Claude's tools cannot create them): `0.8`, `0.9`, `0.10`, `0.11`, `0.12`, `0.13`, `1.0`. Then ask Claude to put each issue in its milestone (it can set a milestone once it exists). The labels `v0.8` … `v1.0` already do the same job, so this is optional.
+7. [ ] **Label colours and descriptions** (Issues > Labels): the new labels came out grey. Suggested: `roadmap-1.0` #5319e7 "Part of the road to 1.0 (#165)"; `rfc` #fbca04 "Design proposal, argued before code"; `v0.8` … `v1.0` one colour (#c5def5) "Planned for this release"; `post-1.0` #d4c5f9 "Deferred until after 1.0"; `epic` #3e4b9e. `v0.14` is no longer used: delete it.
+8. [ ] **Pin** #165 (issue page > "Pin issue") so visitors see the roadmap first.
+9. [ ] **A Project board** (optional; Projects > New > Roadmap layout, add the `roadmap-1.0` issues, group by label). Claude cannot create Projects.
+10. [ ] **Old epics**: #66 (distribution) and #67 (launch) are on hold by your choice; close them as "not planned" with a link to #165, or leave them open. Say which and Claude does it.
+11. [ ] **Release 0.8.0** (0.7.0 is out since 12 Nov): the CLI and the playground's CPU fallback are on `main` but not on npm yet. Claude prepares the version PR; you push the tag.
+
 ## 1. Test on real hardware (the "within the published tolerance" claim)
 
 The tolerances are verified on software GPUs and one RTX 40 (Windows, Chrome). Needed: one run per machine/browser below. **Nothing to install**: open **https://stefanomasneri.com/rullino/check/** (live after the PR with the page is merged and the Pages deploy has run), press the three buttons in order (device is described on load; "Run the parity check", about a minute; "Run the speed check"), then **Copy the report** (or **Download as a file** if copying fails) and paste it as a comment on a new issue "Parity on real GPUs", with the machine's name and macOS version. Claude then decides per filter, as for the RTX.
@@ -31,7 +48,7 @@ For each failure write down: machine, OS and browser versions, what you did, a s
 ## 4. Release 0.7.0
 
 - [x] The PR "Docs for integrators + fixes" and the release PR (#158, version 0.7.0 and its CHANGELOG section) are merged.
-- [ ] From your machine: `git fetch && git tag v0.7.0 origin/main && git push origin v0.7.0`, then watch the `release` workflow.
+- [x] ~~Tag `v0.7.0` pushed~~ (GitHub release of 12 Nov).
 - [ ] Check on npm that all 7 packages show 0.7.0 and the READMEs render (badges, links).
 - [ ] In a clean folder: `npm init -y && npm i @rullino/web` and run the getting-started snippet.
 

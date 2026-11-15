@@ -279,6 +279,23 @@ The split view exists. On top of it:
 
 Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
 
+## 8. Road to 1.0 (accepted 15 Nov 2026)
+
+The maintainer's direction (15 Nov): expand rullino beyond filters, everything on the user's machine (browser, Node, CLI; anything off-device free or nearly free to host), no generative AI, visibility in parallel. Two products on one engine: **the library** (the open photo-development engine: one edit document, previewed in the browser, rendered the same in Node and from the CLI) and **rullino tools** (web pages that each do one job locally and end with "the same in your code"). A market check the same day found a dozen free local browser RAW editors already (LightCraft, Safelight, OpticRaw, photopico…), so the web part is the library's front door, not another general editor. Full proposal: [docs/design/road-to-1.0.md](docs/design/road-to-1.0.md); tracking [#165](https://github.com/Stocastico/rullino/issues/165).
+
+| Release | Theme | Epic |
+|---|---|---|
+| 0.8 | Foundations (v3 graph #174, tiles, hardening) + rullino tools step 1 + releases | [#166](https://github.com/Stocastico/rullino/issues/166) |
+| 0.9 | Codecs, metadata, colour management (RFC #181), HDR | [#167](https://github.com/Stocastico/rullino/issues/167) |
+| 0.10 | `<rullino-editor>` + interop (Lightroom XMP, `.cube` / `.3dl` / `.acv`); adoption gate before RAW | [#206](https://github.com/Stocastico/rullino/issues/206) |
+| 0.11 | RAW (DNG own, proprietary formats through an optional LibRaw adapter) | [#168](https://github.com/Stocastico/rullino/issues/168) |
+| 0.12 | Smart masks (non-generative), pyramids (exposure fusion, focus stacking), alignment | [#170](https://github.com/Stocastico/rullino/issues/170) |
+| 0.13 | Plugins (RFC #196), gallery, CLI++ and MCP, overlay node | [#171](https://github.com/Stocastico/rullino/issues/171) |
+| 1.0 | Specification + conformance suite, semver promise | [#173](https://github.com/Stocastico/rullino/issues/173) |
+| after | Full composition, video, panorama | [#207](https://github.com/Stocastico/rullino/issues/207) |
+
+It supersedes the "no new filters / no full editor UI" limits of §6b and §6c; the rules of CLAUDE.md apply to all of it. The maintainer's answers (15 Nov): metadata kept by default with an option to strip them, short links through a free Cloudflare Worker, MIT for code and CC BY 4.0 for the spec text, the adoption gate before RAW (proposal §9).
+
 ## 7. Open decisions
 
 - ~~Library name~~ → **rullino**, npm scope `@rullino` (org to be registered).

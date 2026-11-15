@@ -3,3 +3,9 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/Stocastico/rullino/security/advisories/new
     about: Report privately, not as a public issue (see SECURITY.md).
+  - name: Questions and ideas
+    url: https://github.com/Stocastico/rullino/discussions
+    about: Ask a question or discuss an idea before opening an issue.
+  - name: Roadmap to 1.0
+    url: https://github.com/Stocastico/rullino/blob/main/docs/design/road-to-1.0.md
+    about: Where the project is going; each release has an epic issue labelled roadmap-1.0.
