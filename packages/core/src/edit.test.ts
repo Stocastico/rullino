@@ -155,11 +155,11 @@ describe('applyEdit on version 3 graphs (CPU)', () => {
       filters,
       scale: { photo: 1, second: 0.5 },
       cpu: async (steps, image, o) => {
-        seen.push(`${steps.map((s) => s.filter.id).join('+')} ${image.width}x${image.height} @${o.scale}`);
+        seen.push(`${o.node}: ${steps.map((s) => s.filter.id).join('+')} ${image.width}x${image.height} @${o.scale}`);
         return runChainCpu(steps, image, { scale: o.scale, fast: true });
       },
     });
-    expect(seen).toEqual(['gain 8x6 @1', 'shift 8x6 @0.5']);
+    expect(seen).toEqual(['bright: gain 8x6 @1', 'sharp: shift 8x6 @0.5']);
   });
 
   it('names a missing input, and still renders a one-input graph from a single image', async () => {

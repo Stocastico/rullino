@@ -180,3 +180,13 @@ function describeCycle(left: readonly GraphNode[], byId: ReadonlyMap<string, Gra
   }
   return [...path.slice(path.indexOf(at)), at].join(' → ');
 }
+
+/**
+ * The steps of one chain node as a version 2 document: what a band worker parses again to run that
+ * node (it cannot receive parsed steps: filters and LUTs are functions and objects of this thread).
+ */
+export function chainDocument(edit: unknown, nodeId: string): { readonly version: 2; readonly steps: readonly StepDocument[] } {
+  const node = migrateEdit(edit).nodes.find((n) => n.id === nodeId);
+  if (!node || (node.kind ?? 'chain') !== 'chain') throw new Error(`node "${nodeId}" is not a chain`);
+  return { version: 2, steps: (node as { steps: readonly StepDocument[] }).steps };
+}

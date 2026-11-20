@@ -60,6 +60,20 @@ const edits: Record<string, unknown> = {
   'disabled steps': doc([{ filter: exposure, enabled: false }, { filter: gaussianBlur, params: { sigma: 2 } }, { filter: sharpen, enabled: false }]),
   'long side': doc([{ filter: gaussianBlur, params: { sigma: 2 } }], { output: { longSide: 100 } }),
   ...Object.fromEntries(looks.map((l) => [`look ${l.id}`, JSON.parse(JSON.stringify(lookEdit(l)))])),
+  // Two different chains on one input, mixed, resized, then a third chain: a worker that ran the
+  // wrong node's steps would change the picture.
+  'a version 3 graph': {
+    version: 3,
+    inputs: { photo: {} },
+    nodes: [
+      { id: 'soft', from: 'photo', steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }] },
+      { id: 'warm', from: 'photo', steps: [{ filter: 'exposure', params: { ev: 0.6 } }, { filter: 'vignette', params: {} }] },
+      { id: 'both', kind: 'mix', from: ['soft', 'warm'], amount: 0.5, mask: radial },
+      { id: 'small', kind: 'resize', from: 'both', scale: 0.5 },
+      { id: 'out', from: 'small', steps: [{ filter: 'sharpen', params: {} }] },
+    ],
+    output: { node: 'out', format: 'png' },
+  },
 };
 const same = (a: LinearImage, b: LinearImage, label: string) => {
   expect([a.width, a.height], label).toEqual([b.width, b.height]);
@@ -104,6 +118,15 @@ describe('threads: the result equals the single-threaded one, bit for bit', () =
   it('with more threads than rows, one row, and rows fewer than the halo', async () => {
     const [one, many] = [await renderer(), await renderer({ threads: 8, pool: { workerUrl, ...FORCE } })];
     for (const [w, h] of [[40, 3], [64, 1], [30, 7]] as const) same(await many.apply(photo(w, h), edits['blur and unsharp']), await one.apply(photo(w, h), edits['blur and unsharp']), `${w}x${h}`);
+  }, 60_000);
+
+  it('renders and encodes a version 3 graph the way the single-threaded renderer does', async () => {
+    const [one, many] = [await renderer(), await renderer({ threads: 3, pool: { workerUrl, ...FORCE } })];
+    const rgba = { data: new Uint8Array(90 * 60 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 7) % 256)), width: 90, height: 60 };
+    const graph = edits['a version 3 graph'];
+    const [a, b] = [await many.render(rgba, graph), await one.render(rgba, graph)];
+    expect([a.width, a.height]).toEqual([45, 30]);
+    expect(Array.from(a.bytes)).toEqual(Array.from(b.bytes));
   }, 60_000);
 
   it('renders and encodes a file the way the single-threaded renderer does', async () => {

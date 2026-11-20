@@ -4,6 +4,7 @@ import { validateGeometry, type Geometry } from './geometry';
 import type { Lut } from './lut';
 import { createRasterMask, validateMask, type Mask } from './mask';
 import type { Step } from './pipeline/chain';
+import { EDIT_VERSION, parseEdit } from './graph';
 import { resolveParams, type ParamSchema } from './params';
 
 // An edit as plain JSON: the chain, optionally its geometry and how to export the result. For share
@@ -96,8 +97,26 @@ export function migrateChain(doc: unknown): ChainDocument {
   throw new Error(`chain: unsupported version ${JSON.stringify(doc.version)}`);
 }
 
-/** Validates a document (e.g. parsed from a link) and turns it back into chain steps. */
+/**
+ * Validates a document (e.g. parsed from a link) and turns it back into chain steps. Reads versions
+ * 1 and 2, and version 3 documents that are one chain on one input (what `serializeChain` writes
+ * from 0.8 on); a real graph needs {@link parseEdit}.
+ */
 export function parseChain(input: unknown, options: ParseOptions): { steps: Step[]; geometry?: Geometry; output?: OutputSettings } {
+  if (isObject(input) && input.version === EDIT_VERSION) {
+    const graph = parseEdit(input, options);
+    const node = graph.nodes[0]!;
+    if (graph.nodes.length !== 1 || node.kind !== 'chain') {
+      const n = Array.isArray(input.nodes) ? input.nodes.length : graph.nodes.length;
+      throw new Error(`parseChain: this document is a graph (${n} nodes); use parseEdit`);
+    }
+    const { node: _, ...output } = graph.output;
+    return {
+      steps: [...node.steps],
+      ...(node.geometry !== undefined ? { geometry: node.geometry } : {}),
+      ...(Object.keys(output).length ? { output } : {}),
+    };
+  }
   const doc = migrateChain(input) as unknown as Record<string, unknown>;
   if (!Array.isArray(doc.steps)) throw new Error('chain: steps must be an array');
   const steps = parseSteps(doc.steps, options, (i) => `chain step ${i}`);

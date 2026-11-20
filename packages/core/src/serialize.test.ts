@@ -94,7 +94,7 @@ describe('serializeChain / parseChain', () => {
 
   it('rejects unknown filters, versions and invalid values with a useful message', () => {
     expect(() => parseChain({ version: 1, steps: [{ filter: 'nope', params: {} }] }, { filters })).toThrow(/nope/);
-    expect(() => parseChain({ version: 3, steps: [] }, { filters })).toThrow(/version/);
+    expect(() => parseChain({ version: 4, steps: [] }, { filters })).toThrow(/version/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: { amount: 'x' } }] }, { filters })).toThrow(/amount/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: { bogus: 1 } }] }, { filters })).toThrow(/bogus/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: {}, mask: { kind: 'radial', center: [0, 0], radius: [0, 1], feather: 0 } }] }, { filters })).toThrow(/radius/);
@@ -141,5 +141,16 @@ describe('edit document v2', () => {
     expect(parseChain(v1, { filters }).steps[0]!.params).toEqual({ amount: 2 });
     expect(() => migrateChain({ version: 0, steps: [] })).toThrow(/version/);
     expect(() => migrateChain('{}')).toThrow(/object/);
+  });
+
+  it('reads a version 3 document that is one chain on one input, like its v2 form', () => {
+    const v2 = { version: 2, geometry: { ...IDENTITY_GEOMETRY, rotate: 90 }, steps: [{ filter: 'gain', params: { amount: 2 } }], output: { format: 'jpeg', longSide: 300 } };
+    const v3 = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'look', from: 'photo', geometry: v2.geometry, steps: v2.steps }], output: { node: 'look', format: 'jpeg', longSide: 300 } };
+    expect(parseChain(v3, { filters })).toEqual(parseChain(v2, { filters }));
+  });
+
+  it('refuses a version 3 document that is a real graph, and says what to use', () => {
+    const graph = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'a', from: 'photo', steps: [] }, { id: 'b', kind: 'resize', from: 'a', scale: 0.5 }] };
+    expect(() => parseChain(graph, { filters })).toThrow(/parseChain: this document is a graph \(2 nodes\); use parseEdit/);
   });
 });

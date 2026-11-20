@@ -1,5 +1,5 @@
-import { applyEdit, createGpuContext, encodeImage, parseChain, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
-import { exportSamples } from '@rullino/core/internal';
+import { applyEdit, createGpuContext, encodeImage, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
+import { chainDocument, exportSamples } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import { createThreadedExecutor, DEFAULT_WORKER_URL, resolveThreads } from './threads';
@@ -135,7 +135,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       if (lut) luts.set(ref, lut);
       return lut;
     };
-    return applyEdit(image, edit, { ...parse, resolveLut, scale: o.scale, cpu: (steps, framed, c) => executor.run(edit, luts, steps, framed, { scale: c.scale, shared }) });
+    return applyEdit(image, edit, { ...parse, resolveLut, scale: o.scale, cpu: (steps, framed, c) => executor.run(chainDocument(edit, c.node), luts, steps, framed, { scale: c.scale, shared }) });
   };
   // Images that leave the renderer are ordinary memory; `render` only reads its result, so it can stay in shared memory.
   const apply = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}) => applyInternal(image, edit, o);
@@ -147,7 +147,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     ...(ctx ? { gpu: ctx } : {}),
     apply,
     async render(input, edit) {
-      const { output = {} } = parseChain(edit, parse); // validates first: a bad document gets its own message
+      const { output } = parseEdit(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
       const image = 'width' in input ? input : await decodeFile(input);
       const out = await applyInternal(image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)

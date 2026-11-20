@@ -24,3 +24,4 @@ export { bandReach, planBands, planSegments, runChainBand, runChainBandRows, run
 export { applyEditPixels } from './edit';
 export { bindSources, checkMixSizes, mixMask, resizeSize, runGraphCpu, walkGraph, type GraphCpuOptions, type GraphSources, type GraphValue } from './graph-cpu';
 export { runGraphGpu, type GraphGpuResult } from './graph-gpu';
+export { chainDocument } from './graph';
