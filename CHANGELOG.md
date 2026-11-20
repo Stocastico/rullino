@@ -11,6 +11,9 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+### Added
+- **core**: edit document version 3, a graph of named inputs and nodes (`chain`, `mix`, `resize`; [RFC](docs/design/edit-document-v3.md)): `parseEdit` reads every version (nodes in any order, cycles and unknown names rejected with a message that names them), `migrateEdit` lifts v1 / v2 to it, and `edit.schema.json` describes v2 and v3. Rendering graphs (`applyEdit` on v3) comes next.
+
 ## [0.7.0]
 
 Documentation for integrators, the `rullino` command, a synchronous Konva filter for colour edits, `.cube` export, a playground that works without WebGPU, and three bug fixes.

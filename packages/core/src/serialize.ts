@@ -100,30 +100,7 @@ export function migrateChain(doc: unknown): ChainDocument {
 export function parseChain(input: unknown, options: ParseOptions): { steps: Step[]; geometry?: Geometry; output?: OutputSettings } {
   const doc = migrateChain(input) as unknown as Record<string, unknown>;
   if (!Array.isArray(doc.steps)) throw new Error('chain: steps must be an array');
-  const byId = new Map(options.filters.map((f) => [f.id, f]));
-  const steps = doc.steps.map((s: unknown, i): Step => {
-    if (!isObject(s) || typeof s.filter !== 'string') throw new Error(`chain step ${i}: missing filter id`);
-    const filter = byId.get(s.filter);
-    if (!filter) throw new Error(`chain step ${i}: unknown filter "${s.filter}"`);
-    const raw = s.params ?? {};
-    if (!isObject(raw)) throw new Error(`chain step ${i}: params must be an object`);
-    const params: Record<string, unknown> = {};
-    for (const [key, v] of Object.entries(raw)) {
-      if (filter.params[key]?.type === 'lut') {
-        const ref = isObject(v) && typeof v.ref === 'string' ? v.ref : undefined;
-        const lut = ref === undefined ? undefined : options.resolveLut?.(ref);
-        if (!lut) throw new Error(`chain step ${i} (${filter.id}): unknown LUT ${JSON.stringify(ref ?? v)}`);
-        params[key] = lut;
-      } else params[key] = v;
-    }
-    try {
-      resolveParams(filter.params, params as never);
-    } catch (e) {
-      throw new Error(`chain step ${i} (${filter.id}): ${(e as Error).message}`);
-    }
-    const mask = s.mask === undefined ? undefined : parseMask(s.mask);
-    return { filter, params, enabled: s.enabled !== false, ...(mask ? { mask } : {}) };
-  });
+  const steps = parseSteps(doc.steps, options, (i) => `chain step ${i}`);
   return {
     steps,
     ...(doc.geometry !== undefined ? { geometry: parseGeometry(doc.geometry) } : {}),
@@ -131,12 +108,40 @@ export function parseChain(input: unknown, options: ParseOptions): { steps: Step
   };
 }
 
+/** The steps of a document, validated; `where(i)` names step i in error messages. Shared with `parseEdit`. */
+export function parseSteps(raw: readonly unknown[], options: ParseOptions, where: (i: number) => string): Step[] {
+  const byId = new Map(options.filters.map((f) => [f.id, f]));
+  return raw.map((s: unknown, i): Step => {
+    if (!isObject(s) || typeof s.filter !== 'string') throw new Error(`${where(i)}: missing filter id`);
+    const filter = byId.get(s.filter);
+    if (!filter) throw new Error(`${where(i)}: unknown filter "${s.filter}"`);
+    const rawParams = s.params ?? {};
+    if (!isObject(rawParams)) throw new Error(`${where(i)}: params must be an object`);
+    const params: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(rawParams)) {
+      if (filter.params[key]?.type === 'lut') {
+        const ref = isObject(v) && typeof v.ref === 'string' ? v.ref : undefined;
+        const lut = ref === undefined ? undefined : options.resolveLut?.(ref);
+        if (!lut) throw new Error(`${where(i)} (${filter.id}): unknown LUT ${JSON.stringify(ref ?? v)}`);
+        params[key] = lut;
+      } else params[key] = v;
+    }
+    try {
+      resolveParams(filter.params, params as never);
+    } catch (e) {
+      throw new Error(`${where(i)} (${filter.id}): ${(e as Error).message}`);
+    }
+    const mask = s.mask === undefined ? undefined : parseMask(s.mask);
+    return { filter, params, enabled: s.enabled !== false, ...(mask ? { mask } : {}) };
+  });
+}
+
 const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide']);
 
-/** Validates output settings and rebuilds them from known fields. */
-function parseOutput(o: unknown): OutputSettings {
+/** Validates output settings and rebuilds them from known fields; `extra` keys are left to the caller (v3's `node`). */
+export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSettings {
   if (!isObject(o)) throw new Error('output: not an object');
-  for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key)) throw new Error(`output: unknown setting "${key}"`);
+  for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key) && !extra.includes(key)) throw new Error(`output: unknown setting "${key}"`);
   const { format, quality, bitDepth, background, longSide } = o;
   if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new Error(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
   if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new Error('output: quality must be a number in [0, 1]');
@@ -155,7 +160,7 @@ function parseOutput(o: unknown): OutputSettings {
   };
 }
 
-function isObject(x: unknown): x is Record<string, unknown> {
+export function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
@@ -173,7 +178,7 @@ const vec2 = (v: unknown): readonly [number, number] => {
 };
 
 /** Rebuilds a mask from known fields only, then validates it. */
-function parseMask(m: unknown): Mask {
+export function parseMask(m: unknown): Mask {
   if (!isObject(m)) throw new Error('mask: not an object');
   const options = {
     ...(m.invert !== undefined ? { invert: m.invert === true } : {}),
@@ -203,7 +208,7 @@ function parseMask(m: unknown): Mask {
   return mask;
 }
 
-function parseGeometry(g: unknown): Geometry {
+export function parseGeometry(g: unknown): Geometry {
   if (!isObject(g) || !isObject(g.crop)) throw new Error('geometry: not an object with a crop');
   const { x, y, width, height } = g.crop;
   const geometry: Geometry = {

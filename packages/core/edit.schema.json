@@ -2,30 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://stefanomasneri.com/rullino/edit.schema.json",
   "title": "rullino edit document",
-  "description": "A photo edit as JSON (version 2): a chain of filter steps, optionally a geometry (orientation, perspective, straighten, crop) and how to export the result. Written by serializeChain and read by parseChain in @rullino/core, which also checks what a schema cannot: filter ids and their params, convex perspective quads, crops inside the frame. Version 1 documents (no output) are migrated by migrateChain.",
-  "type": "object",
-  "required": [
-    "version",
-    "steps"
-  ],
-  "additionalProperties": false,
-  "properties": {
-    "version": {
-      "const": 2
+  "description": "A photo edit as JSON. Version 3 (written by serializeEdit and, from 0.8, serializeChain; read by parseEdit in @rullino/core): named inputs and a graph of nodes (chain, mix, resize). Version 2 (read by parseChain and parseEdit): one chain of filter steps, optionally a geometry and how to export the result. parseEdit also checks what a schema cannot: filter ids and their params, that every name a node reads exists, cycles, convex perspective quads, crops inside the frame.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/documentV2"
     },
-    "steps": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/step"
-      }
-    },
-    "geometry": {
-      "$ref": "#/$defs/geometry"
-    },
-    "output": {
-      "$ref": "#/$defs/output"
+    {
+      "$ref": "#/$defs/documentV3"
     }
-  },
+  ],
   "$defs": {
     "unit": {
       "type": "number",
@@ -289,6 +274,259 @@
           "format": {
             "const": "png"
           }
+        }
+      }
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Lower-case letters, digits and -, starting with a letter. Inputs and nodes share one namespace."
+    },
+    "outputV3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "$ref": "#/$defs/name",
+          "description": "The node to render (default: the last one listed)."
+        },
+        "format": {
+          "enum": [
+            "png",
+            "jpeg",
+            "webp"
+          ],
+          "description": "Default png."
+        },
+        "quality": {
+          "$ref": "#/$defs/unit",
+          "description": "JPEG / WebP quality."
+        },
+        "bitDepth": {
+          "enum": [
+            8,
+            16
+          ],
+          "description": "PNG only. Default 8."
+        },
+        "background": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unit"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "sRGB colour to flatten transparency onto (default white for JPEG)."
+        },
+        "longSide": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Shrink so the long side is at most this many pixels; never enlarges."
+        }
+      },
+      "if": {
+        "properties": {
+          "bitDepth": {
+            "const": 16
+          }
+        },
+        "required": [
+          "bitDepth"
+        ]
+      },
+      "then": {
+        "properties": {
+          "format": {
+            "const": "png"
+          }
+        }
+      }
+    },
+    "chainNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "from",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/name"
+        },
+        "kind": {
+          "const": "chain"
+        },
+        "from": {
+          "$ref": "#/$defs/name",
+          "description": "An input or another node."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "geometry": {
+          "$ref": "#/$defs/geometry"
+        }
+      },
+      "description": "Geometry on the image it reads, then the steps: what a version 2 document does."
+    },
+    "mixNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "from"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/name"
+        },
+        "kind": {
+          "const": "mix"
+        },
+        "from": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/name"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Two inputs or nodes; the second is resampled to the first's size."
+        },
+        "amount": {
+          "$ref": "#/$defs/unit",
+          "description": "How much of the second, default 0.5."
+        },
+        "mask": {
+          "$ref": "#/$defs/mask"
+        }
+      },
+      "description": "first + (second − first) · amount · mask, in premultiplied linear light."
+    },
+    "resizeNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "from"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/name"
+        },
+        "kind": {
+          "const": "resize"
+        },
+        "from": {
+          "$ref": "#/$defs/name"
+        },
+        "longSide": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Shrink so the long side is at most this many pixels."
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Shrink by this factor."
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "longSide": true
+          },
+          "required": [
+            "longSide"
+          ]
+        },
+        {
+          "properties": {
+            "scale": true
+          },
+          "required": [
+            "scale"
+          ]
+        }
+      ],
+      "description": "Linear-light area downscale; never enlarges."
+    },
+    "documentV2": {
+      "type": "object",
+      "required": [
+        "version",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 2
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "geometry": {
+          "$ref": "#/$defs/geometry"
+        },
+        "output": {
+          "$ref": "#/$defs/output"
+        }
+      },
+      "description": "Version 2: one chain of steps on one image. Version 1 (no output) is migrated by migrateChain / migrateEdit first."
+    },
+    "documentV3": {
+      "type": "object",
+      "required": [
+        "version",
+        "inputs",
+        "nodes"
+      ],
+      "additionalProperties": false,
+      "description": "Version 3: named inputs and a graph of nodes (any order; parseEdit sorts them and rejects cycles).",
+      "properties": {
+        "version": {
+          "const": 3
+        },
+        "inputs": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "#/$defs/name"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Reserved for hints; empty today."
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/chainNode"
+              },
+              {
+                "$ref": "#/$defs/mixNode"
+              },
+              {
+                "$ref": "#/$defs/resizeNode"
+              }
+            ]
+          }
+        },
+        "output": {
+          "$ref": "#/$defs/outputV3"
         }
       }
     }
