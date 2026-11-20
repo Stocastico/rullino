@@ -12,7 +12,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 ## [Unreleased]
 
 ### Added
-- **core**: edit document version 3, a graph of named inputs and nodes (`chain`, `mix`, `resize`; [RFC](docs/design/edit-document-v3.md)): `parseEdit` reads every version (nodes in any order, cycles and unknown names rejected with a message that names them), `migrateEdit` lifts v1 / v2 to it, and `edit.schema.json` describes v2 and v3. Rendering graphs (`applyEdit` on v3) comes next.
+- **core**: edit document version 3, a graph of named inputs and nodes (`chain`, `mix`, `resize`; [RFC](docs/design/edit-document-v3.md)): `parseEdit` reads every version (nodes in any order, cycles and unknown names rejected with a message that names them), `migrateEdit` lifts v1 / v2 to it, and `edit.schema.json` describes v2 and v3. `applyEdit` (and `applyEditPixels`) render them on the GPU and on the CPU: one source for a one-input document or a record by input name, `scale` per input, the CPU executor (`cpu`) called once per chain node; version 2 documents render bit for bit as before. The browser and Node renderers and `serializeChain` move to version 3 next.
 
 ## [0.7.0]
 

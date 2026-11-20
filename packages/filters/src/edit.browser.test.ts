@@ -57,4 +57,44 @@ describe('applyEdit on the GPU', () => {
     const out = await applyEdit(src, { version: 2, steps: [] }, { filters, gpu });
     expect(Array.from(out.data)).toEqual(Array.from(src.data));
   });
+
+  it('renders version 3 graphs like the CPU: two inputs, fan-out, mix with a mask, resize, geometry on a node', async () => {
+    const doc = {
+      version: 3,
+      inputs: { photo: {}, other: {} },
+      nodes: [
+        { id: 'base', from: 'photo', geometry: { ...IDENTITY_GEOMETRY, rotate: 90 }, steps: [{ filter: 'exposure', params: { ev: 0.4 } }] },
+        { id: 'soft', from: 'base', steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }] },
+        { id: 'half', kind: 'mix', from: ['base', 'soft'], amount: 0.7, mask: { kind: 'radial', center: [0.5, 0.5], radius: [0.3, 0.3], feather: 0.5 } },
+        { id: 'small', kind: 'resize', from: 'half', longSide: 30 },
+        { id: 'tinted', from: 'other', steps: [{ filter: 'contrast', params: { amount: 0.3 } }] },
+        { id: 'tsmall', kind: 'resize', from: 'tinted', longSide: 30 },
+        { id: 'out', kind: 'mix', from: ['small', 'tsmall'], amount: 0.25 },
+        { id: 'final', from: 'out', steps: [{ filter: 'vignette', params: {} }] },
+      ],
+      output: { node: 'final' },
+    };
+    const sources = { photo: photo(45, 67), other: photo(67, 45) };
+    const [onGpu, onCpu] = await Promise.all([applyEdit(sources, doc, { filters, gpu }), applyEdit(sources, doc, { filters })]);
+    expect([onGpu.width, onGpu.height]).toEqual([onCpu.width, onCpu.height]);
+    expect(Math.max(onGpu.width, onGpu.height)).toBe(30);
+    let worst = 0;
+    for (let i = 0; i < onCpu.data.length; i++) worst = Math.max(worst, Math.abs(onGpu.data[i]! - onCpu.data[i]!));
+    expect(worst).toBeGreaterThan(0);
+    expect(worst).toBeLessThan(4e-3);
+    // A second render reuses pooled textures: a texture both pooled and destroyed, or used after its
+    // release, shows up as a GPU error or a different picture (see CLAUDE.md Traps).
+    const again = await applyEdit(sources, doc, { filters, gpu });
+    expect(Array.from(again.data)).toEqual(Array.from(onGpu.data));
+    await gpu.device.queue.onSubmittedWorkDone();
+    expect(errors).toEqual([]);
+  });
+
+  it('renders a version 2 document through the graph path bit for bit as before', async () => {
+    const chain = serializeChain([{ filter: exposure, params: { ev: 0.4 } }, { filter: gaussianBlur, params: { sigma: 1.5 } }], { geometry: { ...IDENTITY_GEOMETRY, rotate: 180 } });
+    const asV3 = { version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps: chain.steps, geometry: chain.geometry }] };
+    const src = photo(29, 23);
+    const [a, b] = await Promise.all([applyEdit(src, chain, { filters, gpu }), applyEdit(src, asV3, { filters, gpu })]);
+    expect(Array.from(b.data)).toEqual(Array.from(a.data));
+  });
 });

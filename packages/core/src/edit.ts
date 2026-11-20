@@ -1,40 +1,49 @@
 import { decodeSrgb8, encodeSrgb8 } from './color';
 import { applyGeometryCpu, isIdentityGeometry } from './geometry';
 import type { GpuContext } from './gpu/context';
-import { applyGeometry } from './gpu/geometry';
 import { readSrgb8, uploadSrgb8 } from './gpu/io';
 import { downscale } from './gpu/resize';
 import { releaseTexture } from './gpu/pool';
 import { readImage, uploadImage } from './gpu/texture';
-import type { LinearImage, Rgba8Image } from './image';
+import { createImage, type LinearImage, type Rgba8Image } from './image';
+import { parseEdit } from './graph';
+import { checkMixSizes, mixMask, resizeSize, walkGraph, type GraphValue } from './graph-cpu';
+import { runGraphGpu } from './graph-gpu';
+import { blendMasked } from './mask';
 import { runChainCpu, type Step } from './pipeline/chain';
-import { Pipeline } from './pipeline/pipeline';
 import { downscaleCpu, fitWithin } from './resize';
-import { parseChain, type ParseOptions } from './serialize';
+import type { ParseOptions } from './serialize';
 
 export interface ApplyEditOptions extends ParseOptions {
   /** Render on this GPU context; without one the CPU renders (filters' fast paths where they have one). */
   readonly gpu?: GpuContext | undefined;
   /**
-   * Resolution of `source` relative to the original the edit was made on (e.g. 0.25 for a preview
-   * copy). Pixel-unit params are multiplied by it. Default 1.
+   * Resolution of the source relative to the original the edit was made on (e.g. 0.25 for a preview
+   * copy). Pixel-unit params are multiplied by it. Default 1. For a document with several inputs,
+   * one number for all of them or one per input name.
    */
-  readonly scale?: number | undefined;
+  readonly scale?: number | Readonly<Record<string, number>> | undefined;
   /**
-   * Runs the chain on the CPU instead of the calling thread: receives the parsed steps, the framed
+   * Runs a chain on the CPU instead of the calling thread: receives the parsed steps, the framed
    * image and the scale, returns the result (it must equal `runChainCpu(steps, image, { scale, fast:
-   * true })`). For executors that spread the work over threads, see `@rullino/node`. Ignored on the GPU.
+   * true })`). Called once per chain node of a version 3 document. For executors that spread the
+   * work over threads, see `@rullino/node`. Ignored on the GPU.
    */
   readonly cpu?: ((steps: readonly Step[], image: LinearImage, options: { readonly scale: number }) => LinearImage | Promise<LinearImage>) | undefined;
 }
 
+/** One image for a document with one input, or the images by input name (version 3). */
+export type EditSources = LinearImage | Rgba8Image | Readonly<Record<string, LinearImage | Rgba8Image>>;
+
 /**
  * Renders an edit document on an image: its geometry, then its steps, then the `output.longSide`
- * shrink (in linear light; never enlarges). Version 1 documents are migrated. Encode the result with
- * `encodeImage(result, doc.output)`. The source is not changed. It can be 8-bit RGBA pixels as a
- * decoder produces them: on the GPU they are decoded there (much faster than `decodeSrgb8` first).
+ * shrink (in linear light; never enlarges). Version 1 documents are migrated. A version 3 document
+ * (a graph) renders its output node from the inputs it names: pass one image for a one-input
+ * document, or a record by input name. Encode the result with `encodeImage(result, doc.output)`.
+ * The sources are not changed. They can be 8-bit RGBA pixels as a decoder produces them: on the GPU
+ * they are decoded there (much faster than `decodeSrgb8` first).
  */
-export async function applyEdit(source: LinearImage | Rgba8Image, edit: unknown, options: ApplyEditOptions): Promise<LinearImage> {
+export async function applyEdit(source: EditSources, edit: unknown, options: ApplyEditOptions): Promise<LinearImage> {
   return renderEdit(source, edit, options, readImage, (img) => img);
 }
 
@@ -42,7 +51,7 @@ export async function applyEdit(source: LinearImage | Rgba8Image, edit: unknown,
  * {@link applyEdit} returning 8-bit straight-alpha sRGB pixels (ImageData layout): on the GPU the
  * result is encoded there (`readSrgb8`), which is what an interactive preview needs.
  */
-export async function applyEditPixels(source: LinearImage | Rgba8Image, edit: unknown, options: ApplyEditOptions): Promise<Rgba8Image> {
+export async function applyEditPixels(source: EditSources, edit: unknown, options: ApplyEditOptions): Promise<Rgba8Image> {
   const out = await renderEdit(source, edit, options, async (ctx, tex) => ({ data: await readSrgb8(ctx, tex), width: tex.width, height: tex.height }), (img) => ({
     data: encodeSrgb8(img),
     width: img.width,
@@ -51,40 +60,80 @@ export async function applyEditPixels(source: LinearImage | Rgba8Image, edit: un
   return out;
 }
 
+const isLinear = (img: LinearImage | Rgba8Image): img is LinearImage => img.data instanceof Float32Array;
+const isOneImage = (x: EditSources): x is LinearImage | Rgba8Image => ArrayBuffer.isView((x as { data?: unknown }).data) && typeof (x as { width?: unknown }).width === 'number';
+
+/** The sources by input name with their scales, checked against the inputs the graph reads. */
+function bind(inputs: readonly string[], unused: readonly string[], source: EditSources, scale: ApplyEditOptions['scale']) {
+  let byName: Record<string, LinearImage | Rgba8Image>;
+  if (isOneImage(source)) {
+    if (inputs.length !== 1) throw new Error(`the document reads ${inputs.length} inputs (${inputs.join(', ')}): pass them by name`);
+    byName = { [inputs[0]!]: source };
+  } else byName = { ...source };
+  for (const name of Object.keys(byName)) if (!inputs.includes(name) && !unused.includes(name)) throw new Error(`input "${name}" is not one the document reads (${inputs.join(', ')})`);
+  return inputs.map((name) => {
+    const image = byName[name];
+    if (!image) throw new Error(`input "${name}" is missing`);
+    return { name, image, scale: typeof scale === 'number' ? scale : (scale?.[name] ?? 1) };
+  });
+}
+
 async function renderEdit<T>(
-  source: LinearImage | Rgba8Image,
+  source: EditSources,
   edit: unknown,
   options: ApplyEditOptions,
   readGpu: (ctx: GpuContext, tex: GPUTexture) => Promise<T>,
   readCpu: (img: LinearImage) => T,
 ): Promise<T> {
-  const { steps, geometry, output } = parseChain(edit, options);
-  const scale = options.scale ?? 1;
-  const longSide = output?.longSide;
+  const graph = parseEdit(edit, options);
+  const longSide = graph.output.longSide;
   const ctx = options.gpu;
+  const sources = bind(graph.inputs, graph.unused, source, options.scale);
 
-  const linear = source.data instanceof Float32Array;
   if (!ctx) {
-    const image = linear ? (source as LinearImage) : decodeSrgb8(source.data as Uint8Array, source.width, source.height);
-    const framed = geometry && !isIdentityGeometry(geometry) ? applyGeometryCpu(image, geometry) : image;
-    const out = options.cpu ? await options.cpu(steps, framed, { scale }) : runChainCpu(steps, framed, { scale, fast: true });
+    const inputs = new Map<string, GraphValue<LinearImage>>(
+      sources.map(({ name, image, scale }) => [name, { value: isLinear(image) ? image : decodeSrgb8(image.data as Uint8Array, image.width, image.height), scale }]),
+    );
+    const out = (
+      await walkGraph<LinearImage>(graph, inputs, async (node, ins) => {
+        const [a, b] = ins as [GraphValue<LinearImage>, GraphValue<LinearImage> | undefined];
+        switch (node.kind) {
+          case 'chain': {
+            const framed = node.geometry && !isIdentityGeometry(node.geometry) ? applyGeometryCpu(a.value, node.geometry) : a.value;
+            const value = options.cpu ? await options.cpu(node.steps, framed, { scale: a.scale }) : runChainCpu(node.steps, framed, { scale: a.scale, fast: true });
+            return { value, scale: a.scale };
+          }
+          case 'resize': {
+            const [w, h] = resizeSize(node, a.value.width, a.value.height, a.scale);
+            return { value: w === a.value.width && h === a.value.height ? a.value : downscaleCpu(a.value, w, h), scale: a.scale };
+          }
+          case 'mix':
+            checkMixSizes(node, a.value, b!.value);
+            return { value: blendMasked(a.value, b!.value, mixMask(node)), scale: a.scale };
+        }
+      })
+    ).value;
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
-    return readCpu(w === out.width && h === out.height ? out : downscaleCpu(out, w, h));
+    const shrunk = w === out.width && h === out.height ? out : downscaleCpu(out, w, h);
+    // Never hand back a source itself (a resize to the same size passes it through).
+    const isSource = [...inputs.values()].some((v) => v.value === shrunk);
+    return readCpu(isSource ? createImage(shrunk.width, shrunk.height, shrunk.data.slice()) : shrunk);
   }
 
-  // GPU: every texture made here is released before returning; the Pipeline owns its stages.
+  // GPU: every texture made here is released before returning; the graph executor owns its nodes'.
   const owned = new Set<GPUTexture>();
   const own = (t: GPUTexture) => (owned.add(t), t);
-  const pipeline = new Pipeline(ctx);
+  let result: Awaited<ReturnType<typeof runGraphGpu>> | undefined;
   try {
-    const input = own(linear ? uploadImage(ctx, source as LinearImage) : uploadSrgb8(ctx, source.data as Uint8Array, source.width, source.height));
-    const framed = geometry && !isIdentityGeometry(geometry) ? own(applyGeometry(ctx, input, geometry)) : input;
-    pipeline.setSource(framed, { scale });
-    const out = pipeline.run(steps);
+    const inputs = new Map(
+      sources.map(({ name, image, scale }) => [name, { texture: own(isLinear(image) ? uploadImage(ctx, image) : uploadSrgb8(ctx, image.data as Uint8Array, image.width, image.height)), scale }]),
+    );
+    result = await runGraphGpu(ctx, graph, inputs);
+    const out = result.texture;
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
     return await readGpu(ctx, w === out.width && h === out.height ? out : own(downscale(ctx, out, w, h)));
   } finally {
-    pipeline.destroy();
+    result?.dispose();
     for (const t of owned) releaseTexture(ctx, t);
   }
 }

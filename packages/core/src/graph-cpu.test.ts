@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defineFilter } from './define';
 import { applyGeometryCpu, IDENTITY_GEOMETRY } from './geometry';
 import { parseEdit } from './graph';
-import { runGraphCpu } from './graph-cpu';
+import { runGraphCpu, walkGraph, type GraphValue } from './graph-cpu';
 import { createImage, type LinearImage } from './image';
 import { maskImage } from './mask';
 import { runChainCpu } from './pipeline/chain';
@@ -173,5 +173,50 @@ describe('runGraphCpu', () => {
     expect(() => runGraphCpu(doc, { a: picture(2, 2) })).toThrow(/input "b" is missing/);
     expect(() => runGraphCpu(doc, { a: picture(2, 2), b: picture(2, 2), c: picture(2, 2) })).toThrow(/input "c" is not one the document reads \(a, b\)/);
     expect(() => runGraphCpu(doc, picture(2, 2))).toThrow(/the document reads 2 inputs \(a, b\): pass them by name/);
+  });
+});
+
+describe('walkGraph', () => {
+  // Values are tokens; a node that passes its input through returns the same token (an empty chain,
+  // a resize to the same size). A token must not be freed while any live node still holds it.
+  it('frees each value once, after the last node that holds it, also when nodes pass values through', async () => {
+    const doc = {
+      version: 3,
+      inputs: { p: {} },
+      nodes: [
+        { id: 'a', from: 'p', steps: [{ filter: 'gain', params: {} }] }, // makes a new value
+        { id: 'same', kind: 'resize', from: 'a', longSide: 1000 }, // passes a's value through
+        { id: 'b', from: 'same', steps: [] }, // passes it through again
+        { id: 'c', kind: 'mix', from: ['a', 'b'] }, // reads a and b (the same token) long after 'same'
+        { id: 'd', kind: 'mix', from: ['c', 'b'] },
+      ],
+      output: { node: 'd' },
+    };
+    const graph = parseEdit(doc, opts);
+    const freed: string[] = [];
+    let n = 0;
+    const out = await walkGraph<string>(graph, new Map([['p', { value: 'input', scale: 1 }]]), (node, ins) => {
+      for (const i of ins) expect(freed, `${node.id} reads ${i.value}`).not.toContain(i.value);
+      if (node.id === 'same' || node.id === 'b') return { value: ins[0]!.value, scale: 1 } satisfies GraphValue<string>;
+      const value = `${node.id}${n++}`;
+      return { value, scale: 1, free: () => freed.push(value) };
+    });
+    expect(out.value).toBe('d2');
+    expect(freed.sort()).toEqual(['a0', 'c1']); // each once; the input never
+    out.free!();
+    out.free!();
+    expect(freed.sort()).toEqual(['a0', 'c1', 'd2']);
+  });
+
+  it('frees what was made when a node fails', async () => {
+    const graph = parseEdit({ version: 3, inputs: { p: {} }, nodes: [{ id: 'a', from: 'p', steps: [] }, { id: 'b', from: 'a', steps: [] }] }, opts);
+    const freed: string[] = [];
+    await expect(
+      walkGraph<string>(graph, new Map([['p', { value: 'input', scale: 1 }]]), (node) => {
+        if (node.id === 'b') throw new Error('boom');
+        return { value: 'a', scale: 1, free: () => freed.push('a') };
+      }),
+    ).rejects.toThrow('boom');
+    expect(freed).toEqual(['a']);
   });
 });
