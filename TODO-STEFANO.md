@@ -18,7 +18,7 @@ Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.
 9. [ ] **A Project board** (optional; Projects > New > Roadmap layout, add the `roadmap-1.0` issues, group by label). Claude cannot create Projects.
 10. [ ] **Old epics**: #66 (distribution) and #67 (launch) are on hold by your choice; close them as "not planned" with a link to #165, or leave them open. Say which and Claude does it.
 11. [x] ~~Release 0.7.0~~: out since 12 Nov, and it already contains the CLI, the playground's CPU fallback and the benchmarks page (an earlier note here said otherwise). 0.8.0 comes when its epic (#166) is done.
-12. [ ] **Read the v3 RFC** ([docs/design/edit-document-v3.md](./docs/design/edit-document-v3.md), #174) and answer its four open questions (§9); the graph executor (#175) starts after that.
+12. [x] ~~Read the v3 RFC and answer its questions~~ (20 Nov: any order with cycle check, `mix` and `resize` in 0.8, `serializeChain` writes v3, names as proposed).
 
 ## 1. Test on real hardware (the "within the published tolerance" claim)
 
