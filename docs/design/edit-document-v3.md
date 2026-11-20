@@ -49,6 +49,7 @@ Non-goals (now): layers with transforms and blend modes (after 1.0, #207), text,
 |---|---|---|---|
 | `chain` (default) | one | `steps` (v2 steps, masks included), `geometry` (v2) | geometry on the input, then the steps: exactly what a v2 document does |
 | `mix` | two | `amount` (0..1, default 0.5), `mask` (a v2 mask, optional) | `a + (b − a) · amount · mask`, premultiplied linear RGBA (the existing masked-step blend) |
+| `resize` (open question 5) | one | `longSide` or `scale` | the area downscale of `output.longSide`, as a node: steps can follow it |
 
 That is all for 0.8: `mix` is the smallest node with two inputs, so the executor is built and tested on a real graph from the start, and it is useful alone (a grade at partial strength, a selective black and white, the before / after of a look). Planned kinds, each its own RFC or issue: `merge` (exposure fusion, HDR, focus stack; #193), `align` (#194), `overlay` (image or solid with position, scale, opacity; 0.13), plugin kinds named with their package (#196).
 
@@ -96,3 +97,4 @@ The golden test: every document in the repository (docs examples, looks, test fi
 2. **`mix` in 0.8**: ship it as the first multi-input kind (proposal), or keep 0.8 to single-chain graphs and add `mix` later?
 3. **What `serializeChain` writes**: v3 always (proposal: one current format, as `docs/edit-document.md` promises), or v2 for single-chain edits so that 0.7 readers can still open new share links?
 4. **Names**: `inputs` / `nodes` / `from` / `kind`, or other words (`sources`, `ops`, `in`)? Cheap to change now, expensive after 1.0.
+5. **A `resize` kind** (added 20 Nov, from the first tool page): output sharpening belongs after the resize, but a v2 document always shrinks last (`output.longSide`), so the web-ready export renders two documents in sequence. Proposal: a `resize` node (`longSide` or `scale`, linear-light area downscale, never enlarges; bilinear up later) in 0.8 next to `mix`, so `chain → resize → chain` is one document.

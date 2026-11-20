@@ -27,7 +27,8 @@
     "test:pack": "node scripts/pack-smoke.mjs",
     "size": "node scripts/size-budget.mjs",
     "test:e2e:base": "pnpm --filter @rullino/playground smoke:base",
-    "build:docs": "pnpm --filter @rullino/docs docs"
+    "build:docs": "pnpm --filter @rullino/docs docs",
+    "test:e2e:tools": "pnpm --filter @rullino/tools smoke"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

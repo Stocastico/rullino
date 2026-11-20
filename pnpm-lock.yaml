@@ -132,6 +132,25 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.6)(yaml@2.9.1)
 
+  apps/tools:
+    dependencies:
+      '@rullino/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@rullino/filters':
+        specifier: workspace:*
+        version: link:../../packages/filters
+      '@rullino/web':
+        specifier: workspace:*
+        version: link:../../packages/web
+    devDependencies:
+      playwright:
+        specifier: 1.56.1
+        version: 1.56.1
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.6)(yaml@2.9.1)
+
   packages/core:
     dependencies:
       '@webgpu/types':
