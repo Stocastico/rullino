@@ -92,9 +92,10 @@ const looked = core.runChainCpu(presets.lookSteps(presets.looks[0], { intensity:
 out.readmePresets = looked.width === 16 && presets.looks.length >= 10;
 const { autoAdjust } = await import('@rullino/filters');
 out.readmeAuto = typeof autoAdjust(core.createImage(32, 32)) === 'object';
-// The JSON Schema of edit documents ships with core, and accepts what serializeChain writes.
+// The JSON Schema of edit documents ships with core and describes both versions (v2 chains, v3 graphs); parseEdit ships too.
 const schema = (await import('@rullino/core/edit.schema.json', { with: { type: 'json' } })).default;
-out.editSchema = schema.properties.version.const === core.CHAIN_VERSION;
+out.editSchema = schema.$defs.documentV2.properties.version.const === core.CHAIN_VERSION && schema.$defs.documentV3.properties.version.const === core.EDIT_VERSION;
+out.parseEdit = core.parseEdit({ version: 3, inputs: { photo: {} }, nodes: [{ id: 'a', from: 'photo', steps: [] }, { id: 'b', kind: 'resize', from: 'a', scale: 0.5 }] }, { filters }).nodes.length === 2;
 // The root README quick start: the edit as JSON, replayed on the CPU.
 const edit = JSON.stringify(core.serializeChain([{ filter: exposure, params: { ev: 0.3 } }, { filter: filters.find((f) => f.id === 'contrast'), params: { amount: 0.15 } }], { output: { format: 'png', longSide: 2048 } }));
 const replayed = await core.applyEdit(img, JSON.parse(edit), { filters });
