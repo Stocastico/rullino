@@ -45,4 +45,45 @@ describe('edit.schema.json', () => {
     ];
     for (const doc of bad) expect(validate(doc), JSON.stringify(doc)).toBe(false);
   });
+
+  const v3 = {
+    version: 3,
+    inputs: { photo: {}, logo: {} },
+    nodes: [
+      { id: 'colour', from: 'photo', geometry: { ...IDENTITY_GEOMETRY }, steps: [{ filter: 'gain', params: { amount: 2 }, mask: { kind: 'linear', from: [0, 0], to: [1, 1] } }] },
+      { id: 'mono', kind: 'chain', from: 'colour', steps: [] },
+      { id: 'blend', kind: 'mix', from: ['colour', 'mono'], amount: 0.3, mask: { kind: 'radial', center: [0.5, 0.5], radius: [0.2, 0.3], feather: 0.4 } },
+      { id: 'small', kind: 'resize', from: 'blend', longSide: 2048 },
+      { id: 'half', kind: 'resize', from: 'logo', scale: 0.5 },
+    ],
+    output: { node: 'small', format: 'jpeg', quality: 0.9 },
+  };
+
+  it('accepts version 3 graphs with every node kind', () => {
+    expect(validate(v3), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps: [] }] }), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it('rejects version 3 documents parseEdit rejects (the shape; parseEdit also checks names, cycles and filters)', () => {
+    const node = (n: Record<string, unknown>) => ({ ...v3, nodes: [n] });
+    const bad = [
+      { ...v3, inputs: {} },
+      { ...v3, inputs: { Photo: {} } },
+      { ...v3, inputs: { photo: { profile: 'srgb' } } },
+      { ...v3, nodes: [] },
+      node({ id: 'a', kind: 'blur', from: 'photo' }),
+      node({ id: 'A', from: 'photo', steps: [] }),
+      node({ id: 'a', from: 'photo' }),
+      node({ id: 'a', from: ['photo'], steps: [] }),
+      node({ id: 'a', kind: 'mix', from: ['photo'] }),
+      node({ id: 'a', kind: 'mix', from: ['photo', 'photo'], amount: 2 }),
+      node({ id: 'a', kind: 'mix', from: ['photo', 'photo'], steps: [] }),
+      node({ id: 'a', kind: 'resize', from: 'photo' }),
+      node({ id: 'a', kind: 'resize', from: 'photo', longSide: 10, scale: 0.5 }),
+      node({ id: 'a', kind: 'resize', from: 'photo', scale: 1.5 }),
+      { ...v3, output: { node: 'small', size: 3 } },
+      { ...v3, steps: [] },
+    ];
+    for (const doc of bad) expect(validate(doc), JSON.stringify(doc)).toBe(false);
+  });
 });

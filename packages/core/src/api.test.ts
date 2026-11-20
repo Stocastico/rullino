@@ -5,14 +5,14 @@ import * as api from './index';
 describe('@rullino/core public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'CHAIN_VERSION', 'GpuError', 'IDENTITY_GEOMETRY', 'MAX_IMAGE_SIDE', 'MAX_LUT_SIZE', 'Pipeline',
+    'CHAIN_VERSION', 'EDIT_VERSION', 'GpuError', 'IDENTITY_GEOMETRY', 'MAX_IMAGE_SIDE', 'MAX_LUT_SIZE', 'NODE_KINDS', 'Pipeline',
     'ShaderCompileError', 'WebGpuUnavailableError', 'activeSteps', 'applyEdit', 'applyGeometry', 'applyGeometryCpu',
     'applyLutCpu', 'blendMasked', 'compareImages', 'createGpuContext', 'createImage', 'createLut',
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
     'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
     'formatCube', 'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
     'isIdentityGeometry', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
-    'maskImage', 'maskValue', 'migrateChain', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseHald',
+    'maskImage', 'maskValue', 'migrateChain', 'migrateEdit', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseEdit', 'parseHald',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',
     'runChainCpu', 'runFilter', 'sampleCurve', 'sampleImage', 'serializeChain', 'srgbToLinear',
     'toFloat16Array', 'turnGeometry', 'uploadImage', 'uploadSrgb8', 'validateGeometry', 'validateMask',
