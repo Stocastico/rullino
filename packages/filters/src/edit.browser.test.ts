@@ -91,10 +91,12 @@ describe('applyEdit on the GPU', () => {
   });
 
   it('renders a version 2 document through the graph path bit for bit as before', async () => {
-    const chain = serializeChain([{ filter: exposure, params: { ev: 0.4 } }, { filter: gaussianBlur, params: { sigma: 1.5 } }], { geometry: { ...IDENTITY_GEOMETRY, rotate: 180 } });
-    const asV3 = { version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps: chain.steps, geometry: chain.geometry }] };
+    const steps = [{ filter: 'exposure', params: { ev: 0.4 } }, { filter: 'gaussianBlur', params: { sigma: 1.5 } }];
+    const geometry = { ...IDENTITY_GEOMETRY, rotate: 180 };
+    const v2 = { version: 2, steps, geometry };
+    const asV3 = { version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps, geometry }] };
     const src = photo(29, 23);
-    const [a, b] = await Promise.all([applyEdit(src, chain, { filters, gpu }), applyEdit(src, asV3, { filters, gpu })]);
+    const [a, b] = await Promise.all([applyEdit(src, v2, { filters, gpu }), applyEdit(src, asV3, { filters, gpu })]);
     expect(Array.from(b.data)).toEqual(Array.from(a.data));
   });
 });

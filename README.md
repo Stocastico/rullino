@@ -64,7 +64,7 @@ import { contrast, exposure, filters } from '@rullino/filters';
 const edit = serializeChain(
   [{ filter: exposure, params: { ev: 0.3 } }, { filter: contrast, params: { amount: 0.15 } }],
   { output: { format: 'png', longSide: 2048 } },
-); // the JSON above, from filter objects: defaults are left out
+); // the edit above, from filter objects (written as version 3: one input, one chain); defaults are left out
 
 const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0.1, 0.5])); // linear, premultiplied RGBA
 const result = await applyEdit(image, edit, { filters }); // on the CPU; pass { gpu: ctx } to render with WebGPU

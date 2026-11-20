@@ -1,7 +1,7 @@
 import { encodeImage, type LinearImage } from '@rullino/core';
 import { createRenderer, type Renderer } from '@rullino/web';
 import { zipStore } from '../zip';
-import { outputName, webExportEdits, type WebExportOptions, type WebFormat } from './plan';
+import { outputName, webExportEdit, type WebExportOptions, type WebFormat } from './plan';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const files = $<HTMLInputElement>('files');
@@ -32,19 +32,18 @@ function showCode() {
   $('sharpen-value').textContent = sharpen.value;
   quality.disabled = format.value === 'png';
   try {
-    const { shrink, finish } = webExportEdits(options());
+    const edit = webExportEdit(options());
     code.textContent = `import { encodeImage } from '@rullino/core';
 import { createRenderer } from '@rullino/web';
 
-const shrink = ${JSON.stringify(shrink)};
-const finish = ${JSON.stringify(finish)};
+// One edit document: resize in linear light, then sharpen at the final size.
+const edit = ${JSON.stringify(edit, null, 2)};
 
 const renderer = await createRenderer(); // WebGPU, else the CPU in a worker
 export async function webReady(pixels: ImageData): Promise<Blob> {
-  const small = await renderer.apply(pixels, shrink); // linear-light resize first,
-  const sharp = await renderer.apply(small, finish); // then sharpening at the final size
-  return encodeImage(sharp, finish.output); // no metadata is written
-}`;
+  return encodeImage(await renderer.apply(pixels, edit), edit.output); // no metadata is written
+}
+// On a server or in a shell: npx rullino render --edit edit.json photos/ -o web/`;
   } catch (e) {
     code.textContent = (e as Error).message;
   }
@@ -65,9 +64,9 @@ const kb = (bytes: number) => `${Math.max(1, Math.round(bytes / 1024))} KB`;
 async function run() {
   const list = [...(files.files ?? [])];
   if (!list.length) return;
-  let plan;
+  let edit;
   try {
-    plan = webExportEdits(options());
+    edit = webExportEdit(options());
   } catch (e) {
     status.textContent = (e as Error).message;
     return;
@@ -90,10 +89,9 @@ async function run() {
     row.insertCell().textContent = file.name;
     try {
       const pixels = await decode(file);
-      const small: LinearImage = await r.apply(pixels, plan.shrink);
-      const sharp = plan.finish.steps.length ? await r.apply(small, plan.finish) : small;
-      const blob = await encodeImage(sharp, plan.finish.output);
-      const name = outputName(file.name, plan.finish.output.format, taken);
+      const sharp: LinearImage = await r.apply(pixels, edit);
+      const blob = await encodeImage(sharp, edit.output);
+      const name = outputName(file.name, edit.output.format, taken);
       out.push({ name, data: new Uint8Array(await blob.arrayBuffer()) });
       row.insertCell().textContent = `${pixels.width}×${pixels.height} → ${sharp.width}×${sharp.height}`;
       row.insertCell().textContent = `${name}, ${kb(blob.size)} (was ${kb(file.size)})`;

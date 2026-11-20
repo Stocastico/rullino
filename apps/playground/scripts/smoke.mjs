@@ -107,7 +107,7 @@ try {
     const json = await page.$eval('dialog.code-dialog pre code', (c) => c.textContent);
     let doc;
     try { doc = JSON.parse(json); } catch {}
-    check(doc?.version === 2 && doc.steps?.[0]?.filter === 'exposure' && doc.output?.format === 'png', `Code dialog's edit document: ${json.slice(0, 200)}`);
+    check(doc?.version === 3 && doc.nodes?.[0]?.steps?.[0]?.filter === 'exposure' && doc.output?.format === 'png', `Code dialog's edit document (version 3, one chain): ${json.slice(0, 200)}`);
     await page.keyboard.press('Escape');
     check(!(await page.$eval('dialog.code-dialog', (d) => d.open)), 'Escape should close the Code dialog');
   }
