@@ -17,7 +17,8 @@ Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.
 8. [ ] **Pin** #165 (issue page > "Pin issue") so visitors see the roadmap first.
 9. [ ] **A Project board** (optional; Projects > New > Roadmap layout, add the `roadmap-1.0` issues, group by label). Claude cannot create Projects.
 10. [ ] **Old epics**: #66 (distribution) and #67 (launch) are on hold by your choice; close them as "not planned" with a link to #165, or leave them open. Say which and Claude does it.
-11. [ ] **Release 0.8.0** (0.7.0 is out since 12 Nov): the CLI and the playground's CPU fallback are on `main` but not on npm yet. Claude prepares the version PR; you push the tag.
+11. [x] ~~Release 0.7.0~~: out since 12 Nov, and it already contains the CLI, the playground's CPU fallback and the benchmarks page (an earlier note here said otherwise). 0.8.0 comes when its epic (#166) is done.
+12. [ ] **Read the v3 RFC** ([docs/design/edit-document-v3.md](./docs/design/edit-document-v3.md), #174) and answer its four open questions (§9); the graph executor (#175) starts after that.
 
 ## 1. Test on real hardware (the "within the published tolerance" claim)
 
@@ -54,7 +55,7 @@ For each failure write down: machine, OS and browser versions, what you did, a s
 - [ ] Check on npm that all 7 packages show 0.7.0 and the READMEs render (badges, links).
 - [ ] In a clean folder: `npm init -y && npm i @rullino/web` and run the getting-started snippet.
 
-- [ ] Then ask Claude for **0.8.0** (or 0.7.1): `main` already has the playground's CPU fallback in a worker (#160), the `rullino` command (#161) and `docs/benchmarks.md`, none of them on npm yet. Without it `npx rullino` does not exist for visitors.
+- [x] ~~0.7.0 contains the CLI, the CPU fallback and the benchmarks page~~ (checked 20 Nov: `npx rullino` works from npm).
 
 ## 5. Before the launch post
 
