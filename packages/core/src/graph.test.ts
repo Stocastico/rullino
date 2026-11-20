@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defineFilter } from './define';
 import { IDENTITY_GEOMETRY } from './geometry';
-import { EDIT_VERSION, migrateEdit, parseEdit, type EditDocument } from './graph';
+import { chainDocument, EDIT_VERSION, migrateEdit, parseEdit, type EditDocument } from './graph';
 import { parseChain } from './serialize';
 
 const gain = defineFilter({
@@ -150,3 +150,17 @@ describe('parseEdit', () => {
     expect(() => parseEdit({ version: 2, steps: [{ filter: 'nope' }] }, opts)).toThrow(/chain step 0: unknown filter "nope"/);
   });
 });
+
+describe('chainDocument', () => {
+  it('is the steps of one chain node as a version 2 document (what a band worker parses again)', () => {
+    expect(chainDocument(graph(), 'mono')).toEqual({ version: 2, steps: [{ filter: 'gain', params: { amount: 0.5 } }] });
+    expect(chainDocument(v2, 'edit')).toEqual({ version: 2, steps: v2.steps });
+    expect(parseChain(chainDocument(graph(), 'colour'), opts).steps).toEqual((parseEdit(graph(), opts).nodes[0] as { steps: unknown }).steps);
+  });
+
+  it('refuses a node that is not a chain or does not exist', () => {
+    expect(() => chainDocument(graph(), 'blend')).toThrow(/node "blend" is not a chain/);
+    expect(() => chainDocument(graph(), 'nope')).toThrow(/node "nope" is not a chain/);
+  });
+});
+

@@ -49,6 +49,30 @@ describe('rullino CLI', { timeout: 60_000 }, () => {
     expect([info.format, info.width, info.height]).toEqual(['jpeg', 20, 10]);
   });
 
+  it('renders a version 3 graph (resize, then a chain), with --long-side merged into its output', async () => {
+    const dir = await workspace();
+    const graph = {
+      version: 3,
+      inputs: { photo: {} },
+      nodes: [
+        { id: 'small', kind: 'resize', from: 'photo', longSide: 20 },
+        { id: 'inverted', from: 'small', steps: [{ filter: 'invert', params: {} }] },
+      ],
+      output: { node: 'inverted', format: 'png' },
+    };
+    await writeFile(join(dir, 'graph.json'), JSON.stringify(graph));
+    const r = await run(['render', '--edit', join(dir, 'graph.json'), join(dir, 'in', 'a.png'), '-o', join(dir, 'out'), '--backend', 'cpu']);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    const info = await sharp(await readFile(join(dir, 'out', 'a.png'))).metadata();
+    expect([info.width, info.height]).toEqual([20, 10]);
+    const [red] = await pixel(join(dir, 'out', 'a.png'));
+    expect(Math.abs(red! - 55)).toBeLessThan(3);
+    const smaller = await run(['render', '--edit', join(dir, 'graph.json'), join(dir, 'in', 'a.png'), '-o', join(dir, 'out2'), '--long-side', '8', '--backend', 'cpu']);
+    expect(smaller.code).toBe(0);
+    expect((await sharp(await readFile(join(dir, 'out2', 'a.png'))).metadata()).width).toBe(8);
+  });
+
   it('lists the looks', async () => {
     const r = await run(['looks']);
     expect(r.code).toBe(0);

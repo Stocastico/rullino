@@ -26,10 +26,10 @@ export interface ApplyEditOptions extends ParseOptions {
   /**
    * Runs a chain on the CPU instead of the calling thread: receives the parsed steps, the framed
    * image and the scale, returns the result (it must equal `runChainCpu(steps, image, { scale, fast:
-   * true })`). Called once per chain node of a version 3 document. For executors that spread the
+   * true })`). Called once per chain node of a version 3 document, with the node's id (`chainDocument` in `./internal` gives its steps as a document a worker can parse). For executors that spread the
    * work over threads, see `@rullino/node`. Ignored on the GPU.
    */
-  readonly cpu?: ((steps: readonly Step[], image: LinearImage, options: { readonly scale: number }) => LinearImage | Promise<LinearImage>) | undefined;
+  readonly cpu?: ((steps: readonly Step[], image: LinearImage, options: { readonly scale: number; readonly node: string }) => LinearImage | Promise<LinearImage>) | undefined;
 }
 
 /** One image for a document with one input, or the images by input name (version 3). */
@@ -100,7 +100,7 @@ async function renderEdit<T>(
         switch (node.kind) {
           case 'chain': {
             const framed = node.geometry && !isIdentityGeometry(node.geometry) ? applyGeometryCpu(a.value, node.geometry) : a.value;
-            const value = options.cpu ? await options.cpu(node.steps, framed, { scale: a.scale }) : runChainCpu(node.steps, framed, { scale: a.scale, fast: true });
+            const value = options.cpu ? await options.cpu(node.steps, framed, { scale: a.scale, node: node.id }) : runChainCpu(node.steps, framed, { scale: a.scale, fast: true });
             return { value, scale: a.scale };
           }
           case 'resize': {

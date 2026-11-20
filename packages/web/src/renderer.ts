@@ -3,7 +3,7 @@ import {
   createGpuContext,
   createImage,
   encodeImage,
-  parseChain,
+  parseEdit,
   WebGpuUnavailableError,
   type Filter,
   type GpuContext,
@@ -156,7 +156,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     // Parsed here first: a bad document fails with its own message, and the LUTs it names are
     // resolved on this thread (the resolver is a function, which cannot go to the worker).
     const luts: Record<string, Lut> = {};
-    parseChain(edit, {
+    parseEdit(edit, {
       filters,
       resolveLut: (ref) => {
         const lut = resolveLut(ref);
@@ -181,7 +181,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       return new ImageData(new Uint8ClampedArray(out.data.buffer as ArrayBuffer, out.data.byteOffset, out.data.length), out.width, out.height);
     },
     async render(input, edit) {
-      const { output = {} } = parseChain(edit, { filters, resolveLut });
+      const { output } = parseEdit(edit, { filters, resolveLut });
       const pixels = input instanceof Blob ? await decodeFile(input) : input;
       const out = await apply(pixels, edit); // decoded where it renders: on the GPU, or in the worker
       return encodeImage(out, output);

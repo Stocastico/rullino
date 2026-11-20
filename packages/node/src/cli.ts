@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, extname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { parseChain } from '@rullino/core';
+import { parseEdit } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { lookEdit, looks, resolveLookLut } from '@rullino/presets';
 import { createRenderer } from './renderer';
@@ -116,7 +116,7 @@ async function render(values: ReturnType<typeof parse>['values'], inputs: string
   };
   if (Object.keys(edit.output as object).length === 0) delete edit.output;
   // Fail on a bad document once, before any file is read.
-  parseChain(edit, { filters, resolveLut: resolveLookLut });
+  parseEdit(edit, { filters, resolveLut: resolveLookLut });
 
   const photos: string[] = [];
   for (const input of inputs) {
