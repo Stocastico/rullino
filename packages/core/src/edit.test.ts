@@ -6,6 +6,8 @@ import { applyGeometryCpu, IDENTITY_GEOMETRY, type Geometry } from './geometry';
 import { createImage } from './image';
 import { runChainCpu } from './pipeline/chain';
 import { downscaleCpu, fitWithin } from './resize';
+import { parseEdit } from './graph';
+import { runGraphCpu } from './graph-cpu';
 import { serializeChain } from './serialize';
 
 const gain = defineFilter({
@@ -112,5 +114,58 @@ describe('applyEdit (CPU)', () => {
 
   it('reports invalid documents like parseChain', async () => {
     await expect(applyEdit(ramp(2, 2), { version: 2, steps: [{ filter: 'nope', params: {} }] }, { filters })).rejects.toThrow(/nope/);
+  });
+});
+
+describe('applyEdit on version 3 graphs (CPU)', () => {
+  const graphDoc = {
+    version: 3,
+    inputs: { photo: {}, second: {} },
+    nodes: [
+      { id: 'out', kind: 'mix', from: ['bright', 'sharp'], amount: 0.5, mask: { kind: 'linear', from: [0, 0], to: [1, 0] } },
+      { id: 'bright', from: 'photo', steps: [{ filter: 'gain', params: { amount: 2 } }] },
+      { id: 'small', kind: 'resize', from: 'second', scale: 0.5 },
+      { id: 'sharp', from: 'small', steps: [{ filter: 'shift', params: { by: 2 } }] },
+    ],
+    output: { node: 'out', longSide: 4 },
+  };
+
+  it('renders the output node like runGraphCpu with the fast paths, then applies output.longSide', async () => {
+    const photo = ramp(8, 6);
+    const second = ramp(16, 12);
+    const out = await applyEdit({ photo, second }, graphDoc, { filters });
+    const ref = runGraphCpu(parseEdit(graphDoc, { filters }), { photo, second }, { fast: true });
+    const [w, h] = fitWithin(ref.width, ref.height, 4);
+    expect([out.width, out.height]).toEqual([w, h]);
+    expect(Array.from(out.data)).toEqual(Array.from(downscaleCpu(ref, w, h).data));
+  });
+
+  it('takes 8-bit pixels per input and a scale per input', async () => {
+    const bytes = new Uint8Array(8 * 6 * 4).map((_, i) => (i * 29) % 256);
+    const bytes2 = new Uint8Array(16 * 12 * 4).map((_, i) => (i * 13) % 256);
+    const out = await applyEdit({ photo: { data: bytes, width: 8, height: 6 }, second: { data: bytes2, width: 16, height: 12 } }, graphDoc, { filters, scale: { photo: 1, second: 1 } });
+    const ref = runGraphCpu(parseEdit(graphDoc, { filters }), { photo: decodeSrgb8(bytes, 8, 6), second: decodeSrgb8(bytes2, 16, 12) }, { fast: true });
+    const [w, h] = fitWithin(ref.width, ref.height, 4);
+    expect(Array.from(out.data)).toEqual(Array.from(downscaleCpu(ref, w, h).data));
+  });
+
+  it('gives each chain node to the CPU executor, with its own image and scale', async () => {
+    const seen: string[] = [];
+    await applyEdit({ photo: ramp(8, 6), second: ramp(16, 12) }, graphDoc, {
+      filters,
+      scale: { photo: 1, second: 0.5 },
+      cpu: async (steps, image, o) => {
+        seen.push(`${steps.map((s) => s.filter.id).join('+')} ${image.width}x${image.height} @${o.scale}`);
+        return runChainCpu(steps, image, { scale: o.scale, fast: true });
+      },
+    });
+    expect(seen).toEqual(['gain 8x6 @1', 'shift 8x6 @0.5']);
+  });
+
+  it('names a missing input, and still renders a one-input graph from a single image', async () => {
+    await expect(applyEdit({ photo: ramp(8, 6) }, graphDoc, { filters })).rejects.toThrow(/input "second" is missing/);
+    const one = { version: 3, inputs: { p: {} }, nodes: [{ id: 'a', kind: 'resize', from: 'p', longSide: 3 }] };
+    const out = await applyEdit(ramp(8, 6), one, { filters });
+    expect([out.width, out.height]).toEqual([3, 2]);
   });
 });

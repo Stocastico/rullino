@@ -4,7 +4,7 @@
 import { applyGeometryCpu, isIdentityGeometry } from './geometry';
 import type { EditGraph, GraphNode } from './graph';
 import { createImage, type LinearImage } from './image';
-import { maskImage } from './mask';
+import { blendMasked, createRasterMask, type Mask } from './mask';
 import { runChainCpu } from './pipeline/chain';
 import { downscaleCpu } from './resize';
 
@@ -95,13 +95,78 @@ function renderNode(node: GraphNode, ins: readonly Rendered[], fast: boolean): R
       return { image, scale: a.scale };
     }
     case 'mix': {
-      const x = a.image;
-      const y = b!.image;
-      if (x.width !== y.width || x.height !== y.height) throw new Error(`mix "${node.id}": its inputs are ${x.width}×${x.height} and ${y.width}×${y.height}; resize one of them first`);
-      const k = node.mask ? maskImage(node.mask, x.width, x.height) : undefined;
-      const out = createImage(x.width, x.height);
-      for (let i = 0; i < out.data.length; i++) out.data[i] = x.data[i]! + (y.data[i]! - x.data[i]!) * node.amount * (k ? k[i >> 2]! : 1);
-      return { image: out, scale: a.scale };
+      checkMixSizes(node, a.image, b!.image);
+      return { image: blendMasked(a.image, b!.image, mixMask(node)), scale: a.scale };
     }
   }
+}
+
+/** A constant mask of 1, for a mix without a mask (immutable; GPU textures are cached by identity). */
+const EVERYWHERE = createRasterMask(1, 1, Float32Array.of(1));
+
+/**
+ * The mask a `mix` node blends with: its own mask (or 1 everywhere) with the amount folded into the
+ * opacity, so CPU and GPU blend with the very same mask code (`blendMasked` / `blendMask`).
+ */
+export function mixMask(node: Extract<GraphNode, { kind: 'mix' }>): Mask {
+  const m: Mask = node.mask ?? { kind: 'raster', raster: EVERYWHERE };
+  return { ...m, opacity: (m.opacity ?? 1) * node.amount };
+}
+
+export function checkMixSizes(node: Extract<GraphNode, { kind: 'mix' }>, a: { width: number; height: number }, b: { width: number; height: number }): void {
+  if (a.width !== b.width || a.height !== b.height) throw new Error(`mix "${node.id}": its inputs are ${a.width}×${a.height} and ${b.width}×${b.height}; resize one of them first`);
+}
+
+/** A rendered value for {@link walkGraph}: what a node produced, at which scale, and how to free it. */
+export interface GraphValue<T> {
+  readonly value: T;
+  readonly scale: number;
+  /** Frees what this node made; called once no live node holds the value (never for inputs). */
+  readonly free?: () => void;
+}
+
+/**
+ * Walks a graph in order with any backend: `render` makes a node's value from its inputs' values.
+ * A node may hand back one of its inputs' values unchanged (an empty chain, a resize to the same
+ * size), so values are counted by identity: what a value holds is freed once no live node holds it
+ * (inputs are never freed). Returns the output node's value; its `free` gives back what it holds.
+ * Shared by the GPU executor and `applyEdit`'s CPU path.
+ */
+export async function walkGraph<T>(graph: EditGraph, inputs: ReadonlyMap<string, GraphValue<T>>, render: (node: GraphNode, ins: readonly GraphValue<T>[]) => GraphValue<T> | Promise<GraphValue<T>>): Promise<GraphValue<T>> {
+  const values = new Map<string, GraphValue<T>>(inputs);
+  const held = new Map<T, { holders: number; frees: (() => void)[] }>();
+  for (const v of inputs.values()) held.set(v.value, { holders: Infinity, frees: [] });
+  const release = (v: T) => {
+    const h = held.get(v)!;
+    if (--h.holders === 0) {
+      held.delete(v);
+      for (const f of h.frees) f();
+    }
+  };
+  const readers = new Map<string, number>();
+  for (const n of graph.nodes) for (const f of n.from) readers.set(f, (readers.get(f) ?? 0) + 1);
+  try {
+    for (const node of graph.nodes) {
+      const r = await render(node, node.from.map((f) => values.get(f)!));
+      const h = held.get(r.value);
+      if (h) h.holders++;
+      else held.set(r.value, { holders: 1, frees: [] });
+      if (r.free) held.get(r.value)!.frees.push(r.free);
+      values.set(node.id, { value: r.value, scale: r.scale });
+      for (const f of node.from) {
+        const left = readers.get(f)! - 1;
+        readers.set(f, left);
+        if (left === 0 && f !== graph.output.node && !inputs.has(f)) {
+          release(values.get(f)!.value);
+          values.delete(f);
+        }
+      }
+    }
+  } catch (e) {
+    for (const [name, v] of values) if (!inputs.has(name)) release(v.value);
+    throw e;
+  }
+  const out = values.get(graph.output.node)!;
+  let freed = false;
+  return { value: out.value, scale: out.scale, free: () => (freed ? undefined : ((freed = true), release(out.value))) };
 }

@@ -22,4 +22,5 @@ export { colorWgsl } from './wgsl';
 export { effectiveParams, runStepCpu } from './pipeline/chain';
 export { bandReach, planBands, planSegments, runChainBand, runChainBandRows, runChainBands, stepReach, sumStats, twoPhaseStat, type BandOptions, type BandPlan, type PlanOptions, type Segment, type SegmentOptions, type StepReach } from './pipeline/bands';
 export { applyEditPixels } from './edit';
-export { bindSources, resizeSize, runGraphCpu, type GraphCpuOptions, type GraphSources } from './graph-cpu';
+export { bindSources, checkMixSizes, mixMask, resizeSize, runGraphCpu, walkGraph, type GraphCpuOptions, type GraphSources, type GraphValue } from './graph-cpu';
+export { runGraphGpu, type GraphGpuResult } from './graph-gpu';
