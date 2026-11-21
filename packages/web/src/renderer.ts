@@ -12,7 +12,7 @@ import {
   type Lut,
   type Rgba8Image,
 } from '@rullino/core';
-import { applyEditPixels } from '@rullino/core/internal';
+import { applyEditPixels, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import type { PoolOptions, RenderRequest, RenderResponse } from './protocol';
@@ -26,6 +26,13 @@ export interface RendererOptions {
    * 'gpu': WebGPU or a `WebGpuUnavailableError`. 'cpu': the CPU.
    */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
+  /**
+   * Bytes of GPU memory a render may use (roughly: the working textures it holds). Larger images are
+   * rendered in tiles that fit it, with the same result bit for bit; the texture pool keeps at most
+   * half of it in idle textures. Without it only images larger than the GPU's largest texture are
+   * tiled. Ignored on the CPU.
+   */
+  readonly memoryBudget?: number | undefined;
   /** A WebGPU entry point to use instead of `navigator.gpu`. */
   readonly gpu?: GPU | undefined;
   /** GPU errors (shaders that do not compile, validation, out of memory). Default: console.error. */
@@ -147,12 +154,13 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       reason = (e as Error).message;
     }
   }
+  if (ctx && options.memoryBudget !== undefined) setPoolLimit(ctx, options.memoryBudget / 2);
   const worker = !ctx && options.worker !== false && !options.filters ? workerBackend(threads, options.pool) : undefined;
 
   let destroyed = false;
   const run = async (image: LinearImage | Rgba8Image, edit: unknown, scale: number | undefined, pixels: boolean): Promise<LinearImage | Rgba8Image> => {
     if (destroyed) throw new Error('the renderer was destroyed');
-    if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale });
+    if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale, memoryBudget: options.memoryBudget });
     // Parsed here first: a bad document fails with its own message, and the LUTs it names are
     // resolved on this thread (the resolver is a function, which cannot go to the worker).
     const luts: Record<string, Lut> = {};

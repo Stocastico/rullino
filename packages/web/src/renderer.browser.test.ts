@@ -1,6 +1,7 @@
 import { applyEdit, createImage, encodeSrgb8, fromFloat16Array, toFloat16Array, WebGpuUnavailableError, type LinearImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { lookEdit, looks, resolveLookLut } from '@rullino/presets';
+import { poolStats } from '@rullino/core/internal';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRenderer, type Renderer } from './index';
 
@@ -122,6 +123,15 @@ describe('createRenderer (browser)', () => {
       expect(spawn).toHaveBeenCalledTimes(backend === 'cpu' ? 1 : 0);
       spawn.mockRestore();
     }
+  });
+
+  it('memoryBudget renders in tiles with the same result, and keeps the idle pool within half of it', async () => {
+    const src = chart(301, 203);
+    const whole = await make({ backend: 'gpu' });
+    const tiled = await make({ backend: 'gpu', memoryBudget: 300_000 });
+    expect((await tiled.apply(src, edit)).data).toEqual((await whole.apply(src, edit)).data);
+    expect((await tiled.pixels(src, edit)).data).toEqual((await whole.pixels(src, edit)).data);
+    expect(poolStats(tiled.gpu!).bytes).toBeLessThanOrEqual(150_000);
   });
 
   it('render() takes ImageData or an encoded file and encodes as the document says', async () => {

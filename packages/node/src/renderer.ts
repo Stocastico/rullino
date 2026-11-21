@@ -1,10 +1,17 @@
 import { applyEdit, createGpuContext, encodeImage, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
-import { chainDocument, exportSamples } from '@rullino/core/internal';
+import { chainDocument, exportSamples, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import { createThreadedExecutor, DEFAULT_WORKER_URL, resolveThreads } from './threads';
 
 export interface RendererOptions {
+  /**
+   * Bytes of GPU memory a render may use (roughly: the working textures it holds). Larger images are
+   * rendered in tiles that fit it, with the same result bit for bit; the texture pool keeps at most
+   * half of it in idle textures. Without it only images larger than the GPU's largest texture are
+   * tiled. Ignored on the CPU.
+   */
+  readonly memoryBudget?: number | undefined;
   /**
    * 'auto' (default): Dawn through the `webgpu` package if it is installed and finds an adapter,
    * else the CPU (see `reason`). 'gpu': Dawn or an error. 'cpu': the CPU reference.
@@ -112,6 +119,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     }
   }
 
+  if (ctx && options.memoryBudget !== undefined) setPoolLimit(ctx, options.memoryBudget / 2);
   const threads = ctx || options.filters ? 1 : resolveThreads(options.threads);
   const executor =
     threads > 1
@@ -127,7 +135,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       : undefined;
 
   const applyInternal = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}, shared = false) => {
-    if (!executor) return applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale });
+    if (!executor) return applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale, memoryBudget: options.memoryBudget });
     // The workers parse the document again: they need the LUTs it names, by name.
     const luts = new Map<string, Lut>();
     const resolveLut = (ref: string) => {

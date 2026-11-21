@@ -66,7 +66,7 @@ The message names the step and the parameter (see [Errors](./edit-document.md#er
 
 ## Memory and large images
 
-A linear float image costs 16 bytes per pixel on the CPU (a 12 MP photo: 192 MB), 8 bytes on the GPU. A 24 MP photo renders fine on a desktop GPU, but phones and small servers can run out of memory: shrink with `output.longSide` where the final size allows it, render previews from a downscaled copy, and `destroy()` renderers you no longer need. The GPU path requests the adapter's own texture and buffer limits (`renderer.gpu.limits`); a photo larger than the texture limit cannot be uploaded whole.
+A linear float image costs 16 bytes per pixel on the CPU (a 12 MP photo: 192 MB), 8 bytes on the GPU. A 24 MP photo renders fine on a desktop GPU, but phones and small servers can run out of memory: shrink with `output.longSide` where the final size allows it, render previews from a downscaled copy, and `destroy()` renderers you no longer need. The GPU path requests the adapter's own texture and buffer limits (`renderer.gpu.limits`). A photo larger than the texture limit is rendered in tiles automatically; to keep a render within a share of GPU memory, pass `createRenderer({ memoryBudget: bytes })` (or `applyEdit(..., { memoryBudget })`): larger images are then rendered in tiles that fit it, with the same pixels bit for bit, and idle textures are kept within half of it. Tiles cost a little time (each is uploaded and read back, with a halo of the chain's reach around it) and the intermediate images live in CPU memory (8 bytes per pixel each), so the CPU side still needs room for the image.
 
 ## Node
 

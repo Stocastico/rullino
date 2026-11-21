@@ -10,7 +10,11 @@ import { parseEdit } from './graph';
 import { checkMixSizes, mixMask, resizeSize, walkGraph, type GraphValue } from './graph-cpu';
 import { runGraphGpu } from './graph-gpu';
 import { blendMasked } from './mask';
-import { runChainCpu, type Step } from './pipeline/chain';
+import { activeSteps, runChainCpu, type Step } from './pipeline/chain';
+import { stepReach } from './pipeline/bands';
+import { tileSideFor } from './pipeline/tiles';
+import { downscaleTiled, readSrgb8Tiled, runGraphTiled, type HalfImage } from './gpu/tiled';
+import { fromFloat16Array, toFloat16Array } from './half';
 import { downscaleCpu, fitWithin } from './resize';
 import type { ParseOptions } from './serialize';
 
@@ -29,6 +33,14 @@ export interface ApplyEditOptions extends ParseOptions {
    * true })`). Called once per chain node of a version 3 document, with the node's id (`chainDocument` in `./internal` gives its steps as a document a worker can parse). For executors that spread the
    * work over threads, see `@rullino/node`. Ignored on the GPU.
    */
+  /**
+   * Bytes of GPU memory the render may use (roughly: it counts the working textures a render holds).
+   * A larger image is rendered in tiles that fit it, with the same result. Without it, only an image
+   * larger than the device's largest texture is tiled. Ignored on the CPU.
+   */
+  readonly memoryBudget?: number | undefined;
+  /** Called when a render is tiled, with the tile side (texture pixels, halo included). */
+  readonly onTiling?: ((info: { readonly side: number }) => void) | undefined;
   readonly cpu?: ((steps: readonly Step[], image: LinearImage, options: { readonly scale: number; readonly node: string }) => LinearImage | Promise<LinearImage>) | undefined;
 }
 
@@ -44,7 +56,7 @@ export type EditSources = LinearImage | Rgba8Image | Readonly<Record<string, Lin
  * they are decoded there (much faster than `decodeSrgb8` first).
  */
 export async function applyEdit(source: EditSources, edit: unknown, options: ApplyEditOptions): Promise<LinearImage> {
-  return renderEdit(source, edit, options, readImage, (img) => img);
+  return renderEdit(source, edit, options, readImage, async (_ctx, half) => createImage(half.width, half.height, fromFloat16Array(half.data)), (img) => img);
 }
 
 /**
@@ -52,13 +64,19 @@ export async function applyEdit(source: EditSources, edit: unknown, options: App
  * result is encoded there (`readSrgb8`), which is what an interactive preview needs.
  */
 export async function applyEditPixels(source: EditSources, edit: unknown, options: ApplyEditOptions): Promise<Rgba8Image> {
-  const out = await renderEdit(source, edit, options, async (ctx, tex) => ({ data: await readSrgb8(ctx, tex), width: tex.width, height: tex.height }), (img) => ({
+  const out = await renderEdit(source, edit, options, async (ctx, tex) => ({ data: await readSrgb8(ctx, tex), width: tex.width, height: tex.height }), readSrgb8Tiled, (img) => ({
     data: encodeSrgb8(img),
     width: img.width,
     height: img.height,
   }));
   return out;
 }
+
+/** Textures a tile holds besides one per stage: its input, a mask, a pass's intermediates (ping-pong). */
+const TILE_TEXTURES = 6;
+
+/** The halo a chain needs in tiles: the sum of its steps' reaches at full resolution (global steps add none). */
+const chainHalo = (steps: readonly Step[]) => activeSteps(steps).reduce((sum, s) => sum + (stepReach(s) === 'global' ? 0 : (stepReach(s) as number)), 0);
 
 const isLinear = (img: LinearImage | Rgba8Image): img is LinearImage => img.data instanceof Float32Array;
 const isOneImage = (x: EditSources): x is LinearImage | Rgba8Image => ArrayBuffer.isView((x as { data?: unknown }).data) && typeof (x as { width?: unknown }).width === 'number';
@@ -83,6 +101,7 @@ async function renderEdit<T>(
   edit: unknown,
   options: ApplyEditOptions,
   readGpu: (ctx: GpuContext, tex: GPUTexture) => Promise<T>,
+  readTiled: (ctx: GpuContext, img: HalfImage, side: number) => Promise<T>,
   readCpu: (img: LinearImage) => T,
 ): Promise<T> {
   const graph = parseEdit(edit, options);
@@ -118,6 +137,22 @@ async function renderEdit<T>(
     // Never hand back a source itself (a resize to the same size passes it through).
     const isSource = [...inputs.values()].some((v) => v.value === shrunk);
     return readCpu(isSource ? createImage(shrunk.width, shrunk.height, shrunk.data.slice()) : shrunk);
+  }
+
+  const side = tileSideFor({
+    sizes: sources.map(({ image }) => [image.width, image.height] as const),
+    textures: TILE_TEXTURES + Math.max(0, ...graph.nodes.map((n) => (n.kind === 'chain' ? activeSteps(n.steps).length : 0))),
+    halo: Math.max(0, ...graph.nodes.map((n) => (n.kind === 'chain' ? chainHalo(n.steps) : 0))),
+    maxTexture: ctx.limits.maxTextureDimension2D,
+    budget: options.memoryBudget,
+  });
+  if (side !== undefined) {
+    // Tiled (#176): every value in CPU memory as half floats, the same pixels as below.
+    options.onTiling?.({ side });
+    const inputs = new Map(sources.map(({ name, image, scale }) => [name, { image: isLinear(image) ? { width: image.width, height: image.height, data: toFloat16Array(image.data) } : image, scale }]));
+    const out = await runGraphTiled(ctx, graph, inputs, { side });
+    const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
+    return readTiled(ctx, w === out.width && h === out.height ? out : await downscaleTiled(ctx, out, w, h, side), side);
   }
 
   // GPU: every texture made here is released before returning; the graph executor owns its nodes'.

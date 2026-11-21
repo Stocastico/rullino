@@ -1,5 +1,5 @@
 import { defineFilter } from '@rullino/core';
-import { equalizeApply, equalizeBuffers, equalizeCpu, equalizePasses, equalizeStat } from '../equalization';
+import { EQUALIZE_GPU_PHASES, equalizeApply, equalizeBuffers, equalizeCpu, equalizePasses, equalizeStat } from '../equalization';
 import { OKLAB_TOLERANCE } from '../shared';
 
 /**
@@ -24,6 +24,7 @@ export const equalize = defineFilter({
   twoPhase: {
     stat: (src, _p, region) => equalizeStat(src, 1, region),
     apply: (src, { amount }, stat, region) => equalizeApply(src, 1, 1e9, amount, stat, region),
+    gpu: EQUALIZE_GPU_PHASES,
   },
   cpu: (src, { amount }) => equalizeCpu(src, 1, 1e9, amount),
   tolerance: OKLAB_TOLERANCE,

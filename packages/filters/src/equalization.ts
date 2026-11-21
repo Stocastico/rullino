@@ -100,6 +100,9 @@ export function equalizeApply(src: LinearImage, tilesParam: number, clip: number
 /** The whole filter: the statistic of the image, then the mapping (the reference the two phases of the bands must reproduce). */
 export const equalizeCpu = (src: LinearImage, tilesParam: number, clip: number, amount: number): LinearImage => equalizeApply(src, tilesParam, clip, amount, equalizeStat(src, tilesParam));
 
+/** The passes of {@link equalizePasses} by GPU phase (tiled rendering): the histograms, then the CDFs, then the mapping. */
+export const EQUALIZE_GPU_PHASES = { stat: ['histogram'], finish: ['cdf'] } as const;
+
 /** Buffer sizes for at most `maxTiles` per axis. */
 export const equalizeBuffers = (maxTiles: number) => ({ hist: maxTiles * maxTiles * BINS, cdf: maxTiles * maxTiles * BINS });
 
