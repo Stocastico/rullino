@@ -40,6 +40,14 @@ export default defineConfig({
         },
       },
       {
+        // A 200 MP image in tiles within a memory budget, on Dawn (#176): `pnpm test:large`.
+        test: {
+          name: 'large',
+          environment: 'node',
+          include: ['packages/*/test/**/*.large.test.ts'],
+        },
+      },
+      {
         test: {
           name: 'bench',
           include: ['packages/*/bench/**/*.bench.browser.ts'],
