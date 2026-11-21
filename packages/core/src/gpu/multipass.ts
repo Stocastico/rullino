@@ -9,6 +9,7 @@ import { lutTexture } from './lut';
 import { cachedPipeline, objectKey } from './readback';
 import { releaseTexture } from './pool';
 import { createWorkingTexture, WORKING_FORMAT } from './texture';
+import { frameBuffer, wholeFrame, type TileFrame } from './frame';
 
 const WORKGROUP = 8;
 
@@ -25,7 +26,7 @@ export function passShader(filter: Pick<MultipassFilter<any>, 'params' | 'buffer
     (name) => /* wgsl */ `
 @group(0) @binding(${binding++}) var tex_${name}: texture_2d<f32>;
 fn load_${name}(xy: vec2i) -> vec4f {
-  return textureLoad(tex_${name}, clamp(xy, vec2i(0), rl_max_xy), 0);
+  return textureLoad(tex_${name}, clamp(clamp(xy, vec2i(0), rl_frame.zw - 1) - rl_frame.xy, vec2i(0), rl_max_xy), 0);
 }`,
   );
   const buffers = (pass.buffers ?? []).map(
@@ -37,6 +38,8 @@ fn load_${name}(xy: vec2i) -> vec4f {
   const images = imageKeys(filter.params).map(
     (name) => `@group(0) @binding(${binding++}) var imageTex_${name}: texture_2d<f32>;${imageSamplerWgsl(`image_${name}`, `imageTex_${name}`)}`,
   );
+  // Where this texture sits in the whole image (see frame.ts): x, y, full width, full height.
+  const frame = `@group(0) @binding(${binding++}) var<uniform> rl_frame: vec4i;`;
   // All textures of a filter run share one size; it is read once per invocation into rl_max_xy
   // instead of calling textureDimensions() on every load.
   const sizeSource = compute ? `tex_${pass.inputs[0]}` : 'dst';
@@ -49,8 +52,10 @@ ${inputs.join('\n')}
 ${buffers.join('\n')}
 ${luts.join('\n')}
 ${images.join('\n')}
+${frame}
 
-fn size() -> vec2i { return rl_max_xy + 1; }
+// The whole image's size; run() gets whole-image positions and load_<input>() takes them.
+fn size() -> vec2i { return rl_frame.zw; }
 ${curveSamplersWgsl(filter.params, 'params')}
 
 ${colorWgsl}
@@ -64,7 +69,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let s = textureDimensions(dst);
   if (id.x >= s.x || id.y >= s.y) { return; }
   rl_max_xy = vec2i(s) - 1;
-  textureStore(dst, id.xy, run(vec2i(id.xy), params));
+  textureStore(dst, id.xy, run(vec2i(id.xy) + rl_frame.xy, params));
 }
 `;
   }
@@ -82,12 +87,12 @@ fn main() {
 fn main(@builtin(global_invocation_id) id: vec3u) {
   rl_max_xy = vec2i(textureDimensions(${sizeSource})) - 1;
   if (i32(id.x) > rl_max_xy.x || i32(id.y) > rl_max_xy.y) { return; }
-  run(vec2i(id.xy), params);
+  run(vec2i(id.xy) + rl_frame.xy, params);
 }
 `;
 }
 
-/** Bind group layout matching {@link passShader}: [dst], params, inputs..., buffers..., luts..., images... */
+/** Bind group layout matching {@link passShader}: [dst], params, inputs..., buffers..., luts..., images..., frame */
 function passLayout(filter: Pick<MultipassFilter<any>, 'params'>, pass: PassDef): GPUBindGroupLayoutEntry[] {
   const visibility = GPUShaderStage.COMPUTE;
   const entries: GPUBindGroupLayoutEntry[] = [];
@@ -100,6 +105,7 @@ function passLayout(filter: Pick<MultipassFilter<any>, 'params'>, pass: PassDef)
   for (const _ of lutKeys(filter.params))
     entries.push({ binding: entries.length, visibility, texture: { sampleType: 'unfilterable-float', viewDimension: '3d' } });
   for (const _ of imageKeys(filter.params)) entries.push({ binding: entries.length, visibility, texture: { sampleType: 'unfilterable-float' } });
+  entries.push({ binding: entries.length, visibility, buffer: { type: 'uniform' } });
   return entries;
 }
 
@@ -111,15 +117,24 @@ export interface FilterRun {
 
 /**
  * Runs a multipass filter. `params` are used as given after resolving (scale them beforehand if
- * needed). `mask` (see `renderMask`) is required by mask-aware filters and is not owned.
+ * needed). `mask` (see `renderMask`) is required by mask-aware filters and is not owned. `frame`
+ * says where `input` sits in the whole image when it is a tile (default: it is the whole image).
  */
-export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, input: GPUTexture, params: Record<string, unknown>, mask?: GPUTexture): FilterRun {
+export function runMultipass(
+  ctx: GpuContext,
+  filter: MultipassFilter<any>,
+  input: GPUTexture,
+  params: Record<string, unknown>,
+  mask?: GPUTexture,
+  frame: TileFrame = wholeFrame(input.width, input.height),
+): FilterRun {
   const { device } = ctx;
   if (filter.usesMask && !mask) throw new Error(`filter "${filter.id}" needs a mask`);
   const resolved = resolveParams(filter.params, params as never) as Record<string, unknown>;
   const values = packParams(filter.params, resolved as never);
   const uniforms = device.createBuffer({ size: values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   device.queue.writeBuffer(uniforms, 0, values);
+  const frameUniform = frameBuffer(ctx, frame);
 
   const textures = new Map<string, GPUTexture>([['input', input]]);
   if (filter.usesMask) textures.set('mask', mask!);
@@ -151,11 +166,16 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
       },
       () => passLayout(filter, pass),
     );
-    // Buffers, then LUT and image textures, after the inputs.
-    const bufferEntries = (first: number): GPUBindGroupEntry[] => [
-      ...(pass.buffers ?? []).map((name, i) => ({ binding: first + i, resource: { buffer: buffers.get(name)! } })),
-      ...[...lutViews, ...imageViews].map((view, i) => ({ binding: first + (pass.buffers ?? []).length + i, resource: view })),
-    ];
+    // Buffers, then LUT and image textures, then the frame, after the inputs.
+    const bufferEntries = (first: number): GPUBindGroupEntry[] => {
+      const views = [...lutViews, ...imageViews];
+      const after = first + (pass.buffers ?? []).length;
+      return [
+        ...(pass.buffers ?? []).map((name, i) => ({ binding: first + i, resource: { buffer: buffers.get(name)! } })),
+        ...views.map((view, i) => ({ binding: after + i, resource: view })),
+        { binding: after + views.length, resource: { buffer: frameUniform } },
+      ];
+    };
 
     if (pass.kind === 'compute') {
       const inputs = pass.inputs.map((name, i) => ({ binding: 1 + i, resource: textures.get(name)!.createView() }));
@@ -205,5 +225,6 @@ export function runMultipass(ctx: GpuContext, filter: MultipassFilter<any>, inpu
   for (const t of owned) if (t !== output) releaseTexture(ctx, t);
   for (const b of buffers.values()) b.destroy();
   uniforms.destroy();
+  frameUniform.destroy();
   return { output, passes, compiled };
 }
