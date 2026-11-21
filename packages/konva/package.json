@@ -52,6 +52,6 @@
     "konva": ">=9"
   },
   "devDependencies": {
-    "konva": "10.9.0"
+    "konva": "10.9.1"
   }
 }
