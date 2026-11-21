@@ -81,9 +81,44 @@ describe('runChainTiled', () => {
     expect((await runChainTiled(ctx, [], src, { side: 16 })).data).toEqual(src.data);
   });
 
-  it('refuses a global step that does not fit, naming it', async () => {
+  it('refuses a global step without GPU phases that does not fit, naming it', async () => {
     const src = toHalves(createImage(40, 30));
-    const steps = [stepOf(filters.find((x) => x.id === 'equalize')! as Filter, {})];
-    await expect(runChainTiled(ctx, steps, src, { side: 16 })).rejects.toThrow(/"equalize" needs the whole image at once, and 40×30 does not fit in 16 px/);
+    const eq = filters.find((x) => x.id === 'equalize')! as Filter & { kind: 'multipass' };
+    const plain = { ...eq, twoPhase: undefined } as unknown as Filter;
+    await expect(runChainTiled(ctx, [stepOf(plain, {})], src, { side: 16 })).rejects.toThrow(/"equalize" needs the whole image at once, and 40×30 does not fit in 16 px/);
   });
+});
+
+// Global filters (equalize, clahe, otsu) run in two phases: their statistic passes on every tile's
+// own pixels, adding into buffers kept for the render (integer counts, so exact in any order), their
+// finishing passes once, the mapping on every tile.
+describe('global filters, tiled, equal the whole image', () => {
+  const globals = filters.filter((f) => f.kind === 'multipass' && f.reach === 'global');
+  it('there are some, and they all declare their GPU phases', () => {
+    expect(globals.map((f) => f.id).sort()).toEqual(['clahe', 'equalize', 'otsu']);
+    for (const f of globals) {
+      const gpu = f.kind === 'multipass' ? f.twoPhase?.gpu : undefined;
+      expect(gpu, f.id).toBeTruthy();
+      const names = f.kind === 'multipass' ? f.passes.map((p) => p.name) : [];
+      for (const n of [...gpu!.stat, ...gpu!.finish]) expect(names, `${f.id}: phase pass "${n}"`).toContain(n);
+    }
+  });
+
+  it.each(globals.map((f) => [f.id, f as Filter] as const))('%s, alone and between other steps, masked', async (id, f) => {
+    const byId = (x: string) => filters.find((g) => g.id === x)! as Filter;
+    for (const [name, img] of Object.entries(images)) {
+      const src = toHalves(img);
+      for (const [c, params] of parityCases(f.params)) {
+        for (const steps of [
+          [stepOf(f, params)],
+          [stepOf(byId('gaussianBlur'), { sigma: 1.5 }), stepOf(f, params, parityMask), stepOf(byId('vignette'), {}), stepOf(f, params)],
+        ]) {
+          const side = Math.max(16, sideFor(src, haloOf(steps)));
+          const tiled = await runChainTiled(ctx, steps, src, { side });
+          const diff = firstDifference(tiled.data, await whole(steps, src), src.width);
+          expect(diff, `${id} ${c} on ${name}, ${steps.length} steps (side ${side}): ${diff}`).toBeUndefined();
+        }
+      }
+    }
+  }, 120_000);
 });

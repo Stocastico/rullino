@@ -109,6 +109,31 @@ function passLayout(filter: Pick<MultipassFilter<any>, 'params'>, pass: PassDef)
   return entries;
 }
 
+/**
+ * Runs only one part of a two-phase filter's passes (see `TwoPhase.gpu`), with buffers the caller
+ * keeps between runs ({@link createPhaseBuffers}): `stat` and `finish` only fill the buffers (the
+ * run's output is then the input), `apply` maps the input from them.
+ */
+export interface PassPhase {
+  readonly run: 'stat' | 'finish' | 'apply';
+  readonly buffers: ReadonlyMap<string, GPUBuffer>;
+}
+
+/** Zeroed buffers for the phases of one render of a filter (destroy them after its last run). */
+export function createPhaseBuffers(ctx: GpuContext, filter: MultipassFilter<any>): Map<string, GPUBuffer> {
+  return new Map(Object.entries(filter.buffers ?? {}).map(([name, n]) => [name, ctx.device.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE })]));
+}
+
+/** The passes of a filter that run in a phase (all of them without one). */
+function phasePasses(filter: MultipassFilter<any>, phase?: PassPhase): readonly PassDef[] {
+  if (!phase) return filter.passes;
+  const gpu = filter.twoPhase?.gpu;
+  if (!gpu) throw new Error(`filter "${filter.id}" has no GPU phases`);
+  if (phase.run === 'stat') return filter.passes.filter((p) => gpu.stat.includes(p.name));
+  if (phase.run === 'finish') return filter.passes.filter((p) => gpu.finish.includes(p.name));
+  return filter.passes.filter((p) => !gpu.stat.includes(p.name) && !gpu.finish.includes(p.name));
+}
+
 export interface FilterRun {
   readonly output: GPUTexture;
   readonly passes: number;
@@ -127,6 +152,7 @@ export function runMultipass(
   params: Record<string, unknown>,
   mask?: GPUTexture,
   frame: TileFrame = wholeFrame(input.width, input.height),
+  phase?: PassPhase,
 ): FilterRun {
   const { device } = ctx;
   if (filter.usesMask && !mask) throw new Error(`filter "${filter.id}" needs a mask`);
@@ -140,9 +166,7 @@ export function runMultipass(
   if (filter.usesMask) textures.set('mask', mask!);
   const owned = new Set<GPUTexture>();
   // Freshly created buffers are zero-filled, which is the reset reductions need.
-  const buffers = new Map(
-    Object.entries(filter.buffers ?? {}).map(([name, n]) => [name, device.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE })]),
-  );
+  const buffers = phase ? phase.buffers : createPhaseBuffers(ctx, filter);
   const lutViews = lutKeys(filter.params).map((k) => lutTexture(ctx, resolved[k] as Lut).createView());
   const imageViews = imageKeys(filter.params).map((k) => imageTexture(ctx, resolved[k] as LinearImage).createView());
   let compiled = 0;
@@ -156,7 +180,8 @@ export function runMultipass(
     cp.end();
     passes++;
   };
-  for (const pass of filter.passes) {
+  const passList = phasePasses(filter, phase);
+  for (const pass of passList) {
     const pipeline = cachedPipeline(
       ctx,
       `rullino.pass:${filter.id}#${objectKey(filter)}:${pass.name}`,
@@ -220,10 +245,11 @@ export function runMultipass(
   }
   device.queue.submit([enc.finish()]);
 
-  const output = textures.get(filter.passes.at(-1)!.name)!;
+  // A phase that only fills buffers has no output of its own: it hands back the input.
+  const output = phase && phase.run !== 'apply' ? input : textures.get(passList.at(-1)!.name)!;
   // Intermediates go back to the pool once the work that reads them is submitted.
   for (const t of owned) if (t !== output) releaseTexture(ctx, t);
-  for (const b of buffers.values()) b.destroy();
+  if (!phase) for (const b of buffers.values()) b.destroy();
   uniforms.destroy();
   frameUniform.destroy();
   return { output, passes, compiled };

@@ -4,12 +4,15 @@
 // into the result, which lives in CPU memory as half floats (what the textures hold, so nothing is
 // rounded on the way). Tiles therefore give the whole-image result bit for bit.
 import type { Rgba8Image } from '../image';
-import { activeSteps, type Step } from '../pipeline/chain';
+import type { MultipassFilter } from '../filter';
+import { activeSteps, effectiveParams, type Step } from '../pipeline/chain';
 import { planSegments, type Segment } from '../pipeline/bands';
 import { Pipeline } from '../pipeline/pipeline';
 import { planTiles, type TilePlan } from '../pipeline/tiles';
 import type { GpuContext } from './context';
 import { uploadSrgb8Rect } from './io';
+import { blendMask } from './mask';
+import { createPhaseBuffers, runMultipass } from './multipass';
 import { releaseTexture } from './pool';
 import { readTextureBytes } from './readback';
 import { createWorkingTexture } from './texture';
@@ -56,36 +59,104 @@ async function readOwned(ctx: GpuContext, tex: GPUTexture, t: TilePlan, out: Hal
   }
 }
 
-/** One segment over the whole image, tile by tile. */
-async function runSegment(ctx: GpuContext, seg: Segment, src: HalfImage | Rgba8Image, options: TiledOptions): Promise<HalfImage> {
+/** A two-phase step whose statistic is complete: the next segment starts by mapping through it. */
+interface Carried {
+  readonly step: Step;
+  readonly filter: MultipassFilter<any>;
+  readonly buffers: Map<string, GPUBuffer>;
+}
+
+const gpuPhased = (step: Step): step is Step & { filter: MultipassFilter<any> } => step.filter.kind === 'multipass' && step.filter.twoPhase?.gpu !== undefined;
+
+/** The pixels a tile owns, cut out of its result (which covers the tile's `from` – `to` rectangle). */
+function owned(ctx: GpuContext, tex: GPUTexture, t: TilePlan): GPUTexture {
+  const out = createWorkingTexture(ctx, t.x1 - t.x0, t.y1 - t.y0);
+  const enc = ctx.device.createCommandEncoder();
+  enc.copyTextureToTexture({ texture: tex, origin: { x: t.x0 - t.fromX, y: t.y0 - t.fromY } }, { texture: out }, [out.width, out.height]);
+  ctx.device.queue.submit([enc.finish()]);
+  return out;
+}
+
+/**
+ * One segment over the whole image, tile by tile. `carried`: the segment starts with that step's
+ * mapping. `seg.statFor`: every tile adds the statistic of that step over the pixels it owns, and
+ * the step is returned with its finished statistic, for the next segment.
+ */
+async function runSegment(ctx: GpuContext, seg: Segment, src: HalfImage | Rgba8Image, options: TiledOptions, carried?: Carried): Promise<{ image: HalfImage; next?: Carried }> {
   const { width, height } = src;
   if (seg.halo === 'global' && (width > options.side || height > options.side))
     throw new RangeError(`tiled rendering: "${seg.steps[0]!.filter.id}" needs the whole image at once, and ${width}×${height} does not fit in ${options.side} px`);
   const halo = seg.halo === 'global' ? 0 : Math.max(0, seg.halo + (options.extraHalo ?? 0));
+  const scale = options.scale ?? 1;
+  const fullFrame = { x: 0, y: 0, fullWidth: width, fullHeight: height };
+  if (carried && seg.steps[0] !== carried.step) throw new Error('runChainTiled: a statistic was made for a step that does not come next');
+  const steps = carried ? seg.steps.slice(1) : seg.steps;
+  const statFor = seg.statFor as (Step & { filter: MultipassFilter<any> }) | undefined;
+  const next = statFor && { step: statFor, filter: statFor.filter, buffers: createPhaseBuffers(ctx, statFor.filter) };
   const out: HalfImage = { width, height, data: new Uint16Array(width * height * 4) };
   const pipeline = new Pipeline(ctx);
   try {
     for (const t of planTiles(width, height, options.side, halo)) {
+      const frame = { ...fullFrame, x: t.fromX, y: t.fromY };
       const input = upload(ctx, src, t);
-      pipeline.setSource(input, { scale: options.scale ?? 1, frame: { x: t.fromX, y: t.fromY, fullWidth: width, fullHeight: height } });
-      await readOwned(ctx, pipeline.run(seg.steps), t, out);
+      let source = input;
+      if (carried) {
+        // The mapping of the step whose statistic the previous segment made, then its mask, as Pipeline does.
+        const params = effectiveParams(carried.step, scale);
+        source = runMultipass(ctx, carried.filter, input, params, undefined, frame, { run: 'apply', buffers: carried.buffers }).output;
+        if (carried.step.mask) {
+          const mapped = source;
+          source = blendMask(ctx, input, mapped, carried.step.mask, frame);
+          releaseTexture(ctx, mapped);
+        }
+      }
+      pipeline.setSource(source, { scale, frame });
+      const result = pipeline.run(steps);
+      await readOwned(ctx, result, t, out);
+      if (next) {
+        const mine = owned(ctx, result, t);
+        runMultipass(ctx, next.filter, mine, effectiveParams(next.step, scale), undefined, { ...fullFrame, x: t.x0, y: t.y0 }, { run: 'stat', buffers: next.buffers });
+        releaseTexture(ctx, mine);
+      }
       pipeline.destroy();
+      if (source !== input) releaseTexture(ctx, source);
       releaseTexture(ctx, input);
     }
+    if (next) {
+      // Finishing passes read only the buffers; they run once, on a texture of the image's position (0, 0)
+      // that has at least as many pixels per axis as any per-tile invocation they use (CLAHE: ≤ 16 tiles).
+      const scratch = createWorkingTexture(ctx, Math.min(width, 16), Math.min(height, 16));
+      runMultipass(ctx, next.filter, scratch, effectiveParams(next.step, scale), undefined, fullFrame, { run: 'finish', buffers: next.buffers });
+      releaseTexture(ctx, scratch);
+    }
+  } catch (e) {
+    for (const b of next?.buffers.values() ?? []) b.destroy();
+    throw e;
   } finally {
     pipeline.destroy();
   }
-  return out;
+  return { image: out, ...(next && { next }) };
 }
 
 /**
  * Renders `steps` on `src` in tiles no larger than `options.side`, giving what one Pipeline run on
  * the whole image would give, read back as half floats. An 8-bit source is decoded on the GPU like
- * `uploadSrgb8`. A step that needs the whole image at once (a global filter) fails if it does not fit.
+ * `uploadSrgb8`. Global filters with GPU phases (`TwoPhase.gpu`) run in two phases across the tiles;
+ * a global step without them fails if the image does not fit one tile.
  */
 export async function runChainTiled(ctx: GpuContext, steps: readonly Step[], src: HalfImage | Rgba8Image, options: TiledOptions): Promise<HalfImage> {
-  const segments = activeSteps(steps).length ? planSegments(steps, options.scale) : [{ steps: [], halo: 0 } as Segment];
+  const active = activeSteps(steps);
+  // Two phases only when every two-phase step can run them on the GPU; otherwise they stand alone.
+  const twoPhase = active.every((s) => s.filter.kind !== 'multipass' || !s.filter.twoPhase || gpuPhased(s));
+  const segments = active.length ? planSegments(active, options.scale, { twoPhase }) : [{ steps: [], halo: 0 } as Segment];
   let img: HalfImage | Rgba8Image = src;
-  for (const seg of segments) img = await runSegment(ctx, seg, img, options);
+  let carried: Carried | undefined;
+  for (const seg of segments) {
+    const r = await runSegment(ctx, seg, img, options, carried);
+    for (const b of carried?.buffers.values() ?? []) b.destroy();
+    img = r.image;
+    carried = r.next;
+  }
+  for (const b of carried?.buffers.values() ?? []) b.destroy();
   return img as HalfImage;
 }

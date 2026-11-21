@@ -147,6 +147,7 @@ fn run(xy: vec2i, p: Params) -> vec4f {
   twoPhase: {
     stat: (src) => otsuStat(src),
     apply: (src, { invert }, stat) => otsuApply(src, invert, stat),
+    gpu: { stat: ['histogram'], finish: ['level'] },
   },
   cpu: (src, { invert }) => otsuApply(src, invert, otsuStat(src)),
   // f32 vs f64 luminance can move a pixel sitting on a bin edge into the neighbouring bin.
