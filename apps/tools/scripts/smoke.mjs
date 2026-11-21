@@ -101,7 +101,7 @@ try {
   await page.fill('#long-side', '100');
   await page.selectOption('#format', 'png');
   const code = (await page.textContent('#code')) ?? '';
-  if (!code.includes('"longSide":100') || !code.includes('unsharpMask')) failures.push(`the code shown does not follow the settings:\n${code}`);
+  if (!/"longSide": ?100/.test(code) || !code.includes('unsharpMask') || !code.includes('"kind": "resize"')) failures.push(`the code shown does not follow the settings:\n${code}`);
   await page.click('#export');
   await page.waitForSelector('#status[data-done]', { timeout: 120000 });
   const done = await page.getAttribute('#status', 'data-done');

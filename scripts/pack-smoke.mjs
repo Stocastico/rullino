@@ -100,7 +100,10 @@ out.parseEdit = core.parseEdit({ version: 3, inputs: { photo: {} }, nodes: [{ id
 const edit = JSON.stringify(core.serializeChain([{ filter: exposure, params: { ev: 0.3 } }, { filter: filters.find((f) => f.id === 'contrast'), params: { amount: 0.15 } }], { output: { format: 'png', longSide: 2048 } }));
 const replayed = await core.applyEdit(img, JSON.parse(edit), { filters });
 const manual = core.runChainCpu(core.parseChain(JSON.parse(edit), { filters }).steps, img);
-out.readmeJson = edit.startsWith('{"version":2,"steps":[{"filter":"exposure","params":{"ev":0.3}},') && replayed.data.every((v, i) => v === manual.data[i]);
+// serializeChain writes version 3 (one input, one chain node); the README's hand-written version 2 JSON renders the same.
+const readmeV2 = { version: 2, steps: [{ filter: 'exposure', params: { ev: 0.3 } }, { filter: 'contrast', params: { amount: 0.15 } }] };
+const fromReadme = await core.applyEdit(img, readmeV2, { filters });
+out.readmeJson = edit.startsWith('{"version":3,"inputs":{"main":{}},"nodes":[{"id":"edit","from":"main","steps":[{"filter":"exposure","params":{"ev":0.3}},') && replayed.data.every((v, i) => v === manual.data[i]) && fromReadme.data.every((v, i) => v === manual.data[i]);
 // @rullino/node without the optional webgpu package: 'auto' falls back to the CPU and says why,
 // and a look document renders to a PNG.
 const renderer = await createRenderer();

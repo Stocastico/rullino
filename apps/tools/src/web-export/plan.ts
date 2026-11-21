@@ -1,6 +1,6 @@
-// What the web-ready export does, as edit documents: shrink in linear light to the long side, then
-// sharpen a little for the screen (output sharpening belongs after the resize), then encode. With a
-// v2 document the shrink is always last, so these are two documents rendered one after the other.
+// What the web-ready export does, as one edit document (version 3): shrink in linear light to the
+// long side, then sharpen a little for the screen (output sharpening belongs after the resize, which
+// is why this is a graph and not a v2 chain: v2 always shrinks last), then encode.
 
 export type WebFormat = 'jpeg' | 'webp' | 'png';
 
@@ -17,17 +17,24 @@ export interface WebExportOptions {
 /** Radius of the output sharpening, in pixels of the shrunk image: screen detail, not structure. */
 export const SHARPEN_SIGMA = 0.6;
 
-export function webExportEdits(o: WebExportOptions) {
+export function webExportEdit(o: WebExportOptions) {
   if (o.longSide !== undefined && !(Number.isInteger(o.longSide) && o.longSide > 0)) {
     throw new RangeError(`the long side must be a whole number of pixels above 0, not ${o.longSide}`);
   }
-  const shrink = { version: 2, steps: [], ...(o.longSide !== undefined && { output: { longSide: o.longSide } }) };
-  const finish = {
-    version: 2,
-    steps: o.sharpen > 0 ? [{ filter: 'unsharpMask', params: { amount: o.sharpen, sigma: SHARPEN_SIGMA } }] : [],
-    output: { format: o.format, ...(o.format !== 'png' && o.quality !== undefined && { quality: o.quality }) },
+  const resize = o.longSide !== undefined ? [{ id: 'small', kind: 'resize' as const, from: 'photo', longSide: o.longSide }] : [];
+  return {
+    version: 3 as const,
+    inputs: { photo: {} },
+    nodes: [
+      ...resize,
+      {
+        id: 'sharp',
+        from: resize.length ? 'small' : 'photo',
+        steps: o.sharpen > 0 ? [{ filter: 'unsharpMask', params: { amount: o.sharpen, sigma: SHARPEN_SIGMA } }] : [],
+      },
+    ],
+    output: { node: 'sharp', format: o.format, ...(o.format !== 'png' && o.quality !== undefined && { quality: o.quality }) },
   };
-  return { shrink, finish };
 }
 
 const EXTENSIONS: Record<WebFormat, string> = { jpeg: 'jpg', webp: 'webp', png: 'png' };

@@ -4,7 +4,7 @@ import { validateGeometry, type Geometry } from './geometry';
 import type { Lut } from './lut';
 import { createRasterMask, validateMask, type Mask } from './mask';
 import type { Step } from './pipeline/chain';
-import { EDIT_VERSION, parseEdit } from './graph';
+import { EDIT_VERSION, parseEdit, type EditDocument } from './graph';
 import { resolveParams, type ParamSchema } from './params';
 
 // An edit as plain JSON: the chain, optionally its geometry and how to export the result. For share
@@ -57,9 +57,13 @@ export interface ParseOptions {
   readonly resolveLut?: (ref: string) => Lut | undefined;
 }
 
-export function serializeChain(steps: readonly Step[], options: SerializeOptions = {}): ChainDocument {
-  return {
-    version: CHAIN_VERSION,
+/**
+ * Writes a chain as an edit document: version 3, one input `main` and one chain node `edit` (the
+ * shape `migrateEdit` gives a v2 document, so both render the same). Read back with `parseChain`
+ * or `parseEdit`.
+ */
+export function serializeChain(steps: readonly Step[], options: SerializeOptions = {}): EditDocument {
+  const chain = {
     steps: steps.map((step) => {
       const params: Record<string, Json> = {};
       const values = resolveParams(step.filter.params, (step.params ?? {}) as never) as Record<string, unknown>;
@@ -81,7 +85,11 @@ export function serializeChain(steps: readonly Step[], options: SerializeOptions
         ...(step.mask ? { mask: maskDocument(step.mask) } : {}),
       };
     }),
-    ...(options.geometry ? { geometry: options.geometry } : {}),
+  };
+  return {
+    version: EDIT_VERSION,
+    inputs: { main: {} },
+    nodes: [{ id: 'edit', from: 'main', steps: chain.steps, ...(options.geometry ? { geometry: options.geometry } : {}) }],
     ...(options.output ? { output: parseOutput(options.output) } : {}),
   };
 }

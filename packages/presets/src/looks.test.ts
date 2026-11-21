@@ -82,10 +82,10 @@ describe('looks', () => {
 describe('looks as edit documents', () => {
   const chart = createImage(4, 3, Float32Array.from({ length: 48 }, (_, i) => ((i * 37) % 97) / 97));
 
-  it('lookEdit is a version 2 document whose LUT travels by name', () => {
+  it('lookEdit is a version 3 document (one chain) whose LUT travels by name', () => {
     const doc = JSON.parse(JSON.stringify(lookEdit(looks[0]!, { intensity: 0.6 })));
-    expect(doc.version).toBe(2);
-    expect(doc.steps[0].params.look).toEqual({ ref: `look:${looks[0]!.id}` });
+    expect(doc.version).toBe(3);
+    expect(doc.nodes[0].steps[0].params.look).toEqual({ ref: `look:${looks[0]!.id}` });
     expect(JSON.stringify(doc).length).toBeLessThan(500); // a link, not a 33³ table
   });
 

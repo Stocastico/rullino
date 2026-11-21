@@ -19,7 +19,7 @@ function chart(w: number, h: number): LinearImage {
 const edit = {
   version: 2,
   steps: [
-    ...lookEdit(looks[1]!, { intensity: 0.8 }).steps,
+    ...(lookEdit(looks[1]!, { intensity: 0.8 }).nodes[0] as unknown as { steps: unknown[] }).steps,
     { filter: 'gaussianBlur', params: { sigma: 1.5 } },
     { filter: 'curves', params: { rgb: [[0, 0], [0.4, 0.3], [1, 1]] }, mask: { kind: 'radial', center: [0.5, 0.5], radius: [0.3, 0.3], feather: 0.5 } },
   ],
