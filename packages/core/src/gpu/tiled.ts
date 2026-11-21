@@ -5,12 +5,18 @@
 // rounded on the way). Tiles therefore give the whole-image result bit for bit.
 import type { Rgba8Image } from '../image';
 import type { MultipassFilter } from '../filter';
+import { geometryFrame, isIdentityGeometry, type Geometry } from '../geometry';
+import type { EditGraph } from '../graph';
+import { checkMixSizes, mixMask, resizeSize, walkGraph, type GraphValue } from '../graph-cpu';
+import type { Mask } from '../mask';
 import { activeSteps, effectiveParams, type Step } from '../pipeline/chain';
 import { planSegments, type Segment } from '../pipeline/bands';
 import { Pipeline } from '../pipeline/pipeline';
 import { planTiles, type TilePlan } from '../pipeline/tiles';
 import type { GpuContext } from './context';
+import { applyGeometry } from './geometry';
 import { uploadSrgb8Rect } from './io';
+import { downscale } from './resize';
 import { blendMask } from './mask';
 import { createPhaseBuffers, runMultipass } from './multipass';
 import { releaseTexture } from './pool';
@@ -159,4 +165,126 @@ export async function runChainTiled(ctx: GpuContext, steps: readonly Step[], src
   }
   for (const b of carried?.buffers.values() ?? []) b.destroy();
   return img as HalfImage;
+}
+
+// Geometry, resize and mix (#176, graphs): each output tile reads a source rectangle that depends on
+// the mapping. Tiles whose source rectangle would not fit `side` are split until it does.
+
+interface Rect {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+/** Output tiles of a `width` × `height` image, each with the source rectangle it reads (`need`), both at most `side` a side. */
+export function planMapped(width: number, height: number, side: number, need: (r: Rect) => Rect): { out: Rect; src: Rect }[] {
+  const plans: { out: Rect; src: Rect }[] = [];
+  const visit = (out: Rect) => {
+    const src = need(out);
+    const [ow, oh] = [out.x1 - out.x0, out.y1 - out.y0];
+    if ((src.x1 - src.x0 <= side && src.y1 - src.y0 <= side) || (ow === 1 && oh === 1)) return void plans.push({ out, src });
+    if (ow >= oh) {
+      const mid = out.x0 + Math.floor(ow / 2);
+      visit({ ...out, x1: mid });
+      visit({ ...out, x0: mid });
+    } else {
+      const mid = out.y0 + Math.floor(oh / 2);
+      visit({ ...out, y1: mid });
+      visit({ ...out, y0: mid });
+    }
+  };
+  for (const t of planTiles(width, height, side, 0)) visit(t);
+  return plans;
+}
+
+/** A rectangle clamped to a `w` × `h` image, at least one pixel (a tile that reads nothing still binds a texture). */
+function clampRect(x0: number, y0: number, x1: number, y1: number, w: number, h: number): Rect {
+  const cx0 = Math.min(w - 1, Math.max(0, x0));
+  const cy0 = Math.min(h - 1, Math.max(0, y0));
+  return { x0: cx0, y0: cy0, x1: Math.max(cx0 + 1, Math.min(w, x1)), y1: Math.max(cy0 + 1, Math.min(h, y1)) };
+}
+
+const tileOf = (r: Rect): TilePlan => ({ x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, fromX: r.x0, fromY: r.y0, toX: r.x1, toY: r.y1 });
+
+/** Runs `render` on every output tile with its source rectangle uploaded, assembling a `width` × `height` result. */
+async function mapTiles(ctx: GpuContext, src: HalfImage | Rgba8Image, width: number, height: number, side: number, need: (r: Rect) => Rect, render: (input: GPUTexture, out: Rect, from: Rect) => GPUTexture): Promise<HalfImage> {
+  const result: HalfImage = { width, height, data: new Uint16Array(width * height * 4) };
+  for (const { out, src: from } of planMapped(width, height, side, need)) {
+    const input = upload(ctx, src, tileOf(from));
+    const tex = render(input, out, from);
+    await readOwned(ctx, tex, tileOf(out), result);
+    releaseTexture(ctx, tex);
+    releaseTexture(ctx, input);
+  }
+  return result;
+}
+
+/** `applyGeometry` in tiles of at most `side`: the same pixels, bit for bit. */
+export function applyGeometryTiled(ctx: GpuContext, src: HalfImage | Rgba8Image, geometry: Geometry, side: number): Promise<HalfImage> {
+  const frame = geometryFrame(geometry, src.width, src.height);
+  const m = frame.matrix;
+  const at = (x: number, y: number) => {
+    const z = m[6]! * x + m[7]! * y + m[8]!;
+    return [(m[0]! * x + m[1]! * y + m[2]!) / z - 0.5, (m[3]! * x + m[4]! * y + m[5]!) / z - 0.5] as const;
+  };
+  // The bilinear taps of the corners' pixel centres, with a margin for f32 against f64.
+  const need = (r: Rect): Rect => {
+    const pts = [at(r.x0 + 0.5, r.y0 + 0.5), at(r.x1 - 0.5, r.y0 + 0.5), at(r.x0 + 0.5, r.y1 - 0.5), at(r.x1 - 0.5, r.y1 - 0.5)];
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    return clampRect(Math.floor(Math.min(...xs)) - 2, Math.floor(Math.min(...ys)) - 2, Math.floor(Math.max(...xs)) + 3, Math.floor(Math.max(...ys)) + 3, src.width, src.height);
+  };
+  return mapTiles(ctx, src, frame.width, frame.height, side, need, (input, out, from) =>
+    applyGeometry(ctx, input, geometry, { x: out.x0, y: out.y0, width: out.x1 - out.x0, height: out.y1 - out.y0, srcX: from.x0, srcY: from.y0, srcWidth: src.width, srcHeight: src.height }),
+  );
+}
+
+/** `downscale` to `width` × `height` in tiles of at most `side`: the same pixels, bit for bit. */
+export function downscaleTiled(ctx: GpuContext, src: HalfImage | Rgba8Image, width: number, height: number, side: number): Promise<HalfImage> {
+  const [sx, sy] = [src.width / width, src.height / height];
+  const need = (r: Rect) => clampRect(Math.floor(r.x0 * sx) - 1, Math.floor(r.y0 * sy) - 1, Math.ceil(r.x1 * sx) + 1, Math.ceil(r.y1 * sy) + 1, src.width, src.height);
+  return mapTiles(ctx, src, width, height, side, need, (input, out, from) =>
+    downscale(ctx, input, out.x1 - out.x0, out.y1 - out.y0, { x: out.x0, y: out.y0, width: out.x1 - out.x0, height: out.y1 - out.y0, srcX: from.x0, srcY: from.y0, srcWidth: src.width, srcHeight: src.height, fullWidth: width, fullHeight: height }),
+  );
+}
+
+/** `blendMask(a, b, mask)` in tiles of at most `side` (the images have one size). */
+async function blendTiled(ctx: GpuContext, a: HalfImage | Rgba8Image, b: HalfImage | Rgba8Image, mask: Mask, side: number): Promise<HalfImage> {
+  const out: HalfImage = { width: a.width, height: a.height, data: new Uint16Array(a.width * a.height * 4) };
+  for (const t of planTiles(a.width, a.height, side, 0)) {
+    const [ta, tb] = [upload(ctx, a, t), upload(ctx, b, t)];
+    const tex = blendMask(ctx, ta, tb, mask, { x: t.x0, y: t.y0, fullWidth: a.width, fullHeight: a.height });
+    await readOwned(ctx, tex, t, out);
+    for (const x of [tex, ta, tb]) releaseTexture(ctx, x);
+  }
+  return out;
+}
+
+/**
+ * `runGraphGpu` in tiles of at most `options.side`, the inputs and every node's result in CPU
+ * memory: the output node (before `output.longSide`), bit for bit as `runGraphGpu` renders it.
+ */
+export async function runGraphTiled(ctx: GpuContext, graph: EditGraph, inputs: ReadonlyMap<string, { readonly image: HalfImage | Rgba8Image; readonly scale: number }>, options: TiledOptions): Promise<HalfImage> {
+  const values = new Map<string, GraphValue<HalfImage | Rgba8Image>>([...inputs].map(([name, v]) => [name, { value: v.image, scale: v.scale }]));
+  const out = await walkGraph<HalfImage | Rgba8Image>(graph, values, async (node, ins) => {
+    const [a, b] = ins as [GraphValue<HalfImage | Rgba8Image>, GraphValue<HalfImage | Rgba8Image> | undefined];
+    switch (node.kind) {
+      case 'chain': {
+        const framed = node.geometry && !isIdentityGeometry(node.geometry) ? await applyGeometryTiled(ctx, a.value, node.geometry, options.side) : a.value;
+        return { value: await runChainTiled(ctx, node.steps, framed, { ...options, scale: a.scale }), scale: a.scale };
+      }
+      case 'resize': {
+        const [w, h] = resizeSize(node, a.value.width, a.value.height, a.scale);
+        if (w === a.value.width && h === a.value.height) return { value: a.value, scale: a.scale };
+        return { value: await downscaleTiled(ctx, a.value, w, h, options.side), scale: a.scale };
+      }
+      case 'mix':
+        checkMixSizes(node, a.value, b!.value);
+        return { value: await blendTiled(ctx, a.value, b!.value, mixMask(node), options.side), scale: a.scale };
+    }
+  });
+  // Never hand back an input itself (an empty graph path passes it through): decode or copy it.
+  const value = out.value;
+  return [...inputs.values()].some((v) => v.image === value) || !isHalf(value) ? runChainTiled(ctx, [], value, options) : value;
 }
