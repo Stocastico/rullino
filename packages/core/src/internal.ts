@@ -24,6 +24,7 @@ export { bandReach, planBands, planSegments, runChainBand, runChainBandRows, run
 export { planTiles, type TilePlan } from './pipeline/tiles';
 export { runChainTiled, uploadHalves, type HalfImage, type TiledOptions } from './gpu/tiled';
 export { readTextureBytes } from './gpu/readback';
+export { setPoolLimit } from './gpu/pool';
 export { uploadSrgb8Rect } from './gpu/io';
 export { wholeFrame, type TileFrame } from './gpu/frame';
 export { applyEditPixels } from './edit';

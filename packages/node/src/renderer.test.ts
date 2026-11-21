@@ -1,6 +1,7 @@
 import { createImage, fromFloat16Array, IDENTITY_GEOMETRY, serializeChain, toFloat16Array, WebGpuUnavailableError } from '@rullino/core';
 import { exposure, gaussianBlur } from '@rullino/filters';
 import { lookEdit, looks, lookLutRef, lookSteps } from '@rullino/presets';
+import { poolStats } from '@rullino/core/internal';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createRenderer } from './renderer';
 
@@ -61,6 +62,17 @@ describe('createRenderer', DAWN, () => {
     expect(pngSize(out.bytes)).toEqual({ width: 15, height: 10, bitDepth: 16 });
     expect([out.width, out.height]).toEqual([15, 10]);
     expect(pngSize((await r.render(rgba, { version: 2, steps: [] })).bytes).bitDepth).toBe(8);
+  });
+
+  it('memoryBudget renders in tiles with the same result, and keeps the idle pool within half of it', async () => {
+    const tiled = await createRenderer({ backend: 'gpu', memoryBudget: 300_000 });
+    try {
+      const src = photo(301, 203);
+      expect((await tiled.apply(src, edit())).data).toEqual((await (await gpu).apply(src, edit())).data);
+      expect(poolStats(tiled.gpu!).bytes).toBeLessThanOrEqual(150_000);
+    } finally {
+      tiled.destroy();
+    }
   });
 
   it('validates the document before anything else', async () => {

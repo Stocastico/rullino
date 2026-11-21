@@ -27,7 +27,7 @@ describe('@rullino/core public API', () => {
     'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
     'lutSamplerWgsl', 'lutTexture', 'mixMask', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
     'passShader', 'planBands', 'planSegments', 'planTiles', 'poolStats', 'readTextureBytes', 'renderMask', 'reportGpuError', 'resizeSize', 'runChainBand', 'runChainBandRows', 'runChainBands', 'runChainTiled', 'runFused',
-    'runGraphCpu', 'runGraphGpu', 'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'stepReach', 'sumStats', 'toGpuError', 'twoPhaseStat', 'uploadHalves', 'uploadSrgb8Rect', 'validateSchema', 'walkGraph', 'wholeFrame',
+    'runGraphCpu', 'runGraphGpu', 'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'setPoolLimit', 'stepReach', 'sumStats', 'toGpuError', 'twoPhaseStat', 'uploadHalves', 'uploadSrgb8Rect', 'validateSchema', 'walkGraph', 'wholeFrame',
     ]);
     const publicNames = new Set(Object.keys(api));
     for (const name of Object.keys(internal)) expect(publicNames.has(name), `${name} is public and internal`).toBe(false);
