@@ -15,7 +15,7 @@ import { Pipeline } from '../pipeline/pipeline';
 import { planTiles, type TilePlan } from '../pipeline/tiles';
 import type { GpuContext } from './context';
 import { applyGeometry } from './geometry';
-import { uploadSrgb8Rect } from './io';
+import { readSrgb8, uploadSrgb8Rect } from './io';
 import { downscale } from './resize';
 import { blendMask } from './mask';
 import { createPhaseBuffers, runMultipass } from './multipass';
@@ -287,4 +287,17 @@ export async function runGraphTiled(ctx: GpuContext, graph: EditGraph, inputs: R
   // Never hand back an input itself (an empty graph path passes it through): decode or copy it.
   const value = out.value;
   return [...inputs.values()].some((v) => v.image === value) || !isHalf(value) ? runChainTiled(ctx, [], value, options) : value;
+}
+
+/** A half-float image as 8-bit straight-alpha sRGB pixels, encoded on the GPU tile by tile like `readSrgb8`. */
+export async function readSrgb8Tiled(ctx: GpuContext, src: HalfImage, side: number): Promise<Rgba8Image & { data: Uint8ClampedArray<ArrayBuffer> }> {
+  const data = new Uint8ClampedArray(src.width * src.height * 4);
+  for (const t of planTiles(src.width, src.height, side, 0)) {
+    const tex = upload(ctx, src, t);
+    const px = await readSrgb8(ctx, tex);
+    releaseTexture(ctx, tex);
+    const w = t.x1 - t.x0;
+    for (let y = t.y0; y < t.y1; y++) data.set(px.subarray((y - t.y0) * w * 4, (y - t.y0 + 1) * w * 4), (y * src.width + t.x0) * 4);
+  }
+  return { width: src.width, height: src.height, data };
 }

@@ -39,3 +39,33 @@ export function planTiles(width: number, height: number, side: number, halo: num
     }
   return tiles;
 }
+
+export interface TileSideInput {
+  /** The sizes of the images the render reads (its inputs). */
+  readonly sizes: readonly (readonly [number, number])[];
+  /** Working textures a tile may hold at once (stages, passes, masks, input). */
+  readonly textures: number;
+  /** The largest halo a tile needs (the sum of a chain's reaches). */
+  readonly halo: number;
+  /** The device's largest texture side. */
+  readonly maxTexture: number;
+  /** Bytes of GPU memory the render may use, if limited. */
+  readonly budget?: number | undefined;
+}
+
+const BYTES_PER_PIXEL = 8; // rgba16float
+const MIN_INTERIOR = 64;
+
+/**
+ * The tile side for a render, or `undefined` to render whole: tiles when an image is larger than a
+ * texture, or when `textures` whole-image textures would exceed the budget; then the largest side
+ * whose `textures` tiles fit the budget (the device's largest without one). Never less than the halo
+ * needs plus 64 pixels: a budget too small for that is exceeded rather than failing the render.
+ */
+export function tileSideFor({ sizes, textures, halo, maxTexture, budget }: TileSideInput): number | undefined {
+  const tooLarge = sizes.some(([w, h]) => w > maxTexture || h > maxTexture);
+  const area = Math.max(...sizes.map(([w, h]) => w * h));
+  if (!tooLarge && (budget === undefined || area * BYTES_PER_PIXEL * textures <= budget)) return undefined;
+  const fits = budget === undefined ? maxTexture : Math.floor(Math.sqrt(budget / (BYTES_PER_PIXEL * textures)));
+  return Math.min(maxTexture, Math.max(fits, 2 * halo + MIN_INTERIOR));
+}

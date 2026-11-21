@@ -1,4 +1,4 @@
-import { createGpuContext, createImage, defaultParams, Pipeline, toFloat16Array, type Filter, type LinearImage, type Mask, type Step } from '@rullino/core';
+import { applyEdit, createGpuContext, createImage, defaultParams, Pipeline, toFloat16Array, type Filter, type LinearImage, type Mask, type Step } from '@rullino/core';
 import { readTextureBytes, runChainTiled, stepReach, uploadHalves, uploadSrgb8Rect, type HalfImage } from '@rullino/core/internal';
 import { afterAll, describe, expect, it } from 'vitest';
 import { filters } from './index';
@@ -121,4 +121,49 @@ describe('global filters, tiled, equal the whole image', () => {
       }
     }
   }, 120_000);
+});
+
+// applyEdit goes tiled when the image does not fit a texture or the memory budget would be exceeded;
+// what comes out must not depend on it.
+describe('applyEdit in tiles', () => {
+  const edit = {
+    version: 2,
+    geometry: { rotate: 0, flipH: false, flipV: false, straighten: 12, crop: { x: 0.05, y: 0.1, width: 0.9, height: 0.8 } },
+    steps: [
+      { filter: 'gaussianBlur', params: { sigma: 2 } },
+      { filter: 'equalize', params: { amount: 0.7 } },
+      { filter: 'vignette', params: {} },
+      { filter: 'exposure', params: { ev: 0.3 }, mask: { kind: 'linear', from: [0, 0], to: [1, 1] } },
+    ],
+    output: { longSide: 50 },
+  };
+  const rgba = { width: 301, height: 203, data: Uint8Array.from({ length: 301 * 203 * 4 }, (_, i) => (i % 4 === 3 ? 255 : (i * 31 + (i >> 7)) % 256)) };
+
+  it('gives the untiled result bit for bit, as floats and as 8-bit pixels, and says it tiled', async () => {
+    const { applyEditPixels } = await import('@rullino/core/internal');
+    const sides: number[] = [];
+    const opts = { filters, gpu: ctx };
+    const small = { ...opts, memoryBudget: 300_000, onTiling: (i: { side: number }) => sides.push(i.side) };
+    const whole = await applyEdit(rgba, edit, opts);
+    const tiled = await applyEdit(rgba, edit, small);
+    expect(sides.length).toBe(1);
+    expect(sides[0]).toBeLessThan(150);
+    expect([tiled.width, tiled.height]).toEqual([whole.width, whole.height]);
+    expect(tiled.data).toEqual(whole.data);
+    expect((await applyEditPixels(rgba, edit, small)).data).toEqual((await applyEditPixels(rgba, edit, opts)).data);
+    expect(sides.length).toBe(2);
+    // A budget that fits renders whole.
+    await applyEdit(rgba, edit, { ...small, memoryBudget: 1e9 });
+    expect(sides.length).toBe(2);
+  });
+
+  it('tiles on its own an image wider than the largest texture', async () => {
+    const max = ctx.limits.maxTextureDimension2D;
+    const wide = { width: max + 37, height: 9, data: new Uint8Array((max + 37) * 9 * 4).fill(200) };
+    const sides: number[] = [];
+    const out = await applyEdit(wide, { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 1 } }] }, { filters, gpu: ctx, onTiling: (i) => sides.push(i.side) });
+    expect([out.width, out.height]).toEqual([max + 37, 9]);
+    expect(sides).toHaveLength(1);
+    expect(sides[0]).toBeLessThanOrEqual(max);
+  }, 60_000);
 });
