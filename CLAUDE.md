@@ -90,7 +90,7 @@ npx vitest run packages/filters -u    # rewrite docs/filters.md (filter referenc
 - **Zero runtime dependencies** in `packages/*`. `@rullino/ml` takes ONNX Runtime as an argument (optional peer dependency), it never imports it.
 - Parity tests feed CPU and GPU the same **float16-quantised** input, so the tolerance only covers output rounding and math differences. Use odd image sizes to exercise workgroup bounds and row padding.
 - Commit small and often; run `pnpm typecheck && pnpm test:all` before pushing (and `pnpm build && pnpm test:e2e` when the playground or filter list changes). When piping their output (`| tail`), use `set -o pipefail`, or a failure slips through to the commit.
-- **Workflow**: one branch and one PR per milestone step, based on `main`. Claude may merge its own PR once CI is green and no review thread is open; afterwards delete the branch and start the next one from `main`.
+- **Workflow**: one PR per issue, based on `main`, opened when the issue is done (maintainer's rule, 21 Nov 2026); inside it, one commit per logical change (many small commits are welcome). Claude may merge its own PR once CI is green and no review thread is open; afterwards delete the branch and start the next one from `main`.
 
 ## Decisions
 
