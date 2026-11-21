@@ -14,7 +14,7 @@
     "@rullino/web": "workspace:*",
     "@silvia-odwyer/photon": "0.3.3",
     "pixi-filters": "6.1.5",
-    "pixi.js": "8.22.0",
+    "pixi.js": "8.23.0",
     "wasm-vips": "0.0.19"
   },
   "devDependencies": {
