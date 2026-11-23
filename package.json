@@ -18,6 +18,7 @@
     "test:ml": "node scripts/fetch-models.mjs && vitest run --project ml",
     "test:large": "vitest run --project large --silent=false",
     "test:fuzz": "node scripts/fuzz.mjs",
+    "test:engines": "vitest run --project engines",
     "test:e2e:cpu": "pnpm --filter @rullino/playground smoke:cpu",
     "test:e2e:ml": "node scripts/fetch-models.mjs && pnpm --filter @rullino/playground smoke:ml",
     "bench": "vitest run --project bench && node scripts/fs.mjs cat packages/filters/bench/results.txt",
