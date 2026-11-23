@@ -95,11 +95,23 @@ async function decodeFile(file: Uint8Array): Promise<RgbaImage> {
   return { data, width: info.width, height: info.height };
 }
 
-/** Loads Dawn from the optional `webgpu` package and defines the WebGPU globals core relies on. */
-async function loadDawn(): Promise<GPU> {
-  const { create, globals } = await import('webgpu');
-  for (const [name, value] of Object.entries(globals)) if (!(name in globalThis)) (globalThis as Record<string, unknown>)[name] = value;
-  return create([]);
+let dawn: Promise<GPU> | undefined;
+
+/**
+ * Loads Dawn from the optional `webgpu` package, defines the WebGPU globals core relies on, and
+ * creates its instance once per process (#223): every renderer asks it for an adapter and a device
+ * of its own. Several instances in one process made Dawn crash or hang now and then. A failed load
+ * is not kept, so a later renderer tries again.
+ */
+function loadDawn(): Promise<GPU> {
+  dawn ??= import('webgpu').then(({ create, globals }) => {
+    for (const [name, value] of Object.entries(globals)) if (!(name in globalThis)) (globalThis as Record<string, unknown>)[name] = value;
+    return create([]);
+  });
+  return dawn.catch((e: unknown) => {
+    dawn = undefined;
+    throw e;
+  });
 }
 
 export async function createRenderer(options: RendererOptions = {}): Promise<Renderer> {
@@ -107,7 +119,8 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
   const parse = { filters: options.filters ?? allFilters, resolveLut: options.resolveLut ?? resolveLookLut };
   let ctx: GpuContext | undefined;
   let reason: string | undefined;
-  // Kept referenced for the renderer's lifetime: the device belongs to this Dawn instance.
+  // Kept referenced for the renderer's lifetime: the device belongs to this Dawn instance (shared by
+  // the process's renderers, see loadDawn).
   let gpu: GPU | undefined;
   if (backend !== 'cpu') {
     try {
