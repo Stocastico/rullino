@@ -24,3 +24,9 @@ input[type=range] { width: 100%; max-width: 20rem; }
 .card strong { display: block; color: var(--fg); }
 a { color: var(--accent); }
 .download { display: inline-block; margin-top: .5rem; }
+.previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; }
+figure { margin: 0; }
+figure canvas { display: inline-block; width: 50%; height: auto; vertical-align: top; }
+figcaption { font-size: .8rem; color: var(--muted); }
+textarea { width: 100%; font: .85rem/1.4 ui-monospace, monospace; padding: .5rem; border-radius: .4rem; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+label.inline { display: inline-flex; gap: .4rem; align-items: center; margin: 0; }

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apply a look to a folder of photos, in your browser · rullino tools</title>
+  <meta name="description" content="Apply a photo look (or an edit you made) to a whole folder of photos at once and save them as JPEG, WebP or PNG. Runs in your browser: nothing is uploaded." />
+  <link rel="stylesheet" href="../src/style.css" />
+</head>
+<body>
+<main>
+  <p><a href="../">← rullino tools</a></p>
+  <h1>Apply a look to a folder</h1>
+  <p>Pick a folder (or some photos), choose a look or paste an edit document, check a few previews and export them all. <strong>Nothing is uploaded</strong>: every photo is processed on this device, and the exported files carry no location or camera data.</p>
+
+  <div class="row">
+    <div>
+      <label for="folder">A folder</label>
+      <input id="folder" type="file" webkitdirectory multiple />
+    </div>
+    <div>
+      <label for="files">…or some photos</label>
+      <input id="files" type="file" accept="image/*" multiple />
+    </div>
+  </div>
+  <p id="picked"></p>
+
+  <div class="row">
+    <div>
+      <label for="look">Look</label>
+      <select id="look"></select>
+    </div>
+    <div id="intensity-box">
+      <label for="intensity">Intensity <span id="intensity-value">1</span></label>
+      <input id="intensity" type="range" min="0" max="1" step="0.05" value="1" />
+    </div>
+  </div>
+  <div id="paste-box" hidden>
+    <label for="document">Edit document (JSON, e.g. from the playground’s <em>Code</em> button)</label>
+    <textarea id="document" rows="8" spellcheck="false" placeholder='{ "version": 3, "inputs": { "main": {} }, "nodes": [ … ] }'></textarea>
+  </div>
+  <p id="problem" class="bad"></p>
+
+  <div class="row">
+    <div>
+      <label for="long-side">Long side (px, empty = keep the size)</label>
+      <input id="long-side" type="number" min="1" step="1" value="" />
+    </div>
+    <div>
+      <label for="format">Format</label>
+      <select id="format">
+        <option value="jpeg">JPEG</option>
+        <option value="webp">WebP</option>
+        <option value="png">PNG</option>
+      </select>
+    </div>
+    <div>
+      <label for="quality">Quality <span id="quality-value">0.9</span></label>
+      <input id="quality" type="range" min="0.3" max="1" step="0.01" value="0.9" />
+    </div>
+  </div>
+
+  <h2>Preview</h2>
+  <p>The first photos, before and after.</p>
+  <div id="previews" class="previews"></div>
+
+  <p>
+    <button id="export" disabled>Export all</button>
+    <button id="cancel" class="secondary" hidden>Cancel</button>
+    <label class="inline" id="to-folder-box" hidden><input id="to-folder" type="checkbox" /> Write into a folder instead of a zip</label>
+  </p>
+  <progress id="progress" value="0" max="1" hidden></progress>
+  <p id="status"></p>
+  <div id="results"></div>
+
+  <h2>The same in your code</h2>
+  <p>With <code>@rullino/web</code> in a browser, <code>@rullino/node</code> on a server, or one command in a shell:</p>
+  <pre id="code"></pre>
+</main>
+<script type="module" src="../src/look-folder/main.ts"></script>
+</body>
+</html>

@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         'web-export': fileURLToPath(new URL('./web-export/index.html', import.meta.url)),
+        'look-folder': fileURLToPath(new URL('./look-folder/index.html', import.meta.url)),
       },
     },
   },
