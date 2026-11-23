@@ -91,7 +91,7 @@ export function serializeChain(steps: readonly Step[], options: SerializeOptions
     version: EDIT_VERSION,
     inputs: { main: {} },
     nodes: [{ id: 'edit', from: 'main', steps: chain.steps, ...(options.geometry ? { geometry: options.geometry } : {}) }],
-    ...(options.output ? { output: parseOutput(options.output) } : {}),
+    ...(options.output && Object.keys(options.output).length > 0 ? { output: parseOutput(options.output) } : {}),
   };
 }
 
