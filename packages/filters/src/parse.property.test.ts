@@ -9,6 +9,8 @@ import { filters } from './index';
 // reads back to the same steps. RULLINO_FUZZ_RUNS raises the number of runs (the CI fuzz job).
 
 const RUNS = Number(process.env.RULLINO_FUZZ_RUNS ?? 300);
+// Hundreds of cases each: slower than a unit test by nature (and much slower under coverage).
+const SLOW = { timeout: 60_000 };
 // A failure prints its seed: RULLINO_FUZZ_SEED=<seed> replays it.
 if (process.env.RULLINO_FUZZ_SEED) fc.configureGlobal({ seed: Number(process.env.RULLINO_FUZZ_SEED) });
 const opts = { filters };
@@ -98,7 +100,7 @@ function replaced(doc: unknown, path: (string | number)[], value: unknown): unkn
   return copy;
 }
 
-describe('edit document parsers', () => {
+describe('edit document parsers', SLOW, () => {
   it('any JSON value: parseEdit and parseChain return or throw a ParseError', () => {
     const anything = fc.oneof(fc.jsonValue(), fc.record({ version: fc.constantFrom(1, 2, 3, 4, '3', null), steps: fc.jsonValue(), nodes: fc.jsonValue(), inputs: fc.jsonValue(), output: fc.jsonValue() }, { requiredKeys: [] }));
     fc.assert(

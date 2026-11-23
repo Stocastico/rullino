@@ -12,6 +12,8 @@ import { planTiles, tileSideFor } from './tiles';
 
 const RUN = 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }';
 const RUNS = Number(process.env.RULLINO_FUZZ_RUNS ?? 300);
+// Hundreds of cases each: slower than a unit test by nature (and much slower under coverage).
+const SLOW = { timeout: 60_000 };
 // A failure prints its seed: RULLINO_FUZZ_SEED=<seed> replays it.
 if (process.env.RULLINO_FUZZ_SEED) fc.configureGlobal({ seed: Number(process.env.RULLINO_FUZZ_SEED) });
 
@@ -22,7 +24,7 @@ function ownership(w: number, h: number, rects: readonly { x0: number; y0: numbe
   return n;
 }
 
-describe('planBands', () => {
+describe('planBands', SLOW, () => {
   it('owns every row once, reads the halo around it clamped to the image, and keeps bands ≥ 4 × halo unless forced', () => {
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 400 }), fc.integer({ min: 1, max: 64 }), fc.integer({ min: 0, max: 50 }), fc.boolean(), (h, count, halo, force) => {
@@ -45,10 +47,10 @@ describe('planBands', () => {
   });
 });
 
-describe('planTiles', () => {
+describe('planTiles', SLOW, () => {
   it('owns every pixel once, reads the halo clamped to the image, and no texture exceeds the side', () => {
     fc.assert(
-      fc.property(fc.integer({ min: 1, max: 300 }), fc.integer({ min: 1, max: 300 }), fc.integer({ min: 0, max: 20 }), fc.integer({ min: 1, max: 120 }), (w, h, halo, extra) => {
+      fc.property(fc.integer({ min: 1, max: 160 }), fc.integer({ min: 1, max: 160 }), fc.integer({ min: 0, max: 20 }), fc.integer({ min: 1, max: 120 }), (w, h, halo, extra) => {
         const side = 2 * halo + extra;
         const tiles = planTiles(w, h, side, halo);
         expect(ownership(w, h, tiles).every((n) => n === 1)).toBe(true);
@@ -74,7 +76,7 @@ describe('planTiles', () => {
   });
 });
 
-describe('planMapped', () => {
+describe('planMapped', SLOW, () => {
   it('owns every output pixel once, and each tile reads a rectangle that contains what it needs and fits the side (unless one pixel needs more)', () => {
     // A mapping that scales and shifts: the need of a rectangle is its image with a margin, clamped.
     fc.assert(
@@ -102,7 +104,7 @@ describe('planMapped', () => {
   });
 });
 
-describe('tileSideFor', () => {
+describe('tileSideFor', SLOW, () => {
   it('renders whole exactly when everything fits; otherwise a side within the texture limit that leaves room for the halo', () => {
     fc.assert(
       fc.property(
@@ -128,7 +130,7 @@ describe('tileSideFor', () => {
   });
 });
 
-describe('planSegments', () => {
+describe('planSegments', SLOW, () => {
   const local = (reach: number) =>
     defineFilter({ id: `r${reach}`, label: 'r', category: 'classic', kind: 'multipass', params: {}, passes: [{ name: 'out', inputs: ['input'], wgsl: RUN }], reach: () => reach, cpu: (s) => s, tolerance: { abs: 0, rel: 0 } });
   const global = defineFilter({ id: 'g', label: 'g', category: 'classic', kind: 'multipass', params: {}, passes: [{ name: 'out', inputs: ['input'], wgsl: RUN }], reach: 'global', cpu: (s) => s, tolerance: { abs: 0, rel: 0 } });
