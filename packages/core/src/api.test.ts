@@ -5,7 +5,7 @@ import * as api from './index';
 describe('@rullino/core public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'CHAIN_VERSION', 'EDIT_VERSION', 'GpuError', 'IDENTITY_GEOMETRY', 'MAX_IMAGE_SIDE', 'MAX_LUT_SIZE', 'NODE_KINDS', 'Pipeline',
+    'CHAIN_VERSION', 'EDIT_VERSION', 'GpuError', 'IDENTITY_GEOMETRY', 'MAX_IMAGE_SIDE', 'MAX_LUT_SIZE', 'NODE_KINDS', 'ParseError', 'Pipeline',
     'ShaderCompileError', 'WebGpuUnavailableError', 'activeSteps', 'applyEdit', 'applyGeometry', 'applyGeometryCpu',
     'applyLutCpu', 'blendMasked', 'compareImages', 'createGpuContext', 'createImage', 'createLut',
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
