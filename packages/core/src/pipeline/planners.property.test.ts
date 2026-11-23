@@ -12,6 +12,8 @@ import { planTiles, tileSideFor } from './tiles';
 
 const RUN = 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }';
 const RUNS = Number(process.env.RULLINO_FUZZ_RUNS ?? 300);
+// A failure prints its seed: RULLINO_FUZZ_SEED=<seed> replays it.
+if (process.env.RULLINO_FUZZ_SEED) fc.configureGlobal({ seed: Number(process.env.RULLINO_FUZZ_SEED) });
 
 /** How many times each pixel of a w × h image is owned by `rects`. */
 function ownership(w: number, h: number, rects: readonly { x0: number; y0: number; x1: number; y1: number }[]): Uint16Array {

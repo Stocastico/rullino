@@ -9,6 +9,8 @@ import { filters } from './index';
 // reads back to the same steps. RULLINO_FUZZ_RUNS raises the number of runs (the CI fuzz job).
 
 const RUNS = Number(process.env.RULLINO_FUZZ_RUNS ?? 300);
+// A failure prints its seed: RULLINO_FUZZ_SEED=<seed> replays it.
+if (process.env.RULLINO_FUZZ_SEED) fc.configureGlobal({ seed: Number(process.env.RULLINO_FUZZ_SEED) });
 const opts = { filters };
 const serialisable = filters.filter((f) => (Object.values(f.params) as Param[]).every((p) => p.type !== 'lut' && p.type !== 'image')) as Filter[];
 

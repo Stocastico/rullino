@@ -1,0 +1,36 @@
+name: Fuzz
+
+# The property tests with many runs (#177): parsers of edit documents and the band / tile planners
+# today, the image decoders of 0.9 next. Not a required check: a failure prints the counterexample
+# and the seed (replay with RULLINO_FUZZ_SEED=<seed> pnpm test:fuzz).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1' # weekly, Monday 03:17 UTC, with more runs
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per property
+        default: '100000'
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:fuzz
+        env:
+          RULLINO_FUZZ_RUNS: ${{ inputs.runs || (github.event_name == 'schedule' && '100000') || '20000' }}
