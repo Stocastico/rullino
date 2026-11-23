@@ -13,6 +13,7 @@ export default defineConfig({
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
         'web-export': fileURLToPath(new URL('./web-export/index.html', import.meta.url)),
         'look-folder': fileURLToPath(new URL('./look-folder/index.html', import.meta.url)),
+        'lut-maker': fileURLToPath(new URL('./lut-maker/index.html', import.meta.url)),
       },
     },
   },

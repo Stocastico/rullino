@@ -2,7 +2,8 @@
 // Web-ready export: two generated photos (landscape and portrait) through the page's own controls,
 // long side 100, PNG; the downloaded zip must hold both, each at the expected size and with no chunk
 // but IHDR / IDAT / IEND (no metadata). Apply a look to a folder: previews, a bad document, the export
-// (Noir must come back grey) and cancel. Fails on a console error, a failed request or a 404.
+// (Noir must come back grey) and cancel. LUT maker: saturation −1 makes the preview and the .cube grey.
+// Fails on a console error, a failed request or a 404.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
@@ -188,6 +189,38 @@ try {
   });
   await page.waitForSelector('#status[data-cancelled]', { timeout: 60000 });
   if ((await page.getAttribute('#status', 'data-done')) !== '0') failures.push(`look folder: cancelled at once, but ${await page.getAttribute('#status', 'data-done')} photos were exported`);
+
+  // LUT maker: saturation −1 must make the preview grey and the .cube a table of greys, named and sized as asked.
+  await page.goto(base);
+  await page.click('a[href="./lut-maker/"]');
+  await page.waitForURL(/lut-maker/);
+  await page.setInputFiles('#photo', { name: 'colour.png', mimeType: 'image/png', buffer: png(160, 100) });
+  const lutFrame = async (action) => {
+    const n = Number((await page.getAttribute('#status', 'data-frame')) ?? 0);
+    await action();
+    await page.waitForFunction((n) => Number(document.getElementById('status').dataset.frame ?? 0) > n, n, { timeout: 120000 });
+  };
+  await page.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 120000 });
+  const spread = (id) =>
+    page.$eval(id, (c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let m = 0;
+      for (let i = 0; i < d.length; i += 4) m = Math.max(m, Math.abs(d[i] - d[i + 1]), Math.abs(d[i + 1] - d[i + 2]));
+      return m;
+    });
+  await lutFrame(() => page.$eval('#saturation', (el) => { el.value = '-1'; el.dispatchEvent(new Event('input')); }));
+  if ((await spread('#before')) < 50) failures.push('LUT maker: the test photo has no colour');
+  if ((await spread('#after')) > 3) failures.push(`LUT maker: the preview at saturation −1 is not grey (channels differ by ${await spread('#after')})`);
+  if (!((await page.textContent('#code')) ?? '').includes('f.saturation')) failures.push('LUT maker: the code does not show the saturation step');
+  await page.fill('#title', 'Grey test');
+  await page.selectOption('#size', '17');
+  const [cube] = await Promise.all([page.waitForEvent('download'), page.click('#download')]);
+  if (cube.suggestedFilename() !== 'grey-test.cube') failures.push(`LUT maker: file named ${cube.suggestedFilename()}`);
+  const text = readFileSync(await cube.path(), 'utf8');
+  if (!text.startsWith('TITLE "Grey test"\nLUT_3D_SIZE 17\n')) failures.push(`LUT maker: the file starts with ${JSON.stringify(text.slice(0, 40))}`);
+  const rows = text.split('\n').filter((l) => /^[\d.-]+ [\d.-]+ [\d.-]+$/.test(l)).map((l) => l.split(' ').map(Number));
+  if (rows.length !== 17 ** 3) failures.push(`LUT maker: ${rows.length} entries, expected ${17 ** 3}`);
+  if (rows.some(([r, g, b]) => Math.abs(r - g) > 1e-3 || Math.abs(g - b) > 1e-3)) failures.push('LUT maker: the .cube is not grey at saturation −1');
 } finally {
   await browser.close();
   server.close();
