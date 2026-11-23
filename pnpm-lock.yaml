@@ -143,6 +143,9 @@ importers:
       '@rullino/filters':
         specifier: workspace:*
         version: link:../../packages/filters
+      '@rullino/presets':
+        specifier: workspace:*
+        version: link:../../packages/presets
       '@rullino/web':
         specifier: workspace:*
         version: link:../../packages/web

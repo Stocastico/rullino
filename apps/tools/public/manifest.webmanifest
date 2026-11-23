@@ -1,0 +1,11 @@
+{
+  "name": "rullino tools",
+  "short_name": "rullino tools",
+  "description": "Photo tools that run in your browser: nothing is uploaded.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#16161a",
+  "theme_color": "#2b59c3",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compare two renders: where do two images differ? · rullino tools</title>
+  <meta name="description" content="Compare two images pixel by pixel (a browser preview and a server render, two versions, two machines): the largest difference, how many pixels are beyond a tolerance, and a map of where. Runs in your browser: nothing is uploaded." />
+  <link rel="stylesheet" href="../src/style.css" />
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#2b59c3" />
+</head>
+<body>
+<main>
+  <p><a href="../">← rullino tools</a></p>
+  <h1>Compare two renders</h1>
+  <p>Two images of the same size, compared channel by channel (alpha included): the largest difference, how many pixels go beyond a tolerance, and a map of where. Useful to check that a preview and a server render agree, or what a new version changed. <strong>Nothing is uploaded.</strong></p>
+
+  <div class="row">
+    <div>
+      <label for="a">First image</label>
+      <input id="a" type="file" accept="image/*" />
+    </div>
+    <div>
+      <label for="b">Second image</label>
+      <input id="b" type="file" accept="image/*" />
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label for="levels">Tolerance (8-bit levels) <span id="levels-value">2</span></label>
+      <input id="levels" type="range" min="0" max="32" step="1" value="2" />
+    </div>
+    <div>
+      <label for="allowed">Pixels allowed beyond it (%)</label>
+      <input id="allowed" type="number" min="0" max="100" step="0.01" value="0" />
+    </div>
+  </div>
+
+  <p id="verdict"></p>
+  <table id="stats" hidden></table>
+  <div class="compare compare-3">
+    <figure><canvas id="first" width="1" height="1"></canvas><figcaption>First</figcaption></figure>
+    <figure><canvas id="second" width="1" height="1"></canvas><figcaption>Second</figcaption></figure>
+    <figure><canvas id="map" width="1" height="1"></canvas><figcaption>Where they differ: <span class="bad">red</span> beyond the tolerance, blue within it</figcaption></figure>
+  </div>
+
+  <h2>The same in your code</h2>
+  <p>rullino's own promise is stated in linear light, per filter: see the <a href="https://github.com/Stocastico/rullino/blob/main/docs/parity.md">parity table</a>. To check two renders of your own in a test:</p>
+  <pre id="code">import { compareImages, decodeSrgb8 } from '@rullino/core';
+
+// a and b: 8-bit RGBA pixels of one size (ImageData, or a decoder's output)
+const lin = (img) => decodeSrgb8(img.data, img.width, img.height);
+const { pass, worst, outliers } = compareImages(lin(a), lin(b), { abs: 4e-3, rel: 4e-3 });</pre>
+</main>
+<script type="module" src="../src/compare/main.ts"></script>
+</body>
+</html>

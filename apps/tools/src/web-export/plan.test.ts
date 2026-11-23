@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseEdit } from '@rullino/core';
 import { filters } from '@rullino/filters';
-import { outputName, webExportEdit } from './plan';
+import { webExportEdit } from './plan';
 
 describe('webExportEdit', () => {
   it('is one document: a linear-light resize, then sharpening at the final size, then the encoding', () => {
@@ -26,22 +26,5 @@ describe('webExportEdit', () => {
   it('rejects a long side that is not a positive whole number', () => {
     expect(() => webExportEdit({ longSide: 0, sharpen: 0, format: 'jpeg' })).toThrow(/long side/i);
     expect(() => webExportEdit({ longSide: 12.5, sharpen: 0, format: 'jpeg' })).toThrow(/long side/i);
-  });
-});
-
-describe('outputName', () => {
-  it('keeps the name and gives it the extension of the format', () => {
-    const taken = new Set<string>();
-    expect(outputName('IMG_0001.HEIC', 'jpeg', taken)).toBe('IMG_0001.jpg');
-    expect(outputName('beach.png', 'webp', taken)).toBe('beach.webp');
-    expect(outputName('no-extension', 'png', taken)).toBe('no-extension.png');
-  });
-
-  it('never gives two photos the same name', () => {
-    const taken = new Set<string>();
-    expect(outputName('a.jpg', 'jpeg', taken)).toBe('a.jpg');
-    expect(outputName('a.png', 'jpeg', taken)).toBe('a-2.jpg');
-    expect(outputName('a.jpeg', 'jpeg', taken)).toBe('a-3.jpg');
-    expect(outputName('A.jpg', 'jpeg', taken)).toBe('A-4.jpg'); // a.jpg, a-2.jpg and a-3.jpg are taken without case (macOS, Windows)
   });
 });

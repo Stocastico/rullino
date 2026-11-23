@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "rullino tools: web pages that each do one job on the user's machine with the rullino library (nothing is uploaded) and show the same in code. Deployed next to the playground (…/tools/).",
+  "description": "rullino tools: web pages that each do one job on the user's machine with the rullino library (nothing is uploaded) and show the same in code. Deployed next to the playground (\u2026/tools/).",
   "scripts": {
     "build": "vite build",
     "dev": "vite",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*",
+    "@rullino/presets": "workspace:*",
     "@rullino/web": "workspace:*"
   },
   "devDependencies": {

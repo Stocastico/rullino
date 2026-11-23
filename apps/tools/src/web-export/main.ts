@@ -1,7 +1,9 @@
+import { registerOffline } from '../offline';
 import { encodeImage, type LinearImage } from '@rullino/core';
 import { createRenderer, type Renderer } from '@rullino/web';
-import { zipStore } from '../zip';
-import { outputName, webExportEdit, type WebExportOptions, type WebFormat } from './plan';
+import { outputName } from '../names';
+import { decodeFile, downloadLink, kb, whereItRan, type OutputFile } from '../page';
+import { webExportEdit, type WebExportOptions, type WebFormat } from './plan';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const files = $<HTMLInputElement>('files');
@@ -15,7 +17,6 @@ const results = $('results');
 const code = $('code');
 
 let renderer: Promise<Renderer> | undefined;
-let downloadUrl: string | undefined;
 
 function options(): WebExportOptions {
   const side = longSide.value.trim();
@@ -49,18 +50,6 @@ export async function webReady(pixels: ImageData): Promise<Blob> {
   }
 }
 
-async function decode(file: File): Promise<ImageData> {
-  // createImageBitmap applies the EXIF orientation, so portrait photos stay upright.
-  const bitmap = await createImageBitmap(file, { premultiplyAlpha: 'none', colorSpaceConversion: 'default' });
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-  const g = canvas.getContext('2d')!;
-  g.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return g.getImageData(0, 0, canvas.width, canvas.height);
-}
-
-const kb = (bytes: number) => `${Math.max(1, Math.round(bytes / 1024))} KB`;
-
 async function run() {
   const list = [...(files.files ?? [])];
   if (!list.length) return;
@@ -72,13 +61,13 @@ async function run() {
     return;
   }
   exportButton.disabled = true;
+  for (const old of results.querySelectorAll<HTMLAnchorElement>('#download')) URL.revokeObjectURL(old.href);
   results.replaceChildren();
-  if (downloadUrl) URL.revokeObjectURL(downloadUrl);
   delete status.dataset.done;
   const r = await (renderer ??= createRenderer());
-  const where = r.backend === 'gpu' ? 'on this device’s GPU' : `on this device’s CPU (${r.reason ?? 'no WebGPU'})`;
+  const where = whereItRan(r);
   const taken = new Set<string>();
-  const out: { name: string; data: Uint8Array }[] = [];
+  const out: OutputFile[] = [];
   const table = document.createElement('table');
   table.innerHTML = '<tr><th>Photo</th><th>Size</th><th>Exported</th></tr>';
   results.append(table);
@@ -88,7 +77,7 @@ async function run() {
     const row = table.insertRow();
     row.insertCell().textContent = file.name;
     try {
-      const pixels = await decode(file);
+      const pixels = await decodeFile(file);
       const sharp: LinearImage = await r.apply(pixels, edit);
       const blob = await encodeImage(sharp, edit.output);
       const name = outputName(file.name, edit.output.format, taken);
@@ -102,18 +91,7 @@ async function run() {
     }
   }
   const seconds = ((performance.now() - t0) / 1000).toFixed(1);
-  if (out.length) {
-    const single = out.length === 1 ? out[0]! : undefined;
-    const blob = single ? new Blob([single.data as BlobPart]) : new Blob([zipStore(out) as BlobPart], { type: 'application/zip' });
-    downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = single ? single.name : 'web-ready.zip';
-    a.id = 'download';
-    a.className = 'download';
-    a.textContent = single ? `Download ${single.name}` : `Download ${out.length} photos (zip, ${kb(blob.size)})`;
-    results.append(a);
-  }
+  if (out.length) downloadLink(results, out, 'web-ready.zip');
   const failed = list.length - out.length;
   status.textContent = `${out.length} of ${list.length} exported ${where} in ${seconds} s${failed ? `; ${failed} failed (see the table)` : ''}. Nothing left this device.`;
   status.dataset.done = String(out.length);
@@ -126,3 +104,4 @@ files.addEventListener('change', () => {
 for (const el of [longSide, format, quality, sharpen]) el.addEventListener('input', showCode);
 exportButton.addEventListener('click', () => void run());
 showCode();
+registerOffline();

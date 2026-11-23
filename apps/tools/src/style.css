@@ -24,3 +24,14 @@ input[type=range] { width: 100%; max-width: 20rem; }
 .card strong { display: block; color: var(--fg); }
 a { color: var(--accent); }
 .download { display: inline-block; margin-top: .5rem; }
+.previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; }
+figure { margin: 0; }
+figure canvas { display: inline-block; width: 50%; height: auto; vertical-align: top; }
+figcaption { font-size: .8rem; color: var(--muted); }
+textarea { width: 100%; font: .85rem/1.4 ui-monospace, monospace; padding: .5rem; border-radius: .4rem; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+label.inline { display: inline-flex; gap: .4rem; align-items: center; margin: 0; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 1rem 0; }
+.compare canvas { width: 100%; height: auto; display: block; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+input[type=text] { font: inherit; padding: .4rem .5rem; border-radius: .4rem; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+.compare-3 { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+#verdict { font-weight: 600; }
