@@ -11,6 +11,10 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
+## [0.8.0]
+
+Foundations for 1.0: the edit document becomes a graph (version 3), the GPU renders images larger than a texture and within a memory budget, the parsers and planners are fuzzed, `@rullino/web` is tested in Firefox and WebKit, and rullino tools has four pages that work offline. Documents written by 0.8 are version 3, which 0.7 cannot read.
+
 ### Added
 - **core**: edit document version 3, a graph of named inputs and nodes (`chain`, `mix`, `resize`; [RFC](docs/design/edit-document-v3.md)): `parseEdit` reads every version (nodes in any order, cycles and unknown names rejected with a message that names them), `migrateEdit` lifts v1 / v2 to it, and `edit.schema.json` describes v2 and v3. `applyEdit` (and `applyEditPixels`) render them on the GPU and on the CPU: one source for a one-input document or a record by input name, `scale` per input, the CPU executor (`cpu`) called once per chain node; version 2 documents render bit for bit as before. `@rullino/web` and `@rullino/node` (`apply`, `pixels`, `render`, band workers and worker threads included) and the `rullino` command render version 3 documents with one input; `parseChain` reads a version 3 document that is one chain on one input (and says to use `parseEdit` for a real graph); `konvaFilter` takes a one-chain version 3 document and refuses a graph by name. 
 - **core**: tiled GPU rendering (#176). `applyEdit` / `applyEditPixels` on the GPU render an image larger than the device's largest texture in tiles, and `memoryBudget` (bytes) tiles any render whose working textures would exceed it; the result is the untiled one bit for bit, global filters included (equalize, clahe and otsu add their statistic over the tiles). `onTiling` reports the tile side. `@rullino/web` and `@rullino/node` take `createRenderer({ memoryBudget })`, which also caps the idle texture pool at half the budget. `pnpm test:large` renders a 200 MP image on a software GPU within 256 MB.
