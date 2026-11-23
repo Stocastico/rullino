@@ -1,6 +1,6 @@
 // The property tests (`*.property.test.ts`) with many more runs than in `pnpm test`: `pnpm test:fuzz`
-// (RULLINO_FUZZ_RUNS, default 20 000; a seed to replay a failure: RULLINO_FUZZ_SEED). The CI fuzz job
-// runs it on every pull request and, with more runs, every week. New fuzz targets (the decoders of
+// (RULLINO_FUZZ_RUNS, default 20 000; a seed to replay a failure: RULLINO_FUZZ_SEED). The CI fuzz
+// workflow runs it every week and by hand. New fuzz targets (the decoders of
 // 0.9) are property tests too: name them `*.property.test.ts` and they run here.
 import { execFileSync } from 'node:child_process';
 
