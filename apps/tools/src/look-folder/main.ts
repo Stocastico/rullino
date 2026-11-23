@@ -1,3 +1,4 @@
+import { registerOffline } from '../offline';
 import { encodeImage, type EditDocument } from '@rullino/core';
 import { looks } from '@rullino/presets';
 import { createRenderer, type Renderer } from '@rullino/web';
@@ -190,3 +191,4 @@ cancelButton.addEventListener('click', () => {
 });
 lookSelect.value = 'warm';
 refresh();
+registerOffline();

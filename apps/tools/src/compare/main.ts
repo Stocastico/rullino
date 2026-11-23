@@ -1,3 +1,4 @@
+import { registerOffline } from '../offline';
 import { decodeFile } from '../page';
 import { diffImages } from './diff';
 
@@ -60,3 +61,4 @@ for (const key of ['a', 'b'] as const)
   });
 for (const id of ['levels', 'allowed']) $(id).addEventListener('input', update);
 update();
+registerOffline();

@@ -3,7 +3,7 @@
 // long side 100, PNG; the downloaded zip must hold both, each at the expected size and with no chunk
 // but IHDR / IDAT / IEND (no metadata). Apply a look to a folder: previews, a bad document, the export
 // (Noir must come back grey) and cancel. LUT maker: saturation −1 makes the preview and the .cube grey.
-// Compare two renders: identical, one pixel off, two sizes.
+// Compare two renders: identical, one pixel off, two sizes. Offline: every page with the network off.
 // Fails on a console error, a failed request or a 404.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -15,7 +15,7 @@ import { launchOptions } from '../../../scripts/browser-launch.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const PREFIX = '/sites/rullino/tools/';
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const failures = [];
 if (!existsSync(join(dist, 'index.html'))) throw new Error('dist/ does not exist: run pnpm build first');
 
@@ -249,6 +249,38 @@ try {
   await page.setInputFiles('#b', { name: 'b.png', mimeType: 'image/png', buffer: png(49, 30) });
   [v, said] = await verdict('error');
   if (v !== 'error' || !said.includes('50×30 and 49×30')) failures.push(`compare: two sizes gave "${said}"`);
+
+  // Offline: once the service worker has cached the build, every page opens with the network off and
+  // the LUT maker still renders.
+  const context = await browser.newContext();
+  const off = await context.newPage();
+  off.on('pageerror', (e) => failures.push(`offline: page error: ${e.message}`));
+  await off.goto(base);
+  const controlled = await off.evaluate(() =>
+    Promise.race([
+      (async () => {
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) await new Promise((r) => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
+        return true;
+      })(),
+      new Promise((r) => setTimeout(() => r(false), 30000)),
+    ]),
+  );
+  if (!controlled) failures.push('offline: no service worker took control of the page within 30 s');
+  await context.setOffline(true);
+  for (const path of ['', 'web-export/', 'look-folder/', 'lut-maker/', 'compare/']) {
+    try {
+      await off.goto(`${base}${path}`);
+      const h1 = await off.textContent('h1');
+      if (!h1) failures.push(`offline: ${path || 'the hub'} has no title`);
+    } catch (e) {
+      failures.push(`offline: ${path || 'the hub'} did not open: ${e.message.split('\n')[0]}`);
+    }
+  }
+  await off.goto(`${base}lut-maker/`).catch(() => {});
+  await off.setInputFiles('#photo', { name: 'colour.png', mimeType: 'image/png', buffer: png(80, 50) }).catch(() => {});
+  await off.waitForFunction(() => Number(document.getElementById('status')?.dataset.frame ?? 0) > 0, null, { timeout: 120000 }).catch(() => failures.push('offline: the LUT maker did not render a preview'));
+  await context.close();
 } finally {
   await browser.close();
   server.close();

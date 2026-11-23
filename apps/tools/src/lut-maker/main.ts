@@ -1,3 +1,4 @@
+import { registerOffline } from '../offline';
 import { parseCube, type Lut } from '@rullino/core';
 import { looks, resolveLookLut } from '@rullino/presets';
 import { createRenderer, type Renderer } from '@rullino/web';
@@ -101,3 +102,4 @@ $('reset').addEventListener('click', () => {
 });
 for (const el of [lookSelect, ...inputs.values(), $('size'), $('title')]) el.addEventListener('input', () => void update());
 void update();
+registerOffline();

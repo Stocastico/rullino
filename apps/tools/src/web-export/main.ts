@@ -1,3 +1,4 @@
+import { registerOffline } from '../offline';
 import { encodeImage, type LinearImage } from '@rullino/core';
 import { createRenderer, type Renderer } from '@rullino/web';
 import { outputName } from '../names';
@@ -103,3 +104,4 @@ files.addEventListener('change', () => {
 for (const el of [longSide, format, quality, sharpen]) el.addEventListener('input', showCode);
 exportButton.addEventListener('click', () => void run());
 showCode();
+registerOffline();

@@ -6,6 +6,9 @@
   <title>rullino tools</title>
   <meta name="description" content="Photo tools that run in your browser: nothing is uploaded. Each one does one job and shows the same in code with the rullino library." />
   <link rel="stylesheet" href="./src/style.css" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#2b59c3" />
 </head>
 <body>
 <main>
@@ -17,5 +20,6 @@
   <a class="card" href="./compare/"><strong>Compare two renders</strong>Two images in: the largest difference, how many pixels go beyond a tolerance and a map of where. Check that a preview and a server render agree.</a>
   <p>More tools are on the way. The <a href="../">playground</a> is the full workspace.</p>
 </main>
+<script type="module" src="./src/hub.ts"></script>
 </body>
 </html>
