@@ -14,6 +14,7 @@ export default defineConfig({
         'web-export': fileURLToPath(new URL('./web-export/index.html', import.meta.url)),
         'look-folder': fileURLToPath(new URL('./look-folder/index.html', import.meta.url)),
         'lut-maker': fileURLToPath(new URL('./lut-maker/index.html', import.meta.url)),
+        compare: fileURLToPath(new URL('./compare/index.html', import.meta.url)),
       },
     },
   },

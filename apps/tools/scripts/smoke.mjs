@@ -3,6 +3,7 @@
 // long side 100, PNG; the downloaded zip must hold both, each at the expected size and with no chunk
 // but IHDR / IDAT / IEND (no metadata). Apply a look to a folder: previews, a bad document, the export
 // (Noir must come back grey) and cancel. LUT maker: saturation −1 makes the preview and the .cube grey.
+// Compare two renders: identical, one pixel off, two sizes.
 // Fails on a console error, a failed request or a 404.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -19,7 +20,7 @@ const failures = [];
 if (!existsSync(join(dist, 'index.html'))) throw new Error('dist/ does not exist: run pnpm build first');
 
 /** An RGB PNG with a gradient, written by hand (zlib is built into Node). */
-function png(w, h) {
+function png(w, h, poke) {
   const raw = Buffer.alloc((w * 3 + 1) * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
@@ -28,6 +29,7 @@ function png(w, h) {
       raw[i + 1] = (y * 255) / h;
       raw[i + 2] = 128;
     }
+  if (poke) raw[poke.y * (w * 3 + 1) + 1 + poke.x * 3] += poke.by;
   const chunk = (type, data) => {
     const b = Buffer.alloc(12 + data.length);
     b.writeUInt32BE(data.length, 0);
@@ -221,6 +223,32 @@ try {
   const rows = text.split('\n').filter((l) => /^[\d.-]+ [\d.-]+ [\d.-]+$/.test(l)).map((l) => l.split(' ').map(Number));
   if (rows.length !== 17 ** 3) failures.push(`LUT maker: ${rows.length} entries, expected ${17 ** 3}`);
   if (rows.some(([r, g, b]) => Math.abs(r - g) > 1e-3 || Math.abs(g - b) > 1e-3)) failures.push('LUT maker: the .cube is not grey at saturation −1');
+
+  // Compare two renders: identical, one pixel off by 10 levels (differs at 2, agrees at 10, red in the
+  // map at that pixel), two sizes (said so).
+  await page.goto(base);
+  await page.click('a[href="./compare/"]');
+  await page.waitForURL(/compare/);
+  const verdict = async (want) => {
+    await page.waitForFunction((w) => document.getElementById('verdict').dataset.verdict === w, want, { timeout: 30000 }).catch(() => {});
+    return [await page.getAttribute('#verdict', 'data-verdict'), (await page.textContent('#verdict')) ?? ''];
+  };
+  await page.setInputFiles('#a', { name: 'a.png', mimeType: 'image/png', buffer: png(50, 30) });
+  await page.setInputFiles('#b', { name: 'b.png', mimeType: 'image/png', buffer: png(50, 30) });
+  let [v, said] = await verdict('agree');
+  if (v !== 'agree' || !said.startsWith('Identical')) failures.push(`compare: identical images gave "${said}"`);
+  await page.setInputFiles('#b', { name: 'b.png', mimeType: 'image/png', buffer: png(50, 30, { x: 7, y: 4, by: 10 }) });
+  [v, said] = await verdict('differ');
+  if (v !== 'differ' || !said.includes('1 pixel ')) failures.push(`compare: one pixel off by 10 gave "${said}"`);
+  const red = await page.$eval('#map', (c) => [...c.getContext('2d').getImageData(7, 4, 1, 1).data]);
+  const other = await page.$eval('#map', (c) => [...c.getContext('2d').getImageData(8, 4, 1, 1).data]);
+  if (!(red[0] > 200 && red[1] < 80) || other[0] > 200) failures.push(`compare: the map is ${red} at the pixel and ${other} next to it`);
+  await page.$eval('#levels', (el) => { el.value = '10'; el.dispatchEvent(new Event('input')); });
+  [v] = await verdict('agree');
+  if (v !== 'agree') failures.push('compare: a tolerance of 10 levels does not accept a difference of 10');
+  await page.setInputFiles('#b', { name: 'b.png', mimeType: 'image/png', buffer: png(49, 30) });
+  [v, said] = await verdict('error');
+  if (v !== 'error' || !said.includes('50×30 and 49×30')) failures.push(`compare: two sizes gave "${said}"`);
 } finally {
   await browser.close();
   server.close();
