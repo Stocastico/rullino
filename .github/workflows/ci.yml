@@ -77,6 +77,29 @@ jobs:
       # timings mean nothing; real numbers come from real machines).
       - run: pnpm bench:web --headless --strict --sizes 320x240 --runs 1
 
+  # Firefox and WebKit (#177): @rullino/web's CPU path and backend choice (`pnpm test:engines`) and
+  # the built playground without WebGPU. Playwright's Linux builds expose no WebGPU adapter, so
+  # the GPU path stays covered by the Chromium jobs. Not a required check (yet).
+  engines:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps firefox webkit
+      - run: pnpm test:engines
+        timeout-minutes: 10
+      - run: pnpm build
+      - run: pnpm test:e2e:cpu
+        env:
+          RULLINO_E2E_BROWSERS: firefox,webkit
+        timeout-minutes: 10
+
   # The ML models themselves (SlimSAM, MI-GAN, Depth Anything on ONNX Runtime's WASM backend) and the
   # playground's Object, Remove object and Lens blur tools. A separate job: it downloads 69 MB from Hugging Face (cached by
   # the pinned revisions) and takes a few minutes of CPU inference.

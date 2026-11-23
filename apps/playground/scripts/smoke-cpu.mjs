@@ -1,20 +1,39 @@
 // The built playground in a browser WITHOUT WebGPU (Firefox / Safari today): it must say it runs on
 // the CPU, render, react to controls, stay responsive while rendering and export. Fails on any page error.
+// RULLINO_E2E_BROWSERS=chromium,firefox,webkit picks the browsers (default chromium; Playwright's
+// Firefox and WebKit builds have no WebGPU on Linux, Chromium runs without --enable-unsafe-webgpu).
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
+import * as playwright from 'playwright';
 import { preview } from 'vite';
 
 const server = await preview({ root: fileURLToPath(new URL('..', import.meta.url)), preview: { port: 0, strictPort: false } });
 const url = server.resolvedUrls.local[0];
-// No `--enable-unsafe-webgpu`: `requestAdapter()` finds nothing.
-const browser = await chromium.launch({ args: ['--disable-gpu'] });
+const names = (process.env.RULLINO_E2E_BROWSERS ?? 'chromium').split(',').map((s) => s.trim()).filter(Boolean);
 const failures = [];
-const check = (ok, msg) => ok || failures.push(msg);
 
 try {
+  for (const name of names) {
+    const type = playwright[name];
+    if (!type?.launch) throw new Error(`unknown browser "${name}" (chromium, firefox or webkit)`);
+    // No `--enable-unsafe-webgpu`: `requestAdapter()` finds nothing.
+    const browser = await type.launch(name === 'chromium' ? { args: ['--disable-gpu'] } : {});
+    const before = failures.length;
+    try {
+      await run(browser, name);
+    } finally {
+      await browser.close();
+    }
+    console.log(`smoke-cpu (${name}): ${failures.length === before ? 'ok' : 'FAILED'}`);
+  }
+} finally {
+  await server.close();
+}
+
+async function run(browser, name) {
+  const check = (ok, msg) => ok || failures.push(`${name}: ${msg}`);
   const page = await browser.newPage();
-  page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
-  page.on('console', (m) => m.type() === 'error' && failures.push(`console error: ${m.text()}`));
+  page.on('pageerror', (e) => failures.push(`${name}: page error: ${e.message}`));
+  page.on('console', (m) => m.type() === 'error' && failures.push(`${name}: console error: ${m.text()}`));
   const frame = () => page.$eval('#status', (s) => Number(s.dataset.frame ?? 0));
   const nextFrame = async (action, timeout = 60000) => {
     const n = await frame();
@@ -53,9 +72,6 @@ try {
 
   const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#export')]);
   check(download.suggestedFilename().endsWith('.png'), `export file name: ${download.suggestedFilename()}`);
-} finally {
-  await browser.close();
-  await server.close();
 }
 if (failures.length) {
   console.error(failures.map((f) => `FAIL ${f}`).join('\n'));
