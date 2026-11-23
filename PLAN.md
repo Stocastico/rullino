@@ -199,7 +199,7 @@ Reality checks against the original proposal (measured or verified 26 Oct):
 4. ~~Docs by job~~ (four guides, done 29 Oct) and ~~the migration notes~~ (30 Oct). Phase 2 is then only the optional adapters and examples below.
 5. Fabric only if Konva gets interest (watch npm downloads / issues of `@rullino/konva`).
 
-**Parity on real GPUs (30 Oct, open).** The published tolerances are verified on software GPUs only. On an RTX 40 (Chrome, Windows) 25 of 936 browser tests failed (`canny`, `inpaint`, `sketch`, `kuwahara`, the 8-bit sRGB decode; see the Trap in CLAUDE.md). `pnpm report:parity` measures every case on the machine's own GPU; next: run it on the RTX, decide per filter (wider tolerance with a note in `docs/parity.md`, change of the reference, or outliers for hard decisions) and rerun on a second GPU if one is at hand. Until then "within the published tolerance" is a claim about software adapters.
+**Parity on real GPUs (30 Oct, open).** The published tolerances are verified on software GPUs only. On an RTX 40 (Chrome, Windows) 25 of 936 browser tests failed (`canny`, `inpaint`, `sketch`, `kuwahara`, the 8-bit sRGB decode; see the Trap in CLAUDE.md). `pnpm report:parity` measures every case on the machine's own GPU; next: run it on the RTX, decide per filter (wider tolerance with a note in `docs/parity.md`, change of the reference, or outliers for hard decisions) and rerun on a second GPU if one is at hand. Until then "within the published tolerance" is a claim about software adapters. (Update 15 Nov: the RTX 40 is covered by `hardwareTolerance`, an Apple M1 in Chrome and Safari fits inside it at 70–80% of the limits, and an iPhone and an Android phone (Arm Mali) stay within the software tolerances; still missing: Firefox, Intel / AMD GPUs.)
 
 Open issues to keep in view: [#127](https://github.com/Stocastico/rullino/issues/127) CPU fast paths for the remaining slow filters (round 2 so far: OKLab adjustments, bilateral, Kuwahara, inpaint, ascii; split from #95), [#128](https://github.com/Stocastico/rullino/issues/128) tiled CPU execution across workers (done 3 Nov: `threads` in Node and the browser, two-phase global filters, web default 4 workers; Node stays at 1), [#96](https://github.com/Stocastico/rullino/issues/96) playground without WebGPU (done 11 Nov: CPU fallback in `@rullino/web`'s worker, `pnpm test:e2e:cpu`; still reduced to 1024 px and no ML on WebGPU-less machines is untested), [#100](https://github.com/Stocastico/rullino/issues/100) the unexplained 28-minute CI stall (timeouts now make it fail fast; the 3.8 s cold-shader cause of the release failures is fixed). Release routine: `node scripts/set-version.mjs X.Y.Z` + CHANGELOG section in a PR, merge, the maintainer pushes the tag (checklist at the top of CHANGELOG.md); npm can take minutes to show a package the workflow already published.
 
@@ -211,7 +211,7 @@ Open issues to keep in view: [#127](https://github.com/Stocastico/rullino/issues
 ### Before going public (checklist of 4 Nov, after the docs and debug session)
 
 Done in that session: integrator documentation (`docs/getting-started.md`, `concepts.md`, `edit-document.md`, `troubleshooting.md`, a documentation index, a root README that starts from the edit document), three bugs fixed (node JPEG / WebP quality 0, konva preview of a cropped edit and cached failure, web renderer after `destroy()`), a test over every filter at 1×1 / 1×N / N×1 sizes, a test that renders the JSON examples of the format reference. Open, in the order that matters for a launch:
-1. **0.7.0** with the above (CHANGELOG `[Unreleased]` is ready; `node scripts/set-version.mjs 0.7.0`, merge, the maintainer pushes the tag).
+1. **0.7.0** with the above: ~~version and CHANGELOG merged~~ (11 Nov, #158); the maintainer pushes the tag. Merged since, for the next release: the playground's CPU fallback in a worker (#160, closes #96), the `rullino` command and `docs/benchmarks.md` (#161).
 2. **Real-hardware claim**: the tolerances were verified on software GPUs and one RTX 40. Run `pnpm report:parity` on a non-NVIDIA GPU (Apple silicon, Intel or AMD) and open the playground and `@rullino/web` in Safari and Firefox; Firefox / WebKit CI does not exist. A launch post that says "within the published tolerance" must not be refuted by the first reader on a Mac.
 3. ~~**Benchmarks as a page**~~ (done 11 Nov: [`docs/benchmarks.md`](docs/benchmarks.md), machine, code version and losses included).
 4. **GitHub housekeeping**: close #77 and #84 (done), tick the epics #65 / #66, add `good first issue` labels, enable Discussions, set the repository description, topics and a social preview image.
@@ -278,6 +278,23 @@ The split view exists. On top of it:
 6. Then decision 2 above (embeddable `<rullino-editor>`), with what 1–3 taught us about how editors embed rullino.
 
 Sources (4 Nov 2026): img.ly pricing page and Vendr's listing; Pintura store; Filerobot's GitHub README (MIT, react-konva); Magnific's image-editor docs; GitHub pages of CloakIMG, OpenReel Video, FreeCut; web LUT makers (steveseguin, o-l-l-i).
+
+## 8. Road to 1.0 (accepted 15 Nov 2026)
+
+The maintainer's direction (15 Nov): expand rullino beyond filters, everything on the user's machine (browser, Node, CLI; anything off-device free or nearly free to host), no generative AI, visibility in parallel. Two products on one engine: **the library** (the open photo-development engine: one edit document, previewed in the browser, rendered the same in Node and from the CLI) and **rullino tools** (web pages that each do one job locally and end with "the same in your code"). A market check the same day found a dozen free local browser RAW editors already (LightCraft, Safelight, OpticRaw, photopico…), so the web part is the library's front door, not another general editor. Full proposal: [docs/design/road-to-1.0.md](docs/design/road-to-1.0.md); tracking [#165](https://github.com/Stocastico/rullino/issues/165).
+
+| Release | Theme | Epic |
+|---|---|---|
+| 0.8 | Foundations (v3 graph #174, tiles, hardening) + rullino tools step 1 + releases | [#166](https://github.com/Stocastico/rullino/issues/166) |
+| 0.9 | Codecs, metadata, colour management (RFC #181), HDR | [#167](https://github.com/Stocastico/rullino/issues/167) |
+| 0.10 | `<rullino-editor>` + interop (Lightroom XMP, `.cube` / `.3dl` / `.acv`); adoption gate before RAW | [#206](https://github.com/Stocastico/rullino/issues/206) |
+| 0.11 | RAW (DNG own, proprietary formats through an optional LibRaw adapter) | [#168](https://github.com/Stocastico/rullino/issues/168) |
+| 0.12 | Smart masks (non-generative), pyramids (exposure fusion, focus stacking), alignment | [#170](https://github.com/Stocastico/rullino/issues/170) |
+| 0.13 | Plugins (RFC #196), gallery, CLI++ and MCP, overlay node | [#171](https://github.com/Stocastico/rullino/issues/171) |
+| 1.0 | Specification + conformance suite, semver promise | [#173](https://github.com/Stocastico/rullino/issues/173) |
+| after | Full composition, video, panorama | [#207](https://github.com/Stocastico/rullino/issues/207) |
+
+It supersedes the "no new filters / no full editor UI" limits of §6b and §6c; the rules of CLAUDE.md apply to all of it. The maintainer's answers (15 Nov): metadata kept by default with an option to strip them, short links through a free Cloudflare Worker, MIT for code and CC BY 4.0 for the spec text, the adoption gate before RAW (proposal §9).
 
 ## 7. Open decisions
 

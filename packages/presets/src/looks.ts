@@ -1,4 +1,4 @@
-import { serializeChain, type ChainDocument, type CurvePoints, type Lut, type Step } from '@rullino/core';
+import { serializeChain, type EditDocument, type CurvePoints, type Lut, type Step } from '@rullino/core';
 import { applyLut, contrast, curves, grain, grayscale, saturation, vibrance, vignette, whiteBalance } from '@rullino/filters';
 import { bakeLut } from './bake';
 
@@ -198,7 +198,7 @@ export function resolveLookLut(ref: string): Lut | undefined {
   return look && lookLut(look);
 }
 
-/** A look as an edit document (version 2): its steps, with the LUT by name. */
-export function lookEdit(look: Look, options: LookOptions = {}): ChainDocument {
+/** A look as an edit document (version 3, one chain): its steps, with the LUT by name. */
+export function lookEdit(look: Look, options: LookOptions = {}): EditDocument {
   return serializeChain(lookSteps(look, options), { lutRef: lookLutRef });
 }

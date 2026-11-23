@@ -1,9 +1,11 @@
+import { asParseError, ParseError } from './parse-error';
 import type { ExportOptions } from './encode';
 import type { Filter } from './filter';
 import { validateGeometry, type Geometry } from './geometry';
 import type { Lut } from './lut';
 import { createRasterMask, validateMask, type Mask } from './mask';
 import type { Step } from './pipeline/chain';
+import { EDIT_VERSION, parseEdit, type EditDocument } from './graph';
 import { resolveParams, type ParamSchema } from './params';
 
 // An edit as plain JSON: the chain, optionally its geometry and how to export the result. For share
@@ -56,9 +58,13 @@ export interface ParseOptions {
   readonly resolveLut?: (ref: string) => Lut | undefined;
 }
 
-export function serializeChain(steps: readonly Step[], options: SerializeOptions = {}): ChainDocument {
-  return {
-    version: CHAIN_VERSION,
+/**
+ * Writes a chain as an edit document: version 3, one input `main` and one chain node `edit` (the
+ * shape `migrateEdit` gives a v2 document, so both render the same). Read back with `parseChain`
+ * or `parseEdit`.
+ */
+export function serializeChain(steps: readonly Step[], options: SerializeOptions = {}): EditDocument {
+  const chain = {
     steps: steps.map((step) => {
       const params: Record<string, Json> = {};
       const values = resolveParams(step.filter.params, (step.params ?? {}) as never) as Record<string, unknown>;
@@ -80,8 +86,12 @@ export function serializeChain(steps: readonly Step[], options: SerializeOptions
         ...(step.mask ? { mask: maskDocument(step.mask) } : {}),
       };
     }),
-    ...(options.geometry ? { geometry: options.geometry } : {}),
-    ...(options.output ? { output: parseOutput(options.output) } : {}),
+  };
+  return {
+    version: EDIT_VERSION,
+    inputs: { main: {} },
+    nodes: [{ id: 'edit', from: 'main', steps: chain.steps, ...(options.geometry ? { geometry: options.geometry } : {}) }],
+    ...(options.output && Object.keys(options.output).length > 0 ? { output: parseOutput(options.output) } : {}),
   };
 }
 
@@ -90,40 +100,35 @@ export function serializeChain(steps: readonly Step[], options: SerializeOptions
  * Version 1 is version 2 without `output`. Does not validate the steps: {@link parseChain} does.
  */
 export function migrateChain(doc: unknown): ChainDocument {
-  if (!isObject(doc)) throw new Error('chain: not an object');
+  if (!isObject(doc)) throw new ParseError('chain: not an object');
   if (doc.version === CHAIN_VERSION) return doc as unknown as ChainDocument;
   if (doc.version === 1) return { ...doc, version: CHAIN_VERSION } as unknown as ChainDocument;
-  throw new Error(`chain: unsupported version ${JSON.stringify(doc.version)}`);
+  throw new ParseError(`chain: unsupported version ${JSON.stringify(doc.version)}`);
 }
 
-/** Validates a document (e.g. parsed from a link) and turns it back into chain steps. */
+/**
+ * Validates a document (e.g. parsed from a link) and turns it back into chain steps. Reads versions
+ * 1 and 2, and version 3 documents that are one chain on one input (what `serializeChain` writes
+ * from 0.8 on); a real graph needs {@link parseEdit}.
+ */
 export function parseChain(input: unknown, options: ParseOptions): { steps: Step[]; geometry?: Geometry; output?: OutputSettings } {
+  if (isObject(input) && input.version === EDIT_VERSION) {
+    const graph = parseEdit(input, options);
+    const node = graph.nodes[0]!;
+    if (graph.nodes.length !== 1 || node.kind !== 'chain') {
+      const n = Array.isArray(input.nodes) ? input.nodes.length : graph.nodes.length;
+      throw new ParseError(`parseChain: this document is a graph (${n} nodes); use parseEdit`);
+    }
+    const { node: _, ...output } = graph.output;
+    return {
+      steps: [...node.steps],
+      ...(node.geometry !== undefined ? { geometry: node.geometry } : {}),
+      ...(Object.keys(output).length ? { output } : {}),
+    };
+  }
   const doc = migrateChain(input) as unknown as Record<string, unknown>;
-  if (!Array.isArray(doc.steps)) throw new Error('chain: steps must be an array');
-  const byId = new Map(options.filters.map((f) => [f.id, f]));
-  const steps = doc.steps.map((s: unknown, i): Step => {
-    if (!isObject(s) || typeof s.filter !== 'string') throw new Error(`chain step ${i}: missing filter id`);
-    const filter = byId.get(s.filter);
-    if (!filter) throw new Error(`chain step ${i}: unknown filter "${s.filter}"`);
-    const raw = s.params ?? {};
-    if (!isObject(raw)) throw new Error(`chain step ${i}: params must be an object`);
-    const params: Record<string, unknown> = {};
-    for (const [key, v] of Object.entries(raw)) {
-      if (filter.params[key]?.type === 'lut') {
-        const ref = isObject(v) && typeof v.ref === 'string' ? v.ref : undefined;
-        const lut = ref === undefined ? undefined : options.resolveLut?.(ref);
-        if (!lut) throw new Error(`chain step ${i} (${filter.id}): unknown LUT ${JSON.stringify(ref ?? v)}`);
-        params[key] = lut;
-      } else params[key] = v;
-    }
-    try {
-      resolveParams(filter.params, params as never);
-    } catch (e) {
-      throw new Error(`chain step ${i} (${filter.id}): ${(e as Error).message}`);
-    }
-    const mask = s.mask === undefined ? undefined : parseMask(s.mask);
-    return { filter, params, enabled: s.enabled !== false, ...(mask ? { mask } : {}) };
-  });
+  if (!Array.isArray(doc.steps)) throw new ParseError('chain: steps must be an array');
+  const steps = parseSteps(doc.steps, options, (i) => `chain step ${i}`);
   return {
     steps,
     ...(doc.geometry !== undefined ? { geometry: parseGeometry(doc.geometry) } : {}),
@@ -131,20 +136,48 @@ export function parseChain(input: unknown, options: ParseOptions): { steps: Step
   };
 }
 
+/** The steps of a document, validated; `where(i)` names step i in error messages. Shared with `parseEdit`. */
+export function parseSteps(raw: readonly unknown[], options: ParseOptions, where: (i: number) => string): Step[] {
+  const byId = new Map(options.filters.map((f) => [f.id, f]));
+  return raw.map((s: unknown, i): Step => {
+    if (!isObject(s) || typeof s.filter !== 'string') throw new ParseError(`${where(i)}: missing filter id`);
+    const filter = byId.get(s.filter);
+    if (!filter) throw new ParseError(`${where(i)}: unknown filter "${s.filter}"`);
+    const rawParams = s.params ?? {};
+    if (!isObject(rawParams)) throw new ParseError(`${where(i)}: params must be an object`);
+    const params: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(rawParams)) {
+      if (filter.params[key]?.type === 'lut') {
+        const ref = isObject(v) && typeof v.ref === 'string' ? v.ref : undefined;
+        const lut = ref === undefined ? undefined : options.resolveLut?.(ref);
+        if (!lut) throw new ParseError(`${where(i)} (${filter.id}): unknown LUT ${JSON.stringify(ref ?? v)}`);
+        params[key] = lut;
+      } else params[key] = v;
+    }
+    try {
+      resolveParams(filter.params, params as never);
+    } catch (e) {
+      throw new ParseError(`${where(i)} (${filter.id}): ${(e as Error).message}`);
+    }
+    const mask = s.mask === undefined ? undefined : parseMask(s.mask);
+    return { filter, params, enabled: s.enabled !== false, ...(mask ? { mask } : {}) };
+  });
+}
+
 const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide']);
 
-/** Validates output settings and rebuilds them from known fields. */
-function parseOutput(o: unknown): OutputSettings {
-  if (!isObject(o)) throw new Error('output: not an object');
-  for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key)) throw new Error(`output: unknown setting "${key}"`);
+/** Validates output settings and rebuilds them from known fields; `extra` keys are left to the caller (v3's `node`). */
+export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSettings {
+  if (!isObject(o)) throw new ParseError('output: not an object');
+  for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key) && !extra.includes(key)) throw new ParseError(`output: unknown setting "${key}"`);
   const { format, quality, bitDepth, background, longSide } = o;
-  if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new Error(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
-  if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new Error('output: quality must be a number in [0, 1]');
-  if (bitDepth !== undefined && bitDepth !== 8 && bitDepth !== 16) throw new Error('output: bitDepth must be 8 or 16');
-  if (bitDepth === 16 && (format ?? 'png') !== 'png') throw new Error('output: bitDepth 16 needs format png');
-  if (longSide !== undefined && !(Number.isInteger(longSide) && (longSide as number) >= 1)) throw new Error('output: longSide must be a positive integer');
+  if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new ParseError(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
+  if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new ParseError('output: quality must be a number in [0, 1]');
+  if (bitDepth !== undefined && bitDepth !== 8 && bitDepth !== 16) throw new ParseError('output: bitDepth must be 8 or 16');
+  if (bitDepth === 16 && (format ?? 'png') !== 'png') throw new ParseError('output: bitDepth 16 needs format png');
+  if (longSide !== undefined && !(Number.isInteger(longSide) && (longSide as number) >= 1)) throw new ParseError('output: longSide must be a positive integer');
   if (background !== undefined && !(Array.isArray(background) && background.length === 3 && background.every((c) => typeof c === 'number' && c >= 0 && c <= 1))) {
-    throw new Error('output: background must be [r, g, b] in [0, 1]');
+    throw new ParseError('output: background must be [r, g, b] in [0, 1]');
   }
   return {
     ...(format !== undefined ? { format } : {}),
@@ -155,7 +188,7 @@ function parseOutput(o: unknown): OutputSettings {
   };
 }
 
-function isObject(x: unknown): x is Record<string, unknown> {
+export function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
@@ -168,13 +201,13 @@ function maskDocument(m: Mask): MaskDocument {
 }
 
 const vec2 = (v: unknown): readonly [number, number] => {
-  if (!Array.isArray(v) || v.length !== 2 || !v.every((x) => typeof x === 'number')) throw new Error('mask: points must be [x, y] number pairs');
+  if (!Array.isArray(v) || v.length !== 2 || !v.every((x) => typeof x === 'number')) throw new ParseError('mask: points must be [x, y] number pairs');
   return [v[0] as number, v[1] as number];
 };
 
 /** Rebuilds a mask from known fields only, then validates it. */
-function parseMask(m: unknown): Mask {
-  if (!isObject(m)) throw new Error('mask: not an object');
+export function parseMask(m: unknown): Mask {
+  if (!isObject(m)) throw new ParseError('mask: not an object');
   const options = {
     ...(m.invert !== undefined ? { invert: m.invert === true } : {}),
     ...(m.opacity !== undefined ? { opacity: Number(m.opacity) } : {}),
@@ -189,22 +222,22 @@ function parseMask(m: unknown): Mask {
       break;
     case 'raster': {
       const { width, height, data } = m;
-      if (!Number.isInteger(width) || !Number.isInteger(height) || typeof data !== 'string') throw new Error('mask (raster): needs integer width, height and base64 data');
-      const bytes = fromBase64(data);
+      if (!Number.isInteger(width) || !Number.isInteger(height) || typeof data !== 'string') throw new ParseError('mask (raster): needs integer width, height and base64 data');
+      const bytes = asParseError('mask (raster)', () => fromBase64(data as string));
       const values = new Float32Array(bytes.length);
       for (let i = 0; i < bytes.length; i++) values[i] = bytes[i]! / 255;
-      mask = { kind: 'raster', raster: createRasterMask(width as number, height as number, values), ...options };
+      mask = { kind: 'raster', raster: asParseError('', () => createRasterMask(width as number, height as number, values)), ...options };
       break;
     }
     default:
-      throw new Error(`mask: unknown kind ${JSON.stringify(m.kind)}`);
+      throw new ParseError(`mask: unknown kind ${JSON.stringify(m.kind)}`);
   }
-  validateMask(mask);
+  asParseError('', () => validateMask(mask));
   return mask;
 }
 
-function parseGeometry(g: unknown): Geometry {
-  if (!isObject(g) || !isObject(g.crop)) throw new Error('geometry: not an object with a crop');
+export function parseGeometry(g: unknown): Geometry {
+  if (!isObject(g) || !isObject(g.crop)) throw new ParseError('geometry: not an object with a crop');
   const { x, y, width, height } = g.crop;
   const geometry: Geometry = {
     rotate: g.rotate as Geometry['rotate'],
@@ -215,13 +248,13 @@ function parseGeometry(g: unknown): Geometry {
     ...(g.perspective !== undefined
       ? {
           perspective: (() => {
-            if (!Array.isArray(g.perspective) || g.perspective.length !== 4) throw new Error('geometry: perspective needs 4 points');
+            if (!Array.isArray(g.perspective) || g.perspective.length !== 4) throw new ParseError('geometry: perspective needs 4 points');
             return g.perspective.map(vec2) as unknown as NonNullable<Geometry['perspective']>;
           })(),
         }
       : {}),
   };
-  validateGeometry(geometry);
+  asParseError('', () => validateGeometry(geometry));
   return geometry;
 }
 

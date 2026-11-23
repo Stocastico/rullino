@@ -28,6 +28,9 @@ const lutFilter = { id: 'lutty', label: 'LUT', kind: 'multipass', params: { lut:
 const patchFilter = { id: 'patchy', label: 'Patch', kind: 'multipass', params: { patch: { type: 'image', default: createImage(1, 1), label: 'Patch' } } } as unknown as Filter<any>;
 const filters = [gain, lutFilter, patchFilter];
 
+/** The steps of the one chain node serializeChain writes. */
+const stepsOf = (doc: { nodes: readonly unknown[] }) => (doc.nodes[0] as { steps: { params: unknown }[] }).steps;
+
 /** JSON round trip, as through a URL or a file. */
 const viaJson = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 
@@ -50,7 +53,7 @@ describe('serializeChain / parseChain', () => {
 
   it('stores only params that differ from the defaults (short links)', () => {
     const doc = serializeChain([{ filter: gain, params: { amount: 1, mode: 'hard' } }]);
-    expect(doc.steps[0]!.params).toEqual({ mode: 'hard' });
+    expect(stepsOf(doc)[0]!.params).toEqual({ mode: 'hard' });
   });
 
   it('round-trips the geometry', () => {
@@ -70,7 +73,7 @@ describe('serializeChain / parseChain', () => {
   it('stores LUTs by reference only', () => {
     const lut = identityLut(3);
     const doc = serializeChain([{ filter: lutFilter, params: { lut } }], { lutRef: (l) => (l === lut ? 'look:test' : undefined) });
-    expect(viaJson(doc).steps[0]!.params).toEqual({ lut: { ref: 'look:test' } });
+    expect(stepsOf(viaJson(doc))[0]!.params).toEqual({ lut: { ref: 'look:test' } });
     const back = parseChain(viaJson(doc), { filters, resolveLut: (ref) => (ref === 'look:test' ? lut : undefined) });
     expect(back.steps[0]!.params!.lut).toBe(lut);
   });
@@ -83,7 +86,7 @@ describe('serializeChain / parseChain', () => {
 
   it('refuses an image param (a patch cannot travel in a link) unless it is the default', () => {
     expect(() => serializeChain([{ filter: patchFilter, params: { patch: createImage(2, 2) } }])).toThrow(/image/);
-    expect(serializeChain([{ filter: patchFilter }]).steps[0]!.params).toEqual({});
+    expect(stepsOf(serializeChain([{ filter: patchFilter }]))[0]!.params).toEqual({});
     expect(() => parseChain({ version: 1, steps: [{ filter: 'patchy', params: { patch: { width: 1 } } }] }, { filters })).toThrow(/patch/);
   });
 
@@ -94,7 +97,7 @@ describe('serializeChain / parseChain', () => {
 
   it('rejects unknown filters, versions and invalid values with a useful message', () => {
     expect(() => parseChain({ version: 1, steps: [{ filter: 'nope', params: {} }] }, { filters })).toThrow(/nope/);
-    expect(() => parseChain({ version: 3, steps: [] }, { filters })).toThrow(/version/);
+    expect(() => parseChain({ version: 4, steps: [] }, { filters })).toThrow(/version/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: { amount: 'x' } }] }, { filters })).toThrow(/amount/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: { bogus: 1 } }] }, { filters })).toThrow(/bogus/);
     expect(() => parseChain({ version: 1, steps: [{ filter: 'gain', params: {}, mask: { kind: 'radial', center: [0, 0], radius: [0, 1], feather: 0 } }] }, { filters })).toThrow(/radius/);
@@ -104,12 +107,16 @@ describe('serializeChain / parseChain', () => {
 });
 
 describe('edit document v2', () => {
-  it('writes version 2 and round-trips the output settings', () => {
+  it('writes version 3 (one input, one chain node) and round-trips the output settings', () => {
     const output: OutputSettings = { format: 'jpeg', quality: 0.85, longSide: 2048, background: [1, 0.5, 0] };
-    const doc = viaJson(serializeChain([{ filter: gain, params: { amount: 2 } }], { output }));
+    const doc = viaJson(serializeChain([{ filter: gain, params: { amount: 2 } }], { output, geometry: IDENTITY_GEOMETRY }));
     expect(CHAIN_VERSION).toBe(2);
-    expect(doc.version).toBe(2);
-    expect(doc.output).toEqual(output);
+    expect(doc).toEqual({
+      version: 3,
+      inputs: { main: {} },
+      nodes: [{ id: 'edit', from: 'main', steps: [{ filter: 'gain', params: { amount: 2 } }], geometry: IDENTITY_GEOMETRY }],
+      output,
+    });
     expect(parseChain(doc, { filters }).output).toEqual(output);
     expect(parseChain(viaJson(serializeChain([])), { filters }).output).toBeUndefined();
     expect(serializeChain([])).not.toHaveProperty('output');
@@ -141,5 +148,16 @@ describe('edit document v2', () => {
     expect(parseChain(v1, { filters }).steps[0]!.params).toEqual({ amount: 2 });
     expect(() => migrateChain({ version: 0, steps: [] })).toThrow(/version/);
     expect(() => migrateChain('{}')).toThrow(/object/);
+  });
+
+  it('reads a version 3 document that is one chain on one input, like its v2 form', () => {
+    const v2 = { version: 2, geometry: { ...IDENTITY_GEOMETRY, rotate: 90 }, steps: [{ filter: 'gain', params: { amount: 2 } }], output: { format: 'jpeg', longSide: 300 } };
+    const v3 = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'look', from: 'photo', geometry: v2.geometry, steps: v2.steps }], output: { node: 'look', format: 'jpeg', longSide: 300 } };
+    expect(parseChain(v3, { filters })).toEqual(parseChain(v2, { filters }));
+  });
+
+  it('refuses a version 3 document that is a real graph, and says what to use', () => {
+    const graph = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'a', from: 'photo', steps: [] }, { id: 'b', kind: 'resize', from: 'a', scale: 0.5 }] };
+    expect(() => parseChain(graph, { filters })).toThrow(/parseChain: this document is a graph \(2 nodes\); use parseEdit/);
   });
 });

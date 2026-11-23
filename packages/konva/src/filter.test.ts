@@ -93,6 +93,13 @@ describe('konvaFilter', () => {
     expect(Array.from(img.data)).not.toEqual(Array.from(before.data));
   });
 
+  it('takes a version 3 document that is one colour chain, and refuses a graph with a message', () => {
+    const chain = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'grade', from: 'photo', steps: [{ filter: 'exposure', params: { ev: 0.5 } }] }] };
+    expect(() => konvaFilter(chain)).not.toThrow();
+    const graph = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'a', from: 'photo', steps: [] }, { id: 'b', kind: 'resize', from: 'a', scale: 0.5 }] };
+    expect(() => konvaFilter(graph)).toThrow(/konvaFilter: a graph \(2 nodes\) cannot run as a Konva filter; only one colour chain can/);
+  });
+
   it('says what it cannot do instead of doing less', () => {
     expect(() => konvaFilter(doc([{ filter: 'gaussianBlur', params: { sigma: 2 } }]))).toThrow(/konvaFilter.*gaussianBlur.*colour/i);
     expect(() => konvaFilter(doc([{ filter: 'vignette', params: {} }]))).toThrow(/konvaFilter.*vignette/);

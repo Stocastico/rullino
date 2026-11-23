@@ -4,7 +4,7 @@
 
 Describe a photo edit once, as JSON. **Preview it live on the GPU** in the browser, **render the final file on a server**, or **replay it on the CPU** wherever there is no GPU, with output that agrees within a [published per-filter tolerance](./docs/parity.md). TypeScript, WebGPU, MIT, no runtime dependencies.
 
-51 filters cover classic image processing (blurs, Canny edges, thresholds, morphology, median, bilateral, CLAHE) and photo-app adjustments and looks (exposure, curves, white balance, colour grading, LUTs, vignette, grain), plus masks, crop / perspective geometry, export to PNG / JPEG / WebP and a few optional on-device AI tools. The **[playground](https://stefanomasneri.com/rullino/)** shows them on your own photo (it never leaves your machine); the **[API reference](https://stefanomasneri.com/rullino/docs/)** is generated from the sources.
+51 filters cover classic image processing (blurs, Canny edges, thresholds, morphology, median, bilateral, CLAHE) and photo-app adjustments and looks (exposure, curves, white balance, colour grading, LUTs, vignette, grain), plus masks, crop / perspective geometry, export to PNG / JPEG / WebP and a few optional on-device AI tools. The **[playground](https://stefanomasneri.com/rullino/)** shows them on your own photo (it never leaves your machine), the **[tools](https://stefanomasneri.com/rullino/tools/)** do one job each with them (web-ready export, apply a look to a folder, LUT maker, compare two renders; they work offline once loaded); the **[API reference](https://stefanomasneri.com/rullino/docs/)** is generated from the sources.
 
 [![The rullino playground: a photo with a look applied, before / after split, histogram and look gallery](./docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 
@@ -64,7 +64,7 @@ import { contrast, exposure, filters } from '@rullino/filters';
 const edit = serializeChain(
   [{ filter: exposure, params: { ev: 0.3 } }, { filter: contrast, params: { amount: 0.15 } }],
   { output: { format: 'png', longSide: 2048 } },
-); // the JSON above, from filter objects: defaults are left out
+); // the edit above, from filter objects (written as version 3: one input, one chain); defaults are left out
 
 const image = createImage(2, 1, Float32Array.from([0.1, 0.2, 0.3, 1, 0.4, 0.2, 0.1, 0.5])); // linear, premultiplied RGBA
 const result = await applyEdit(image, edit, { filters }); // on the CPU; pass { gpu: ctx } to render with WebGPU
@@ -77,7 +77,7 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 | Package | What it is | You need it when |
 |---|---|---|
 | [`@rullino/web`](./packages/web/README.md) | Browser renderer: WebGPU, else the CPU in Web Workers (with band threads) | you render edits in a web page |
-| [`@rullino/node`](./packages/node/README.md) | Node renderer: the same shaders on Dawn, else the CPU (worker threads); files in and out through `sharp` | you render on a server or in a script |
+| [`@rullino/node`](./packages/node/README.md) | Node renderer and the `rullino` command: the same shaders on Dawn, else the CPU (worker threads); files in and out through `sharp` | you render on a server, in a script or from a shell |
 | [`@rullino/konva`](./packages/konva/README.md) | `attachEdit(node)`: a `Konva.Image` edited with documents, previews at screen size, full-resolution export | you build on Konva |
 | [`@rullino/core`](./packages/core/README.md) | The engine: edit documents, `Pipeline`, masks, geometry, LUTs, colour maths, export, `defineFilter` | you want the low-level API or to write filters |
 | [`@rullino/filters`](./packages/filters/README.md) | 51 filters, each a WGSL shader plus a TypeScript reference | you pick filters yourself (the renderers include them) |
@@ -86,7 +86,11 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 
 All packages share one version number, are ESM only and have **no runtime dependencies**.
 
-> **Status: 0.x.** The API may still change between minor versions (changes are in the [changelog](./CHANGELOG.md)); `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without a stability promise. Input is 8-bit sRGB (what the browser decodes); 16-bit PNG is supported as output. Not done: 16-bit / HDR input, analysis filters such as Hough, video input. See [PLAN.md](./PLAN.md).
+> **Status: 0.x.** The API may still change between minor versions (changes are in the [changelog](./CHANGELOG.md)); `@rullino/core/internal` and `@rullino/ml/internal` are plumbing without a stability promise. Input is 8-bit sRGB (what the browser decodes); 16-bit PNG is supported as output. Not done yet: 16-bit / HDR / RAW input, metadata on export, analysis filters such as Hough; see the [road to 1.0](./docs/design/road-to-1.0.md).
+
+## Roadmap
+
+Toward 1.0, two products on one engine: **the library**, the open photo-development engine (one edit document previewed in the browser and rendered the same in Node and from the CLI, with codecs, colour management, HDR, RAW, masks, Lightroom-preset and LUT interop and an embeddable editor), and **rullino tools**, web pages that each do one job on your machine (apply a look to a folder, make a LUT, web-ready export) and show the same in code. Everything runs locally; no generative AI. Proposal: [Road to 1.0](./docs/design/road-to-1.0.md); tracking issue [#165](https://github.com/Stocastico/rullino/issues/165). Comments and RFC feedback welcome; [good first issues](https://github.com/Stocastico/rullino/labels/good%20first%20issue) are labelled.
 
 ## Why
 
@@ -103,7 +107,7 @@ Image processing in the browser is well served by general tools; what is missing
 | Fabric.js, Konva | Canvas libraries with built-in filters | Object model first, filters second |
 | small WebGPU filter repos | Demos and single-purpose tools (for example LUT-only) | Not published as general libraries, as far as we could find |
 
-rullino is modern, typed, composable and GPU-first, with zero runtime dependencies: every filter is a WebGPU compute shader **and** a plain TypeScript reference, tested against each other; filters chain into fused shaders; masks, geometry, 3D LUTs and export are part of the same model. The trade-off is that it needs WebGPU (no WebGL fallback). *Comparison last checked in October 2026; corrections welcome.*
+rullino is modern, typed, composable and GPU-first, with zero runtime dependencies: every filter is a WebGPU compute shader **and** a plain TypeScript reference, tested against each other; filters chain into fused shaders; masks, geometry, 3D LUTs and export are part of the same model. The trade-off is that the fast path needs WebGPU (no WebGL fallback): without it the CPU implementation renders the same document in a worker, seconds instead of milliseconds for a 12 MP photo (see the [benchmarks](./docs/benchmarks.md)). *Comparison last checked in October 2026; corrections welcome.*
 
 ## Design highlights
 
@@ -117,9 +121,9 @@ rullino is modern, typed, composable and GPU-first, with zero runtime dependenci
 
 - **Start here**: [Getting started](./docs/getting-started.md) · [Concepts](./docs/concepts.md) · [The edit document](./docs/edit-document.md) · [Troubleshooting](./docs/troubleshooting.md).
 - **Guides by job**: [preview and export in the browser](./docs/guides/preview-and-export.md) · [the same edit on the server](./docs/guides/same-edit-on-the-server.md) · [looks and LUTs in your editor](./docs/guides/looks-in-your-editor.md) · [remove an object on-device](./docs/guides/remove-an-object.md) · [migrating from glfx.js and tui.image-editor](./docs/guides/migrating-from-glfx-and-tui.md).
-- **Reference**: [filters](./docs/filters.md) (parameters, ranges, defaults; generated from the schemas) · [parity table](./docs/parity.md) (how far GPU and CPU may differ, per filter) · [API](https://stefanomasneri.com/rullino/docs/) (generated from the sources) · the edit document's [JSON Schema](./packages/core/edit.schema.json).
+- **Reference**: [filters](./docs/filters.md) (parameters, ranges, defaults; generated from the schemas) · [parity table](./docs/parity.md) (how far GPU and CPU may differ, per filter) · [benchmarks](./docs/benchmarks.md) (real-hardware numbers, losses included) · [API](https://stefanomasneri.com/rullino/docs/) (generated from the sources) · the edit document's [JSON Schema](./packages/core/edit.schema.json).
 - **Examples**: [Konva photo editor](https://github.com/Stocastico/rullino/tree/main/examples/konva-editor) ([StackBlitz](https://stackblitz.com/github/Stocastico/rullino/tree/main/examples/konva-editor?file=main.js)), [Next.js: preview in the browser, render on the server](https://github.com/Stocastico/rullino/tree/main/examples/nextjs-server-render), [Node batch](https://github.com/Stocastico/rullino/tree/main/examples/node-batch), [CPU fallback in a worker](https://github.com/Stocastico/rullino/tree/main/examples/worker-fallback). Their `ts` examples and the documentation's are type-checked against the sources.
-- **Project**: [PLAN.md](./PLAN.md) (design and roadmap) · [CLAUDE.md](./CLAUDE.md) (conventions and the reasoning behind decisions) · [CHANGELOG.md](./CHANGELOG.md) · [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md).
+- **Project**: [PLAN.md](./PLAN.md) (design and roadmap) · [Road to 1.0](./docs/design/road-to-1.0.md) · [CLAUDE.md](./CLAUDE.md) (conventions and the reasoning behind decisions) · [CHANGELOG.md](./CHANGELOG.md) · [CONTRIBUTING.md](./CONTRIBUTING.md) · [SECURITY.md](./SECURITY.md).
 
 ## Development
 

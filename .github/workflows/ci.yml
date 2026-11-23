@@ -65,6 +65,8 @@ jobs:
       - run: pnpm test:e2e:base
       # The hardware check page (built by `pnpm build`): runs the parity check on two filters and the speed check in headless Chromium.
       - run: pnpm --filter @rullino/hardware-check smoke
+      # rullino tools (built by `pnpm build`): the web-ready export page from a sub-path, two photos through its own controls, the zip checked.
+      - run: pnpm --filter @rullino/tools smoke
       # Timings are not asserted (shared runners vary); this only checks that the benchmark runs.
       - run: pnpm bench
       # The CPU benchmark is bundled before it runs: check the bundle builds and runs (one filter).
@@ -74,6 +76,31 @@ jobs:
       # The comparison page (#77) on a small image: every library still loads and runs (SwiftShader
       # timings mean nothing; real numbers come from real machines).
       - run: pnpm bench:web --headless --strict --sizes 320x240 --runs 1
+
+  # Firefox and WebKit (#177): @rullino/web's CPU path and backend choice (`pnpm test:engines`) and
+  # the built playground without WebGPU. Playwright's Linux builds expose no WebGPU adapter, so
+  # the GPU path stays covered by the Chromium jobs. Not a required check, and only on pushes to main
+  # and manual runs (about 10 minutes; Actions minutes are limited): locally `pnpm test:engines`.
+  engines:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps firefox webkit
+      - run: pnpm test:engines
+        timeout-minutes: 10
+      - run: pnpm build
+      - run: pnpm test:e2e:cpu
+        env:
+          RULLINO_E2E_BROWSERS: firefox,webkit
+        timeout-minutes: 10
 
   # The ML models themselves (SlimSAM, MI-GAN, Depth Anything on ONNX Runtime's WASM backend) and the
   # playground's Object, Remove object and Lens blur tools. A separate job: it downloads 69 MB from Hugging Face (cached by

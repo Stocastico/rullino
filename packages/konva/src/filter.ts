@@ -1,4 +1,4 @@
-import { parseChain, type Filter, type Lut } from '@rullino/core';
+import { parseChain, parseEdit, type Filter, type Lut } from '@rullino/core';
 import { filters as allFilters } from '@rullino/filters';
 import { bakeLut, resolveLookLut } from '@rullino/presets';
 
@@ -27,7 +27,10 @@ export interface FilterPixels {
  * doing less; the document's `output` settings and switched-off steps are ignored.
  */
 export function konvaFilter(edit: unknown, options: KonvaFilterOptions = {}): (imageData: FilterPixels) => void {
-  const { steps, geometry } = parseChain(edit, { filters: options.filters ?? allFilters, resolveLut: options.resolveLut ?? resolveLookLut });
+  const parse = { filters: options.filters ?? allFilters, resolveLut: options.resolveLut ?? resolveLookLut };
+  const graph = parseEdit(edit, parse);
+  if (graph.nodes.length !== 1 || graph.nodes[0]!.kind !== 'chain') throw new Error(`konvaFilter: a graph (${graph.nodes.length} nodes) cannot run as a Konva filter; only one colour chain can`);
+  const { steps, geometry } = parseChain(edit, parse);
   if (geometry && (geometry.rotate !== 0 || geometry.flipH || geometry.flipV || geometry.straighten !== 0 || geometry.perspective || geometry.crop.x !== 0 || geometry.crop.y !== 0 || geometry.crop.width !== 1 || geometry.crop.height !== 1)) {
     throw new Error('konvaFilter: the document has a geometry (crop, turn, perspective); a Konva filter cannot change the picture\'s frame');
   }

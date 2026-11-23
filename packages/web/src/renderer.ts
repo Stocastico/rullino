@@ -3,7 +3,7 @@ import {
   createGpuContext,
   createImage,
   encodeImage,
-  parseChain,
+  parseEdit,
   WebGpuUnavailableError,
   type Filter,
   type GpuContext,
@@ -12,7 +12,7 @@ import {
   type Lut,
   type Rgba8Image,
 } from '@rullino/core';
-import { applyEditPixels } from '@rullino/core/internal';
+import { applyEditPixels, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import type { PoolOptions, RenderRequest, RenderResponse } from './protocol';
@@ -26,6 +26,13 @@ export interface RendererOptions {
    * 'gpu': WebGPU or a `WebGpuUnavailableError`. 'cpu': the CPU.
    */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
+  /**
+   * Bytes of GPU memory a render may use (roughly: the working textures it holds). Larger images are
+   * rendered in tiles that fit it, with the same result bit for bit; the texture pool keeps at most
+   * half of it in idle textures. Without it only images larger than the GPU's largest texture are
+   * tiled. Ignored on the CPU.
+   */
+  readonly memoryBudget?: number | undefined;
   /** A WebGPU entry point to use instead of `navigator.gpu`. */
   readonly gpu?: GPU | undefined;
   /** GPU errors (shaders that do not compile, validation, out of memory). Default: console.error. */
@@ -147,16 +154,17 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       reason = (e as Error).message;
     }
   }
+  if (ctx && options.memoryBudget !== undefined) setPoolLimit(ctx, options.memoryBudget / 2);
   const worker = !ctx && options.worker !== false && !options.filters ? workerBackend(threads, options.pool) : undefined;
 
   let destroyed = false;
   const run = async (image: LinearImage | Rgba8Image, edit: unknown, scale: number | undefined, pixels: boolean): Promise<LinearImage | Rgba8Image> => {
     if (destroyed) throw new Error('the renderer was destroyed');
-    if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale });
+    if (!worker) return (pixels ? applyEditPixels : applyEdit)(image, edit, { filters, resolveLut, gpu: ctx, scale, memoryBudget: options.memoryBudget });
     // Parsed here first: a bad document fails with its own message, and the LUTs it names are
     // resolved on this thread (the resolver is a function, which cannot go to the worker).
     const luts: Record<string, Lut> = {};
-    parseChain(edit, {
+    parseEdit(edit, {
       filters,
       resolveLut: (ref) => {
         const lut = resolveLut(ref);
@@ -181,7 +189,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       return new ImageData(new Uint8ClampedArray(out.data.buffer as ArrayBuffer, out.data.byteOffset, out.data.length), out.width, out.height);
     },
     async render(input, edit) {
-      const { output = {} } = parseChain(edit, { filters, resolveLut });
+      const { output } = parseEdit(edit, { filters, resolveLut });
       const pixels = input instanceof Blob ? await decodeFile(input) : input;
       const out = await apply(pixels, edit); // decoded where it renders: on the GPU, or in the worker
       return encodeImage(out, output);

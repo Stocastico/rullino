@@ -92,14 +92,18 @@ const looked = core.runChainCpu(presets.lookSteps(presets.looks[0], { intensity:
 out.readmePresets = looked.width === 16 && presets.looks.length >= 10;
 const { autoAdjust } = await import('@rullino/filters');
 out.readmeAuto = typeof autoAdjust(core.createImage(32, 32)) === 'object';
-// The JSON Schema of edit documents ships with core, and accepts what serializeChain writes.
+// The JSON Schema of edit documents ships with core and describes both versions (v2 chains, v3 graphs); parseEdit ships too.
 const schema = (await import('@rullino/core/edit.schema.json', { with: { type: 'json' } })).default;
-out.editSchema = schema.properties.version.const === core.CHAIN_VERSION;
+out.editSchema = schema.$defs.documentV2.properties.version.const === core.CHAIN_VERSION && schema.$defs.documentV3.properties.version.const === core.EDIT_VERSION;
+out.parseEdit = core.parseEdit({ version: 3, inputs: { photo: {} }, nodes: [{ id: 'a', from: 'photo', steps: [] }, { id: 'b', kind: 'resize', from: 'a', scale: 0.5 }] }, { filters }).nodes.length === 2;
 // The root README quick start: the edit as JSON, replayed on the CPU.
 const edit = JSON.stringify(core.serializeChain([{ filter: exposure, params: { ev: 0.3 } }, { filter: filters.find((f) => f.id === 'contrast'), params: { amount: 0.15 } }], { output: { format: 'png', longSide: 2048 } }));
 const replayed = await core.applyEdit(img, JSON.parse(edit), { filters });
 const manual = core.runChainCpu(core.parseChain(JSON.parse(edit), { filters }).steps, img);
-out.readmeJson = edit.startsWith('{"version":2,"steps":[{"filter":"exposure","params":{"ev":0.3}},') && replayed.data.every((v, i) => v === manual.data[i]);
+// serializeChain writes version 3 (one input, one chain node); the README's hand-written version 2 JSON renders the same.
+const readmeV2 = { version: 2, steps: [{ filter: 'exposure', params: { ev: 0.3 } }, { filter: 'contrast', params: { amount: 0.15 } }] };
+const fromReadme = await core.applyEdit(img, readmeV2, { filters });
+out.readmeJson = edit.startsWith('{"version":3,"inputs":{"main":{}},"nodes":[{"id":"edit","from":"main","steps":[{"filter":"exposure","params":{"ev":0.3}},') && replayed.data.every((v, i) => v === manual.data[i]) && fromReadme.data.every((v, i) => v === manual.data[i]);
 // @rullino/node without the optional webgpu package: 'auto' falls back to the CPU and says why,
 // and a look document renders to a PNG.
 const renderer = await createRenderer();

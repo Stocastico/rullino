@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>rullino tools</title>
+  <meta name="description" content="Photo tools that run in your browser: nothing is uploaded. Each one does one job and shows the same in code with the rullino library." />
+  <link rel="stylesheet" href="./src/style.css" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#2b59c3" />
+</head>
+<body>
+<main>
+  <h1>rullino tools</h1>
+  <p>Each page does one job with your photos <strong>in this browser</strong>: they are never uploaded, there is no account and nothing to install. Every tool ends with the few lines that do the same in your own code with <a href="https://github.com/Stocastico/rullino">rullino</a>, the open photo-development library they are built on.</p>
+  <a class="card" href="./web-export/"><strong>Web-ready export</strong>Resize a whole set of photos to a long side, sharpen them for screens and save them as JPEG, WebP or PNG, without their location and camera data.</a>
+  <a class="card" href="./look-folder/"><strong>Apply a look to a folder</strong>Give a whole folder of photos the same look, or an edit you made in the playground, with previews first, then export them all at once.</a>
+  <a class="card" href="./lut-maker/"><strong>LUT maker</strong>Grade a photo with a look and a few sliders and download it as a .cube file for DaVinci Resolve, Premiere, Final Cut, OBS or a phone video app.</a>
+  <a class="card" href="./compare/"><strong>Compare two renders</strong>Two images in: the largest difference, how many pixels go beyond a tolerance and a map of where. Check that a preview and a server render agree.</a>
+  <p>More tools are on the way. The <a href="../">playground</a> is the full workspace.</p>
+</main>
+<script type="module" src="./src/hub.ts"></script>
+</body>
+</html>

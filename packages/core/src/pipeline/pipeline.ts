@@ -1,5 +1,6 @@
 import type { PointwiseFilter } from '../filter';
 import type { GpuContext } from '../gpu/context';
+import type { TileFrame } from '../gpu/frame';
 import { blendMask, renderMask } from '../gpu/mask';
 import { runMultipass } from '../gpu/multipass';
 import { validateMask } from '../mask';
@@ -7,6 +8,11 @@ import { releaseTexture } from '../gpu/pool';
 import { objectKey } from '../gpu/readback';
 import { activeSteps, effectiveParams, type ChainOptions, type Step } from './chain';
 import { runFused } from './fuse';
+
+export interface SourceOptions extends ChainOptions {
+  /** Where the source sits in the whole image when it is a tile (see `TileFrame`); default: it is the whole image. */
+  readonly frame?: TileFrame;
+}
 
 export interface PipelineOptions {
   /** Fuse consecutive pointwise steps into one pass (default true). Off is useful for debugging. */
@@ -38,6 +44,7 @@ export class Pipeline {
   readonly #fuse: boolean;
   #source: GPUTexture | undefined;
   #scale = 1;
+  #frame: TileFrame | undefined;
   #sourceVersion = 0;
   #cache: CachedStage[] = [];
 
@@ -48,11 +55,13 @@ export class Pipeline {
 
   /**
    * Sets the input working texture. Not owned: the caller keeps it alive and destroys it.
-   * `scale` is its resolution relative to the full image (see {@link ChainOptions}).
+   * `scale` is its resolution relative to the full image (see {@link ChainOptions}); `frame` places
+   * a tile in the whole image.
    */
-  setSource(texture: GPUTexture, options: ChainOptions = {}): void {
+  setSource(texture: GPUTexture, options: SourceOptions = {}): void {
     this.#source = texture;
     this.#scale = options.scale ?? 1;
+    this.#frame = options.frame;
     this.#sourceVersion++;
     this.#evict(0);
   }
@@ -80,10 +89,10 @@ export class Pipeline {
         if (head.usesMask) {
           const { mask } = stage.steps[0]!;
           if (!mask) throw new Error(`filter "${head.id}" needs a mask`);
-          maskTex = renderMask(this.#ctx, mask, input.width, input.height);
+          maskTex = renderMask(this.#ctx, mask, input.width, input.height, this.#frame);
           this.stats.passes++;
         }
-        const r = runMultipass(this.#ctx, head, input, stage.params[0]!, maskTex);
+        const r = runMultipass(this.#ctx, head, input, stage.params[0]!, maskTex, this.#frame);
         if (maskTex) releaseTexture(this.#ctx, maskTex);
         this.stats.passes += r.passes;
         this.stats.compiles += r.compiled;
@@ -98,7 +107,7 @@ export class Pipeline {
       if (mask) {
         // Masked steps are always alone in their stage (see #plan).
         const filtered = output;
-        output = blendMask(this.#ctx, input, filtered, mask);
+        output = blendMask(this.#ctx, input, filtered, mask, this.#frame);
         releaseTexture(this.#ctx, filtered);
         this.stats.passes++;
       }

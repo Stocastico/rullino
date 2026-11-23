@@ -145,20 +145,21 @@ How to encode the result. Everything is optional; unknown keys are rejected so a
 
 ## Errors
 
-`parseChain` (and so every renderer) validates a whole document before rendering anything, and says which step and which parameter is wrong:
+`parseEdit` and `parseChain` (and so every renderer) validate a whole document before rendering anything, and say which node, step and parameter is wrong. Everything wrong with a document is thrown as a `ParseError` (exported by `@rullino/core`), so an application can tell a bad document (show the message to whoever wrote it) from a failure of rullino itself (any other error: a bug, please report it). Property tests feed the parsers random and mangled documents to keep it that way.
 
 ```text
 chain step 1: unknown filter "exposur"
 chain step 0 (exposure): unknown parameter "stops"
 chain step 2 (gaussianBlur): parameter "sigma" (float): invalid value "big"
+node "small" (resize): needs longSide or scale
 mask (radial): radius must be > 0
 geometry: crop must be a non-empty rectangle inside [0, 1]²
 output: bitDepth 16 needs format png
-chain: unsupported version 3
+edit: unsupported version 4
 ```
 
 Treat documents from users as untrusted input and render them with a limit on image size and a timeout, like any file you decode: a document cannot run code, but a large raster mask or a very large `sigma` is real work.
 
 ## Versioning
 
-The `version` field is the format, not the library. A new library version reads every older document; writing always produces the current one. `migrateChain` lifts old documents explicitly (version 1 → 2 is a copy with `version: 2`). While rullino is 0.x the format may still change between minor versions, with a migration and a note in the [changelog](../CHANGELOG.md); a document you keep for years should be stored with the library version that wrote it.
+The `version` field is the format, not the library. **Version 3** (named inputs and a graph of nodes, so that two images or two chains can meet: see the [design](./design/edit-document-v3.md)) is being added in 0.8: `parseEdit` reads it, `applyEdit` renders it (pass a record of images by input name), and so do `@rullino/web`, `@rullino/node` and the `rullino` command for documents with one input. `serializeChain` writes version 3 (one input `main`, one chain node `edit`, the shape `migrateEdit` gives a version 2 document); this page describes version 2, which is shorter to write by hand and is read forever. A new library version reads every older document; writing always produces the current one. `migrateChain` lifts old documents explicitly (version 1 → 2 is a copy with `version: 2`). While rullino is 0.x the format may still change between minor versions, with a migration and a note in the [changelog](../CHANGELOG.md); a document you keep for years should be stored with the library version that wrote it.

@@ -1,7 +1,7 @@
 // The CPU backend's Web Worker: renders edit documents with the built-in filters' fast paths, and,
 // with `threads` above 1, hands the bands of the chain to a pool of band workers (threads.ts).
 import { applyEdit, type ApplyEditOptions } from '@rullino/core';
-import { applyEditPixels } from '@rullino/core/internal';
+import { applyEditPixels, chainDocument } from '@rullino/core/internal';
 import { filters } from '@rullino/filters';
 import type { RenderRequest, RenderResponse } from './protocol';
 import { createThreadedExecutor, type ThreadedExecutor } from './threads';
@@ -27,7 +27,7 @@ scope.onmessage = async ({ data: { id, image, edit, luts, scale, pixels, threads
       scale,
       ...(executor && {
         cpu: async (steps, framed, c) => {
-          const done = await executor!.run(edit, luts, steps, framed, c.scale);
+          const done = await executor!.run(chainDocument(edit, c.node), luts, steps, framed, c.scale); // the band workers parse the node's steps again
           bands += done.bands;
           bandedMs += done.bandedMs;
           inlineMs += done.inlineMs;

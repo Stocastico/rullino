@@ -11,18 +11,29 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 
 ## [Unreleased]
 
-### Added
-- Documentation: [Benchmarks](docs/benchmarks.md), the real-hardware numbers (GPU against PixiJS, wasm-vips and Photon; the CPU backend on worker threads) with the machine, the code each came from, the losses and the limits.
-- **node**: the `rullino` command (`npx rullino render --edit edit.json photos/ -o out/`, `--look <id>`, `rullino looks`): renders an edit document or a built-in look onto files and folders, with `--format`, `--quality`, `--long-side`, `--backend` and `--threads`. It never overwrites an input and reports a bad document once, before reading any photo. Exit codes: 0 ok, 1 a photo failed, 2 usage. `pnpm test:pack` runs it from the installed tarball.
+## [0.8.0]
 
+Foundations for 1.0: the edit document becomes a graph (version 3), the GPU renders images larger than a texture and within a memory budget, the parsers and planners are fuzzed, `@rullino/web` is tested in Firefox and WebKit, and rullino tools has four pages that work offline. Documents written by 0.8 are version 3, which 0.7 cannot read.
+
+### Added
+- **core**: edit document version 3, a graph of named inputs and nodes (`chain`, `mix`, `resize`; [RFC](docs/design/edit-document-v3.md)): `parseEdit` reads every version (nodes in any order, cycles and unknown names rejected with a message that names them), `migrateEdit` lifts v1 / v2 to it, and `edit.schema.json` describes v2 and v3. `applyEdit` (and `applyEditPixels`) render them on the GPU and on the CPU: one source for a one-input document or a record by input name, `scale` per input, the CPU executor (`cpu`) called once per chain node; version 2 documents render bit for bit as before. `@rullino/web` and `@rullino/node` (`apply`, `pixels`, `render`, band workers and worker threads included) and the `rullino` command render version 3 documents with one input; `parseChain` reads a version 3 document that is one chain on one input (and says to use `parseEdit` for a real graph); `konvaFilter` takes a one-chain version 3 document and refuses a graph by name. 
+- **core**: tiled GPU rendering (#176). `applyEdit` / `applyEditPixels` on the GPU render an image larger than the device's largest texture in tiles, and `memoryBudget` (bytes) tiles any render whose working textures would exceed it; the result is the untiled one bit for bit, global filters included (equalize, clahe and otsu add their statistic over the tiles). `onTiling` reports the tile side. `@rullino/web` and `@rullino/node` take `createRenderer({ memoryBudget })`, which also caps the idle texture pool at half the budget. `pnpm test:large` renders a 200 MP image on a software GPU within 256 MB.
+- **core**: `ParseError`: `parseEdit`, `parseChain` and `migrateEdit` throw it for anything wrong with a document (same messages as before), so an application can tell a bad document from a bug. Property tests (fast-check) feed the parsers random and mangled documents and check the band and tile planners; `pnpm test:fuzz` runs them with 20 000 runs each (also a weekly CI workflow). `pnpm test:engines` runs `@rullino/web` in Firefox and WebKit, and CI runs the playground without WebGPU in both on `main` (#177).
+- rullino tools (#178): three new pages next to web-ready export: **Apply a look to a folder** (a folder or some photos, a built-in look or a pasted edit document, previews, export with progress and cancel into a folder or a zip), **LUT maker** (grade one photo with a look and six sliders, download the `.cube`; the preview is the LUT itself) and **Compare two renders** (tolerance in 8-bit levels, verdict, largest difference, a map of where). The tools work offline once loaded (service worker over the whole build) and can be installed (manifest).
 ### Changed
-- Playground without WebGPU (Firefox, Safari, older machines): the CPU fallback now renders in `@rullino/web`'s worker with the fast paths instead of the reference on the main thread, so the page stays usable (Kuwahara on a 1024 px picture: 3.2 s frozen → 1.2 s in the background). Chains that cannot travel to a worker (a LUT file loaded by hand, an ML patch or depth map) still render on the main thread, with the fast paths. New e2e `pnpm test:e2e:cpu` runs the built playground in a browser with no WebGPU.
+- **core**: `serializeChain` leaves out an empty `output` (it used to write `output: {}`, which read back as no output).
+- **core**: `serializeChain` writes version 3 (one input `main`, one chain node `edit`; returns an `EditDocument`), and so do `lookEdit`, the playground's share links and Code button: rullino 0.7 and older cannot read these documents (they read v1 / v2 only). Version 1 and 2 documents are read forever.
+
+### Fixed
+- **node**: every `createRenderer()` created its own Dawn instance; the renderers of a process now share one (each with its own device). Several instances in one process are the likely cause of occasional crashes and hangs seen in tests (25 isolated runs clean afterwards, against a hang in 13 before) (#223).
 
 ## [0.7.0]
 
-Documentation for integrators, a synchronous Konva filter for colour edits, `.cube` export and three bug fixes.
+Documentation for integrators, the `rullino` command, a synchronous Konva filter for colour edits, `.cube` export, a playground that works without WebGPU, and three bug fixes.
 
 ### Added
+- Documentation: [Benchmarks](docs/benchmarks.md), the real-hardware numbers (GPU against PixiJS, wasm-vips and Photon; the CPU backend on worker threads) with the machine, the code each came from, the losses and the limits.
+- **node**: the `rullino` command (`npx rullino render --edit edit.json photos/ -o out/`, `--look <id>`, `rullino looks`): renders an edit document or a built-in look onto files and folders, with `--format`, `--quality`, `--long-side`, `--backend` and `--threads`. It never overwrites an input and reports a bad document once, before reading any photo. Exit codes: 0 ok, 1 a photo failed, 2 usage. `pnpm test:pack` runs it from the installed tarball.
 - **konva**: `konvaFilter(doc)`, a synchronous Konva filter from an edit document, for colour edits (exposure, curves, saturation, LUTs, the looks; no masks, geometry or neighbourhood steps, which it refuses with a message): the document is baked once into a 33³ LUT and each pixel costs one lookup (about 45 ms per megapixel), so `node.filters([...])` + `cache()` and tools that look filters up by name in `Konva.Filters` (Filerobot) can use rullino. `@rullino/konva` now depends on `@rullino/filters` and `@rullino/presets` directly.
 - Example `examples/filerobot-looks`: Filerobot Image Editor with rullino looks as Konva filters (`konvaFilter`), loaded by name from its design state and switched while it runs; built and driven in `pnpm test:pack`.
 - **core**: `formatCube(lut)` writes a LUT as a `.cube` file (the inverse of `parseCube`). With the playground's **Export look (.cube)** (bakes the enabled colour steps of the chain into a 33³ LUT), a look made in rullino works in DaVinci Resolve, Premiere, OBS and phone apps.
@@ -30,6 +41,9 @@ Documentation for integrators, a synchronous Konva filter for colour edits, `.cu
 - Documentation: [Getting started](docs/getting-started.md), [Concepts](docs/concepts.md), the [edit document reference](docs/edit-document.md) (its JSON examples are parsed and rendered by a test) and [Troubleshooting](docs/troubleshooting.md); the root README now starts from the edit document and lists the packages. The `ts` blocks of `docs/*.md` are type-checked like the guides'.
 - Playground: compare with any step (**Compare with** menu) and hold `\` to see the original.
 - Example `examples/nextjs-server-render`: a Next.js app that previews an edit document in the browser with `@rullino/web` and renders it at full resolution in a route handler with `@rullino/node`; built and driven in `pnpm test:pack`.
+
+### Changed
+- Playground without WebGPU (Firefox, Safari, older machines): the CPU fallback now renders in `@rullino/web`'s worker with the fast paths instead of the reference on the main thread, so the page stays usable (Kuwahara on a 1024 px picture: 3.2 s frozen → 1.2 s in the background). Chains that cannot travel to a worker (a LUT file loaded by hand, an ML patch or depth map) still render on the main thread, with the fast paths. New e2e `pnpm test:e2e:cpu` runs the built playground in a browser with no WebGPU.
 
 ### Fixed
 - **node**: JPEG / WebP output with `quality` below 0.005 (including 0) threw "Expected integer between 1 and 100" from sharp; the quality is now at least 1.

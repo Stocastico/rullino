@@ -130,6 +130,14 @@ export interface TwoPhase<S extends ParamSchema = ParamSchema> {
   readonly stat: (src: LinearImage, p: ParamValues<S>, region?: RowRegion) => Float64Array;
   /** The filter on `src` (whole image or band) given the statistic of the whole image. Reads no neighbours. */
   readonly apply: (src: LinearImage, p: ParamValues<S>, stat: Float64Array, region?: RowRegion) => LinearImage;
+  /**
+   * The same split of the filter's passes on the GPU, for tiled rendering: `stat` names the passes
+   * that make the statistic (run on the pixels each tile owns, adding into the filter's buffers,
+   * which stay for the whole render), `finish` those that turn it into what the mapping reads (run
+   * once, after the last tile), and the other passes are the mapping (run on every tile). Without
+   * it, a tiled render needs the image to fit one texture for this step.
+   */
+  readonly gpu?: { readonly stat: readonly string[]; readonly finish: readonly string[] };
 }
 
 /**

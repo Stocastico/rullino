@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LUT maker: grade a photo, download a .cube for video · rullino tools</title>
+  <meta name="description" content="Grade one photo with a look and a few sliders and download the result as a .cube LUT for DaVinci Resolve, Premiere, Final Cut, OBS or a phone app. Runs in your browser: nothing is uploaded." />
+  <link rel="stylesheet" href="../src/style.css" />
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#2b59c3" />
+</head>
+<body>
+<main>
+  <p><a href="../">← rullino tools</a></p>
+  <h1>LUT maker</h1>
+  <p>Grade a photo with a look and a few sliders, then download the grade as a <strong>.cube</strong> file: DaVinci Resolve, Premiere, Final Cut, OBS and most phone video apps read it. The preview shows the LUT itself, so what you see is what the file does. <strong>Nothing is uploaded.</strong></p>
+
+  <label for="photo">A photo to grade on</label>
+  <input id="photo" type="file" accept="image/*" />
+
+  <div class="compare">
+    <figure><canvas id="before" width="1" height="1"></canvas><figcaption>Before</figcaption></figure>
+    <figure><canvas id="after" width="1" height="1"></canvas><figcaption>With the LUT</figcaption></figure>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="look">Look</label>
+      <select id="look"><option value="">None</option></select>
+    </div>
+    <div>
+      <label for="intensity">Look intensity <span data-value="intensity"></span></label>
+      <input id="intensity" type="range" min="0" max="1" step="0.05" value="1" />
+    </div>
+  </div>
+  <div class="row" id="sliders"></div>
+
+  <div class="row">
+    <div>
+      <label for="title">Name</label>
+      <input id="title" type="text" value="My grade" />
+    </div>
+    <div>
+      <label for="size">Size</label>
+      <select id="size">
+        <option value="17">17³ (small, phones)</option>
+        <option value="33" selected>33³ (standard)</option>
+        <option value="65">65³ (finest)</option>
+      </select>
+    </div>
+  </div>
+  <p><button id="download" disabled>Download .cube</button> <button id="reset" class="secondary">Reset</button></p>
+  <p id="status"></p>
+
+  <h2>The same in your code</h2>
+  <p>The grade is a list of ordinary rullino steps; <code>@rullino/presets</code> bakes it and <code>@rullino/core</code> writes the file:</p>
+  <pre id="code"></pre>
+</main>
+<script type="module" src="../src/lut-maker/main.ts"></script>
+</body>
+</html>

@@ -28,7 +28,7 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'],
-          exclude: ['**/*.browser.test.ts'],
+          exclude: ['**/*.browser.test.ts', '**/*.engines.test.ts'],
         },
       },
       {
@@ -37,6 +37,14 @@ export default defineConfig({
           name: 'ml',
           environment: 'node',
           include: ['packages/ml/test/**/*.integration.test.ts'],
+        },
+      },
+      {
+        // A 200 MP image in tiles within a memory budget, on Dawn (#176): `pnpm test:large`.
+        test: {
+          name: 'large',
+          environment: 'node',
+          include: ['packages/*/test/**/*.large.test.ts'],
         },
       },
       {
@@ -63,6 +71,21 @@ export default defineConfig({
             headless: true,
             provider: playwright({ launchOptions: launchOptions({ vulkan: true }) }),
             instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+      {
+        // Firefox and WebKit (#177): `*.engines.test.ts`, the CPU path and the backend choice
+        // (Playwright's Linux builds have no WebGPU adapter): `pnpm test:engines`.
+        test: {
+          name: 'engines',
+          include: ['packages/*/src/**/*.engines.test.ts'],
+          testTimeout: 60_000,
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: 'firefox' }, { browser: 'webkit' }],
           },
         },
       },

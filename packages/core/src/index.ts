@@ -29,7 +29,7 @@ export { readImage, uploadImage } from './gpu/texture';
 export { fromFloat16Array, toFloat16Array } from './half';
 export { createImage, MAX_IMAGE_SIDE, sampleImage, type LinearImage, type Rgba8Image } from './image';
 export { applyLutCpu, createLut, formatCube, identityLut, lutFromFunction, MAX_LUT_SIZE, parseCube, parseHald, type Lut } from './lut';
-export { applyGeometry } from './gpu/geometry';
+export { applyGeometry, type GeometryTile } from './gpu/geometry';
 export { blendMasked, createRasterMask, maskImage, maskValue, resampleRaster, validateMask, type LinearMask, type Mask, type RadialMask, type RasterMask, type RasterMaskData, type RowRegion, type Vec2 } from './mask';
 export { fillShape, paintStroke, type BrushOptions, type FillOptions, type Shape } from './paint';
 export { magicWand, type WandOptions } from './wand';
@@ -55,8 +55,11 @@ export {
   type ParamValues,
 } from './params';
 export { activeSteps, runChainCpu, type ChainOptions, type Step } from './pipeline/chain';
-export { Pipeline, type PipelineOptions } from './pipeline/pipeline';
-export { downscale } from './gpu/resize';
+export { Pipeline, type PipelineOptions, type SourceOptions } from './pipeline/pipeline';
+export type { TileFrame } from './gpu/frame';
+export { downscale, type DownscaleTile } from './gpu/resize';
 export { downscaleCpu, fitWithin } from './resize';
+export { EDIT_VERSION, NODE_KINDS, migrateEdit, parseEdit, type EditDocument, type EditGraph, type GraphNode, type NodeDocument, type NodeKind } from './graph';
+export { ParseError } from './parse-error';
 export { CHAIN_VERSION, migrateChain, parseChain, serializeChain, type ChainDocument, type MaskDocument, type OutputSettings, type ParseOptions, type SerializeOptions, type Json, type StepDocument } from './serialize';
-export { applyEdit, type ApplyEditOptions } from './edit';
+export { applyEdit, type ApplyEditOptions, type EditSources } from './edit';

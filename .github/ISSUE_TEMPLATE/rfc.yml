@@ -1,0 +1,33 @@
+name: RFC (design proposal)
+description: A change to the edit format, a new package or a new subsystem, argued before it is built
+labels: [rfc]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        RFCs are for decisions that are hard to undo: the edit document format, public APIs, new packages, new runtime constraints. Small features go in a feature request. The roadmap these fit into is [docs/design/road-to-1.0.md](https://github.com/Stocastico/rullino/blob/main/docs/design/road-to-1.0.md). Remember the one hard rule: **everything runs on the client** (browser, Node, CLI).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What cannot be done today, and who needs it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The design, with document / API examples. Say how it is tested (CPU reference, GPU parity, banded = whole).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: compat
+    attributes:
+      label: Compatibility and client-only check
+      description: Does an existing edit document still render the same? Does anything leave the user's machine?
+    validations:
+      required: true

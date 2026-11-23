@@ -80,6 +80,16 @@ export function uploadSrgb8(ctx: GpuContext, data: Uint8Array | Uint8ClampedArra
   return decodeStaging(ctx, staging);
 }
 
+/**
+ * The rectangle at (`x`, `y`), `width` × `height`, of 8-bit straight-alpha sRGB pixels `data` of an
+ * image `fullWidth` pixels wide, decoded like {@link uploadSrgb8} into a working texture (a tile).
+ */
+export function uploadSrgb8Rect(ctx: GpuContext, data: Uint8Array | Uint8ClampedArray, fullWidth: number, x: number, y: number, width: number, height: number): GPUTexture {
+  const staging = stagingTexture(ctx, width, height);
+  ctx.device.queue.writeTexture({ texture: staging }, data as Uint8Array<ArrayBuffer>, { offset: (y * fullWidth + x) * 4, bytesPerRow: fullWidth * 4, rowsPerImage: height }, { width, height });
+  return decodeStaging(ctx, staging);
+}
+
 export interface EncodeOptions {
   /** 'premultiplied' suits a canvas configured with alphaMode 'premultiplied'; 'straight' suits ImageData / export. */
   readonly alpha: 'premultiplied' | 'straight';

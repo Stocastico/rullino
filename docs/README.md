@@ -13,6 +13,6 @@
 
 **Guides by job**: [preview and export in the browser](./guides/preview-and-export.md) · [the same edit on the server](./guides/same-edit-on-the-server.md) · [looks and LUTs in your editor](./guides/looks-in-your-editor.md) · [remove an object on-device](./guides/remove-an-object.md) · [migrating from glfx.js and tui.image-editor](./guides/migrating-from-glfx-and-tui.md).
 
-**Design notes** (proposals argued before they were built): [tiled CPU execution](./design/tiled-cpu.md), [Filerobot](./design/filerobot.md).
+**Design notes** (proposals argued before they were built): [tiled CPU execution](./design/tiled-cpu.md), [Filerobot](./design/filerobot.md), [road to 1.0](./design/road-to-1.0.md) (the 0.8 → 1.0 platform roadmap, a proposal; tracking in [#165](https://github.com/Stocastico/rullino/issues/165)).
 
 The API reference is generated from the sources: <https://stefanomasneri.com/rullino/docs/>. Package READMEs: [core](../packages/core/README.md), [filters](../packages/filters/README.md), [presets](../packages/presets/README.md), [ml](../packages/ml/README.md), [node](../packages/node/README.md), [web](../packages/web/README.md), [konva](../packages/konva/README.md).

@@ -1,6 +1,7 @@
 import { applyEdit, createImage, encodeSrgb8, fromFloat16Array, toFloat16Array, WebGpuUnavailableError, type LinearImage } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { lookEdit, looks, resolveLookLut } from '@rullino/presets';
+import { poolStats } from '@rullino/core/internal';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRenderer, type Renderer } from './index';
 
@@ -19,7 +20,7 @@ function chart(w: number, h: number): LinearImage {
 const edit = {
   version: 2,
   steps: [
-    ...lookEdit(looks[1]!, { intensity: 0.8 }).steps,
+    ...(lookEdit(looks[1]!, { intensity: 0.8 }).nodes[0] as unknown as { steps: unknown[] }).steps,
     { filter: 'gaussianBlur', params: { sigma: 1.5 } },
     { filter: 'curves', params: { rgb: [[0, 0], [0.4, 0.3], [1, 1]] }, mask: { kind: 'radial', center: [0.5, 0.5], radius: [0.3, 0.3], feather: 0.5 } },
   ],
@@ -124,6 +125,15 @@ describe('createRenderer (browser)', () => {
     }
   });
 
+  it('memoryBudget renders in tiles with the same result, and keeps the idle pool within half of it', async () => {
+    const src = chart(301, 203);
+    const whole = await make({ backend: 'gpu' });
+    const tiled = await make({ backend: 'gpu', memoryBudget: 300_000 });
+    expect((await tiled.apply(src, edit)).data).toEqual((await whole.apply(src, edit)).data);
+    expect((await tiled.pixels(src, edit)).data).toEqual((await whole.pixels(src, edit)).data);
+    expect(poolStats(tiled.gpu!).bytes).toBeLessThanOrEqual(150_000);
+  });
+
   it('render() takes ImageData or an encoded file and encodes as the document says', async () => {
     for (const backend of ['gpu', 'cpu'] as const) {
       const r = await make({ backend });
@@ -156,6 +166,19 @@ describe('createRenderer({ threads }) (browser)', () => {
     'a global step in the middle': { version: 2, steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }, { filter: 'equalize', params: {} }, { filter: 'sharpen', params: {} }] },
     'equalize, clahe and otsu, two phases': { version: 2, steps: [{ filter: 'equalize', params: { amount: 0.8 } }, { filter: 'clahe', params: { tiles: 5 } }, { filter: 'exposure', params: { ev: 0.2 } }, { filter: 'otsu', params: {} }] },
     'geometry and long side': { version: 2, geometry: { rotate: 0, flipH: false, flipV: false, straighten: 5, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } }, steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }], output: { format: 'png', longSide: 40 } },
+    // Two different chains, mixed, resized, then a third: a band worker running the wrong node's steps changes the picture.
+    'a version 3 graph': {
+      version: 3,
+      inputs: { photo: {} },
+      nodes: [
+        { id: 'soft', from: 'photo', steps: [{ filter: 'gaussianBlur', params: { sigma: 2 } }] },
+        { id: 'warm', from: 'photo', steps: [{ filter: 'exposure', params: { ev: 0.6 } }, { filter: 'vignette', params: {} }] },
+        { id: 'both', kind: 'mix', from: ['soft', 'warm'], amount: 0.5 },
+        { id: 'small', kind: 'resize', from: 'both', scale: 0.5 },
+        { id: 'out', from: 'small', steps: [{ filter: 'sharpen', params: {} }] },
+      ],
+      output: { node: 'out', format: 'png' },
+    },
   };
   const src = chart(53, 61);
 
@@ -166,6 +189,16 @@ describe('createRenderer({ threads }) (browser)', () => {
     sameBytes(await many.apply(src, doc), await one.apply(src, doc));
     expect(seen).toHaveLength(1);
     expect(seen[0]!.bands, 'the render was split into bands').toBeGreaterThan(1);
+  });
+
+  it('render() encodes a version 3 graph at its output size, on the GPU and in the worker alike', async () => {
+    const graph = documents['a version 3 graph'];
+    const pixels = new ImageData(new Uint8ClampedArray(40 * 30 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 7) % 256)), 40, 30);
+    for (const backend of ['gpu', 'cpu'] as const) {
+      const png = await (await make({ backend, threads: 3, pool: FORCE })).render(pixels, graph);
+      const bitmap = await createImageBitmap(png);
+      expect([bitmap.width, bitmap.height], backend).toEqual([20, 15]);
+    }
   });
 
   it('pixels() and 8-bit input give the same bytes too', async () => {

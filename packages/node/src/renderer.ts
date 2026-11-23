@@ -1,10 +1,17 @@
-import { applyEdit, createGpuContext, encodeImage, parseChain, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
-import { exportSamples } from '@rullino/core/internal';
+import { applyEdit, createGpuContext, encodeImage, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
+import { chainDocument, exportSamples, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import { createThreadedExecutor, DEFAULT_WORKER_URL, resolveThreads } from './threads';
 
 export interface RendererOptions {
+  /**
+   * Bytes of GPU memory a render may use (roughly: the working textures it holds). Larger images are
+   * rendered in tiles that fit it, with the same result bit for bit; the texture pool keeps at most
+   * half of it in idle textures. Without it only images larger than the GPU's largest texture are
+   * tiled. Ignored on the CPU.
+   */
+  readonly memoryBudget?: number | undefined;
   /**
    * 'auto' (default): Dawn through the `webgpu` package if it is installed and finds an adapter,
    * else the CPU (see `reason`). 'gpu': Dawn or an error. 'cpu': the CPU reference.
@@ -88,11 +95,23 @@ async function decodeFile(file: Uint8Array): Promise<RgbaImage> {
   return { data, width: info.width, height: info.height };
 }
 
-/** Loads Dawn from the optional `webgpu` package and defines the WebGPU globals core relies on. */
-async function loadDawn(): Promise<GPU> {
-  const { create, globals } = await import('webgpu');
-  for (const [name, value] of Object.entries(globals)) if (!(name in globalThis)) (globalThis as Record<string, unknown>)[name] = value;
-  return create([]);
+let dawn: Promise<GPU> | undefined;
+
+/**
+ * Loads Dawn from the optional `webgpu` package, defines the WebGPU globals core relies on, and
+ * creates its instance once per process (#223): every renderer asks it for an adapter and a device
+ * of its own. Several instances in one process made Dawn crash or hang now and then. A failed load
+ * is not kept, so a later renderer tries again.
+ */
+function loadDawn(): Promise<GPU> {
+  dawn ??= import('webgpu').then(({ create, globals }) => {
+    for (const [name, value] of Object.entries(globals)) if (!(name in globalThis)) (globalThis as Record<string, unknown>)[name] = value;
+    return create([]);
+  });
+  return dawn.catch((e: unknown) => {
+    dawn = undefined;
+    throw e;
+  });
 }
 
 export async function createRenderer(options: RendererOptions = {}): Promise<Renderer> {
@@ -100,7 +119,8 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
   const parse = { filters: options.filters ?? allFilters, resolveLut: options.resolveLut ?? resolveLookLut };
   let ctx: GpuContext | undefined;
   let reason: string | undefined;
-  // Kept referenced for the renderer's lifetime: the device belongs to this Dawn instance.
+  // Kept referenced for the renderer's lifetime: the device belongs to this Dawn instance (shared by
+  // the process's renderers, see loadDawn).
   let gpu: GPU | undefined;
   if (backend !== 'cpu') {
     try {
@@ -112,6 +132,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     }
   }
 
+  if (ctx && options.memoryBudget !== undefined) setPoolLimit(ctx, options.memoryBudget / 2);
   const threads = ctx || options.filters ? 1 : resolveThreads(options.threads);
   const executor =
     threads > 1
@@ -127,7 +148,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       : undefined;
 
   const applyInternal = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}, shared = false) => {
-    if (!executor) return applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale });
+    if (!executor) return applyEdit(image, edit, { ...parse, gpu: ctx, scale: o.scale, memoryBudget: options.memoryBudget });
     // The workers parse the document again: they need the LUTs it names, by name.
     const luts = new Map<string, Lut>();
     const resolveLut = (ref: string) => {
@@ -135,7 +156,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       if (lut) luts.set(ref, lut);
       return lut;
     };
-    return applyEdit(image, edit, { ...parse, resolveLut, scale: o.scale, cpu: (steps, framed, c) => executor.run(edit, luts, steps, framed, { scale: c.scale, shared }) });
+    return applyEdit(image, edit, { ...parse, resolveLut, scale: o.scale, cpu: (steps, framed, c) => executor.run(chainDocument(edit, c.node), luts, steps, framed, { scale: c.scale, shared }) });
   };
   // Images that leave the renderer are ordinary memory; `render` only reads its result, so it can stay in shared memory.
   const apply = (image: LinearImage | Rgba8Image, edit: unknown, o: { readonly scale?: number } = {}) => applyInternal(image, edit, o);
@@ -147,7 +168,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     ...(ctx ? { gpu: ctx } : {}),
     apply,
     async render(input, edit) {
-      const { output = {} } = parseChain(edit, parse); // validates first: a bad document gets its own message
+      const { output } = parseEdit(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
       const image = 'width' in input ? input : await decodeFile(input);
       const out = await applyInternal(image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)
