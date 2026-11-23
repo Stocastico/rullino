@@ -20,6 +20,9 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 - **core**: `serializeChain` leaves out an empty `output` (it used to write `output: {}`, which read back as no output).
 - **core**: `serializeChain` writes version 3 (one input `main`, one chain node `edit`; returns an `EditDocument`), and so do `lookEdit`, the playground's share links and Code button: rullino 0.7 and older cannot read these documents (they read v1 / v2 only). Version 1 and 2 documents are read forever.
 
+### Fixed
+- **node**: every `createRenderer()` created its own Dawn instance; the renderers of a process now share one (each with its own device). Several instances in one process are the likely cause of occasional crashes and hangs seen in tests (25 isolated runs clean afterwards, against a hang in 13 before) (#223).
+
 ## [0.7.0]
 
 Documentation for integrators, the `rullino` command, a synchronous Konva filter for colour edits, `.cube` export, a playground that works without WebGPU, and three bug fixes.
