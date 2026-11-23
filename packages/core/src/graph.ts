@@ -2,6 +2,7 @@
 // A v1 / v2 document is the one-input, one-chain case and is lifted by `migrateEdit`. Parsing checks
 // every node, sorts them (each after what it reads; ties in list order), rejects cycles and leaves
 // out what the output does not need. Rendering graphs is the executor's job (#175).
+import { asParseError, ParseError } from './parse-error';
 import type { Geometry } from './geometry';
 import type { Mask } from './mask';
 import type { Step } from './pipeline/chain';
@@ -61,9 +62,9 @@ const FIELDS: Record<NodeKind, readonly string[]> = {
  * Does not validate: {@link parseEdit} does.
  */
 export function migrateEdit(doc: unknown): EditDocument {
-  if (!isObject(doc)) throw new Error('edit: not an object');
+  if (!isObject(doc)) throw new ParseError('edit: not an object');
   if (doc.version === EDIT_VERSION) return doc as unknown as EditDocument;
-  if (doc.version !== 1 && doc.version !== 2) throw new Error(`edit: unsupported version ${JSON.stringify(doc.version)}`);
+  if (doc.version !== 1 && doc.version !== 2) throw new ParseError(`edit: unsupported version ${JSON.stringify(doc.version)}`);
   const { steps, geometry, output } = migrateChain(doc);
   return {
     version: EDIT_VERSION,
@@ -78,30 +79,30 @@ export function parseEdit(input: unknown, options: ParseOptions): EditGraph {
   const legacy = isObject(input) && (input.version === 1 || input.version === 2);
   const doc = migrateEdit(input) as unknown as Record<string, unknown>;
 
-  if (!isObject(doc.inputs) || Object.keys(doc.inputs).length === 0) throw new Error('inputs: at least one input is needed');
+  if (!isObject(doc.inputs) || Object.keys(doc.inputs).length === 0) throw new ParseError('inputs: at least one input is needed');
   const inputNames = Object.keys(doc.inputs);
   for (const name of inputNames) {
-    if (!NAME.test(name)) throw new Error(`input "${name}": names are lower-case letters, digits and "-", starting with a letter`);
+    if (!NAME.test(name)) throw new ParseError(`input "${name}": names are lower-case letters, digits and "-", starting with a letter`);
     const hints = doc.inputs[name];
-    if (!isObject(hints)) throw new Error(`input "${name}": must be an object`);
-    for (const key of Object.keys(hints)) throw new Error(`input "${name}": unknown setting "${key}"`);
+    if (!isObject(hints)) throw new ParseError(`input "${name}": must be an object`);
+    for (const key of Object.keys(hints)) throw new ParseError(`input "${name}": unknown setting "${key}"`);
   }
   const inputs = new Set(inputNames);
 
-  if (!Array.isArray(doc.nodes) || doc.nodes.length === 0) throw new Error('nodes: at least one node is needed');
+  if (!Array.isArray(doc.nodes) || doc.nodes.length === 0) throw new ParseError('nodes: at least one node is needed');
   const listed = doc.nodes.map((raw, i) => parseNode(raw, i, inputs, options, legacy));
   const byId = new Map<string, GraphNode>();
   for (const node of listed) {
-    if (byId.has(node.id)) throw new Error(`node "${node.id}": two nodes have this id`);
+    if (byId.has(node.id)) throw new ParseError(`node "${node.id}": two nodes have this id`);
     byId.set(node.id, node);
   }
   for (const node of listed)
-    for (const name of node.from) if (!inputs.has(name) && !byId.has(name)) throw new Error(`node "${node.id}": reads "${name}", which is neither an input nor a node`);
+    for (const name of node.from) if (!inputs.has(name) && !byId.has(name)) throw new ParseError(`node "${node.id}": reads "${name}", which is neither an input nor a node`);
 
   const out = doc.output === undefined ? {} : doc.output;
   const settings = parseOutput(out, ['node']);
   const outNode = isObject(out) && out.node !== undefined ? out.node : listed[listed.length - 1]!.id;
-  if (typeof outNode !== 'string' || !byId.has(outNode)) throw new Error(`output: node ${JSON.stringify(outNode)} is not a node`);
+  if (typeof outNode !== 'string' || !byId.has(outNode)) throw new ParseError(`output: node ${JSON.stringify(outNode)} is not a node`);
 
   const sorted = sortNodes(listed, byId);
   // What the output needs: walk back from it.
@@ -121,35 +122,35 @@ export function parseEdit(input: unknown, options: ParseOptions): EditGraph {
 }
 
 function parseNode(raw: unknown, i: number, inputs: ReadonlySet<string>, options: ParseOptions, legacy: boolean): GraphNode {
-  if (!isObject(raw)) throw new Error(`node ${i}: not an object`);
+  if (!isObject(raw)) throw new ParseError(`node ${i}: not an object`);
   const id = raw.id;
-  if (typeof id !== 'string' || !NAME.test(id)) throw new Error(`node ${i}: id ${JSON.stringify(id)} must be lower-case letters, digits and "-", starting with a letter`);
-  if (inputs.has(id)) throw new Error(`node "${id}": the name is already an input`);
+  if (typeof id !== 'string' || !NAME.test(id)) throw new ParseError(`node ${i}: id ${JSON.stringify(id)} must be lower-case letters, digits and "-", starting with a letter`);
+  if (inputs.has(id)) throw new ParseError(`node "${id}": the name is already an input`);
   const kind = raw.kind ?? 'chain';
-  if (!(NODE_KINDS as readonly unknown[]).includes(kind)) throw new Error(`node "${id}": unknown kind ${JSON.stringify(kind)} (known: ${NODE_KINDS.join(', ')})`);
+  if (!(NODE_KINDS as readonly unknown[]).includes(kind)) throw new ParseError(`node "${id}": unknown kind ${JSON.stringify(kind)} (known: ${NODE_KINDS.join(', ')})`);
   const k = kind as NodeKind;
   const where = `node "${id}" (${k})`;
-  for (const key of Object.keys(raw)) if (!FIELDS[k].includes(key)) throw new Error(`${where}: unknown field "${key}"`);
+  for (const key of Object.keys(raw)) if (!FIELDS[k].includes(key)) throw new ParseError(`${where}: unknown field "${key}"`);
 
   if (k === 'mix') {
     const from = raw.from;
-    if (!Array.isArray(from) || from.length !== 2 || !from.every((f) => typeof f === 'string')) throw new Error(`${where}: from must list two names`);
+    if (!Array.isArray(from) || from.length !== 2 || !from.every((f) => typeof f === 'string')) throw new ParseError(`${where}: from must list two names`);
     const amount = raw.amount ?? 0.5;
-    if (typeof amount !== 'number' || !(amount >= 0 && amount <= 1)) throw new Error(`${where}: amount must be a number in [0, 1]`);
+    if (typeof amount !== 'number' || !(amount >= 0 && amount <= 1)) throw new ParseError(`${where}: amount must be a number in [0, 1]`);
     const mask = raw.mask === undefined ? undefined : parseMask(raw.mask);
     return { kind: 'mix', id, from: [from[0] as string, from[1] as string], amount, ...(mask ? { mask } : {}) };
   }
-  if (typeof raw.from !== 'string') throw new Error(`${where}: from must be one name`);
+  if (typeof raw.from !== 'string') throw new ParseError(`${where}: from must be one name`);
   const from: [string] = [raw.from];
   if (k === 'resize') {
     const { longSide, scale } = raw;
-    if (longSide === undefined && scale === undefined) throw new Error(`${where}: needs longSide or scale`);
-    if (longSide !== undefined && scale !== undefined) throw new Error(`${where}: longSide and scale exclude each other`);
-    if (longSide !== undefined && !(Number.isInteger(longSide) && (longSide as number) >= 1)) throw new Error(`${where}: longSide must be a positive integer`);
-    if (scale !== undefined && !(typeof scale === 'number' && scale > 0 && scale <= 1)) throw new Error(`${where}: scale must be in (0, 1]`);
+    if (longSide === undefined && scale === undefined) throw new ParseError(`${where}: needs longSide or scale`);
+    if (longSide !== undefined && scale !== undefined) throw new ParseError(`${where}: longSide and scale exclude each other`);
+    if (longSide !== undefined && !(Number.isInteger(longSide) && (longSide as number) >= 1)) throw new ParseError(`${where}: longSide must be a positive integer`);
+    if (scale !== undefined && !(typeof scale === 'number' && scale > 0 && scale <= 1)) throw new ParseError(`${where}: scale must be in (0, 1]`);
     return { kind: 'resize', id, from, ...(longSide !== undefined ? { longSide: longSide as number } : {}), ...(scale !== undefined ? { scale: scale as number } : {}) };
   }
-  if (!Array.isArray(raw.steps)) throw new Error(legacy ? 'chain: steps must be an array' : `${where}: steps must be an array`);
+  if (!Array.isArray(raw.steps)) throw new ParseError(legacy ? 'chain: steps must be an array' : `${where}: steps must be an array`);
   // A lifted v1 / v2 document keeps the messages parseChain gives.
   const steps = parseSteps(raw.steps, options, legacy ? (s) => `chain step ${s}` : (s) => `node "${id}" step ${s}`);
   return { kind: 'chain', id, from, steps, ...(raw.geometry !== undefined ? { geometry: parseGeometry(raw.geometry) } : {}) };
@@ -162,7 +163,7 @@ function sortNodes(listed: readonly GraphNode[], byId: ReadonlyMap<string, Graph
   const ready = (n: GraphNode) => n.from.every((f) => !byId.has(f) || done.has(f));
   while (sorted.length < listed.length) {
     const next = listed.find((n) => !done.has(n.id) && ready(n));
-    if (!next) throw new Error(`parseEdit: nodes ${describeCycle(listed.filter((n) => !done.has(n.id)), byId)} form a cycle`);
+    if (!next) throw new ParseError(`parseEdit: nodes ${describeCycle(listed.filter((n) => !done.has(n.id)), byId)} form a cycle`);
     done.add(next.id);
     sorted.push(next);
   }
@@ -187,6 +188,6 @@ function describeCycle(left: readonly GraphNode[], byId: ReadonlyMap<string, Gra
  */
 export function chainDocument(edit: unknown, nodeId: string): { readonly version: 2; readonly steps: readonly StepDocument[] } {
   const node = migrateEdit(edit).nodes.find((n) => n.id === nodeId);
-  if (!node || (node.kind ?? 'chain') !== 'chain') throw new Error(`node "${nodeId}" is not a chain`);
+  if (!node || (node.kind ?? 'chain') !== 'chain') throw new ParseError(`node "${nodeId}" is not a chain`);
   return { version: 2, steps: (node as { steps: readonly StepDocument[] }).steps };
 }

@@ -145,16 +145,17 @@ How to encode the result. Everything is optional; unknown keys are rejected so a
 
 ## Errors
 
-`parseChain` (and so every renderer) validates a whole document before rendering anything, and says which step and which parameter is wrong:
+`parseEdit` and `parseChain` (and so every renderer) validate a whole document before rendering anything, and say which node, step and parameter is wrong. Everything wrong with a document is thrown as a `ParseError` (exported by `@rullino/core`), so an application can tell a bad document (show the message to whoever wrote it) from a failure of rullino itself (any other error: a bug, please report it). Property tests feed the parsers random and mangled documents to keep it that way.
 
 ```text
 chain step 1: unknown filter "exposur"
 chain step 0 (exposure): unknown parameter "stops"
 chain step 2 (gaussianBlur): parameter "sigma" (float): invalid value "big"
+node "small" (resize): needs longSide or scale
 mask (radial): radius must be > 0
 geometry: crop must be a non-empty rectangle inside [0, 1]²
 output: bitDepth 16 needs format png
-chain: unsupported version 3
+edit: unsupported version 4
 ```
 
 Treat documents from users as untrusted input and render them with a limit on image size and a timeout, like any file you decode: a document cannot run code, but a large raster mask or a very large `sigma` is real work.
