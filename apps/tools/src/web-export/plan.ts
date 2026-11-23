@@ -2,7 +2,9 @@
 // long side, then sharpen a little for the screen (output sharpening belongs after the resize, which
 // is why this is a graph and not a v2 chain: v2 always shrinks last), then encode.
 
-export type WebFormat = 'jpeg' | 'webp' | 'png';
+import type { WebFormat } from '../names';
+
+export type { WebFormat } from '../names';
 
 export interface WebExportOptions {
   /** Long side in pixels; omitted keeps the size. Never enlarges. */
@@ -35,23 +37,4 @@ export function webExportEdit(o: WebExportOptions) {
     ],
     output: { node: 'sharp', format: o.format, ...(o.format !== 'png' && o.quality !== undefined && { quality: o.quality }) },
   };
-}
-
-const EXTENSIONS: Record<WebFormat, string> = { jpeg: 'jpg', webp: 'webp', png: 'png' };
-
-/**
- * The name of a photo's export: its own name with the format's extension, made unique among `taken`
- * (compared without case, as on macOS and Windows), which it updates.
- */
-export function outputName(input: string, format: WebFormat, taken: Set<string>): string {
-  const dot = input.lastIndexOf('.');
-  const stem = dot > 0 ? input.slice(0, dot) : input;
-  const ext = EXTENSIONS[format];
-  for (let n = 1; ; n++) {
-    const name = `${stem}${n === 1 ? '' : `-${n}`}.${ext}`;
-    if (!taken.has(name.toLowerCase())) {
-      taken.add(name.toLowerCase());
-      return name;
-    }
-  }
 }
