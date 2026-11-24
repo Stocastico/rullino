@@ -79,10 +79,8 @@ jobs:
 
   # Firefox and WebKit (#177): @rullino/web's CPU path and backend choice (`pnpm test:engines`) and
   # the built playground without WebGPU. Playwright's Linux builds expose no WebGPU adapter, so
-  # the GPU path stays covered by the Chromium jobs. Not a required check, and only on pushes to main
-  # and manual runs (about 10 minutes; Actions minutes are limited): locally `pnpm test:engines`.
+  # the GPU path stays covered by the Chromium jobs. Not a required check (yet): locally `pnpm test:engines`.
   engines:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
