@@ -50,6 +50,7 @@ import { brushOptions, brushSize, fitRaster, setImageSize, setMaskSource, tools,
 import { samples } from './samples';
 import { History } from './history';
 import { decodeState, encodeState } from './share';
+import { expand, shorten } from './short-links';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
 import { createDepthMapper } from './depth-estimate';
 import { statusText } from './status-text';
@@ -1157,11 +1158,14 @@ ui.share.addEventListener('click', async () => {
   try {
     const doc = serializeChain(toSteps(chain), { geometry, lutRef });
     const sample = imageSample;
-    const text = await encodeState({ chain: doc, ...(sample ? { sample } : {}) });
-    const url = `${location.origin}${location.pathname}#s=${text}`;
+    const state = { chain: doc, ...(sample ? { sample } : {}) };
+    // A short link when the short-link service answers (#208), else the whole state in the fragment.
+    const id = await shorten(state);
+    const url = `${location.origin}${location.pathname}${id ? `#l=${id}` : `#s=${await encodeState(state)}`}`;
     window.history.replaceState(null, '', url);
     await navigator.clipboard?.writeText(url).catch(() => undefined);
-    announce(`Link copied (${(url.length / 1024).toFixed(1)} KB)${sample ? '' : ' · it applies the edits to a sample image: your own image is not included'}`);
+    const what = id ? 'Short link copied' : `Link copied (${(url.length / 1024).toFixed(1)} KB)`;
+    announce(`${what}${sample ? '' : ' · it applies the edits to a sample image: your own image is not included'}`);
   } catch (e) {
     announce(`Cannot share: ${(e as Error).message}`);
   }
@@ -1188,10 +1192,12 @@ ui.code.addEventListener('click', () => void (codeDialog ??= loadCodeDialog()).t
 
 /** The edits and sample image in the URL fragment, if any. */
 async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } | undefined> {
-  const text = new URLSearchParams(location.hash.slice(1)).get('s');
-  if (!text) return undefined;
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const text = hash.get('s');
+  const short = hash.get('l');
+  if (!text && !short) return undefined;
   try {
-    const state = (await decodeState(text)) as { chain?: unknown; sample?: unknown };
+    const state = (short ? await expand(short) : await decodeState(text!)) as { chain?: unknown; sample?: unknown };
     const { steps, geometry: g } = parseChain(state.chain, { filters, resolveLut });
     const states = steps.map((st) => ({
       ...newStep(st.filter),
