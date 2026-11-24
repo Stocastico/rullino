@@ -19,13 +19,14 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Two jobs, as in deploy-pages' README: with the upload and the deploy in one job, the deploy's
+# artifact lookup sometimes found nothing right after a successful upload ("Found 0 artifact(s)",
+# three runs in a row on 24 Nov 2026; actions/deploy-pages#451). A separate job reads the artifact
+# once its upload has finished, and the deploy can be re-run alone.
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -48,5 +49,14 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/playground/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
