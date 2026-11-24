@@ -8,7 +8,8 @@ Claude wrote the proposal ([docs/design/road-to-1.0.md](./docs/design/road-to-1.
 
 1. [x] ~~Upload the M1 reports~~ (Chrome and Safari, 15 Nov): every filter within the real-GPU tolerances, no change needed. Firefox on the M1 is still missing (section 1).
 2. [x] ~~Answer the open questions~~ (15 Nov: metadata kept by default with a strip option, Cloudflare Worker yes, MIT for code + CC BY 4.0 for the spec text, the adoption gate before RAW).
-   - [ ] When the short-links issue (#208) is next: a free **Cloudflare account**, a Workers KV namespace, and an API token with "Edit Cloudflare Workers" for the deploy (Claude writes the Worker and a `wrangler.toml`; the token goes in the repository's Actions secrets as `CLOUDFLARE_API_TOKEN`, never in a file). Optionally a subdomain such as `r.stefanomasneri.com`.
+   - [x] ~~Short links (#208): Cloudflare account, KV namespace, `CLOUDFLARE_API_TOKEN` secret~~ (24 Nov; the free `workers.dev` address, no subdomain).
+   - [ ] **Deploy the short-link Worker** once its PR is merged: Actions → *Short links* → *Run workflow*. Claude reads the address from the run's log and switches the playground's Share button to short links.
 3. [ ] **Merge the PR #205** with the proposal (or ask for changes there).
 4. [ ] **Enable Discussions** (Settings > General > Features > Discussions), with the categories *Announcements*, *Q&A*, *Ideas*, *RFCs* (open format), *Show and tell*. Then ask Claude to write the first posts (welcome + how to ask; one thread per RFC pointing at its issue). Claude cannot enable it, and the tools it has cannot post discussions until it exists.
 5. [ ] **Initialise the wiki**: Wiki tab > "Create the first page" > save anything. Then from your machine: `node scripts/publish-wiki.mjs --dry-run`, then `node scripts/publish-wiki.mjs`. (Claude cannot push to `rullino.wiki.git`.)
