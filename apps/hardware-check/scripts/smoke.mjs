@@ -36,6 +36,7 @@ try {
   await page.waitForSelector('#status[data-done]', { timeout: 120000 });
   const env = await page.textContent('#env');
   if (!/WebGPU: available/.test(env ?? '')) failures.push(`no WebGPU in the page: ${env}`);
+  if (!/Architecture: \S+/.test(env ?? '')) failures.push(`the device description lacks the CPU architecture: ${env}`);
   const done = await page.getAttribute('#status', 'data-done');
   if (done !== 'parity') failures.push(`the parity check ended with "${done}": ${await page.textContent('#status')}`);
   const verdict = (await page.textContent('#parity')) ?? '';
@@ -45,6 +46,9 @@ try {
   await page.waitForSelector('#speed[data-done]', { timeout: 300000 });
   const speed = (await page.textContent('#speed')) ?? '';
   if (!/GPU 12 MP[^\n]*first \d+ ms/.test(speed) || !/CPU 12 MP[^\n]*first \d+ ms/.test(speed)) failures.push(`speed lines missing:\n${speed}`);
+  // The CPU lines say how the render went (bands on workers, time banded / inline): the clue to a slow machine.
+  if (!/CPU 12 MP[^\n]*bands \d+, banded \d+ ms, inline \d+ ms/.test(speed)) failures.push(`CPU lines lack the render diagnostics:\n${speed}`);
+  if (/GPU \d+ MP[^\n]*bands/.test(speed)) failures.push(`GPU lines carry CPU diagnostics:\n${speed}`);
   const report = await page.evaluate(async () => (document.getElementById('copy').click(), 'clicked'));
   if (report !== 'clicked') failures.push('copy button missing');
 } finally {

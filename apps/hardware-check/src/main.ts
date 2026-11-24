@@ -14,10 +14,26 @@ let parity: ParityResult | undefined;
 let envText = '';
 let speedText = '';
 
+/**
+ * The CPU architecture the browser runs on. Chrome's user agent says "Intel" on Apple Silicon too,
+ * but this one tells an arm build from an x86 build under Rosetta; Firefox and Safari have none.
+ */
+async function describeArchitecture(): Promise<string> {
+  const uaData = (navigator as { userAgentData?: { getHighEntropyValues(hints: string[]): Promise<Record<string, string>> } }).userAgentData;
+  if (!uaData) return 'n/a (this browser does not tell)';
+  try {
+    const v = await uaData.getHighEntropyValues(['architecture', 'bitness', 'platformVersion']);
+    return `${v['architecture'] || '?'}${v['bitness'] ? ` ${v['bitness']}-bit` : ''}${v['platformVersion'] ? `, platform version ${v['platformVersion']}` : ''}`;
+  } catch {
+    return 'n/a (refused)';
+  }
+}
+
 async function describeEnvironment(): Promise<string> {
   const lines = [
     `Browser: ${navigator.userAgent}`,
     `Platform: ${navigator.platform}, ${navigator.hardwareConcurrency ?? '?'} logical cores, memory hint ${(navigator as { deviceMemory?: number }).deviceMemory ?? 'n/a'} GB, pixel ratio ${devicePixelRatio}`,
+    `Architecture: ${await describeArchitecture()}`,
     `Secure context: ${isSecureContext}; cross-origin isolated: ${crossOriginIsolated}`,
   ];
   if (!navigator.gpu) {
@@ -120,8 +136,11 @@ async function runSpeedCheck() {
     const { createRenderer } = await import('@rullino/web');
     for (const backend of ['gpu', 'cpu'] as const) {
       let renderer;
+      let last: { bands: number; bandedMs: number; inlineMs: number } | undefined;
       try {
-        renderer = await createRenderer({ backend });
+        // onRender: what the CPU render did (bands run on workers, time in banded / inline segments);
+        // 0 or 1 bands on a big image means the worker pool did not help.
+        renderer = await createRenderer({ backend, pool: { onRender: (info) => (last = info) } });
       } catch (e) {
         lines.push(`${backend.toUpperCase()}: not available (${(e as Error).message})`);
         show();
@@ -137,7 +156,8 @@ async function runSpeedCheck() {
           await renderer.pixels(image, chain);
           runs.push(Math.round(performance.now() - t));
         }
-        lines.push(`${backend.toUpperCase()} ${mp} MP (${image.width}x${image.height}): ${runs.map((ms, i) => `${i === 0 ? 'first' : 'next'} ${ms} ms`).join(', ')}`);
+        const diagnostics = backend === 'cpu' && last ? ` [bands ${last.bands}, banded ${Math.round(last.bandedMs)} ms, inline ${Math.round(last.inlineMs)} ms]` : '';
+        lines.push(`${backend.toUpperCase()} ${mp} MP (${image.width}x${image.height}): ${runs.map((ms, i) => `${i === 0 ? 'first' : 'next'} ${ms} ms`).join(', ')}${diagnostics}`);
         show();
       }
       renderer.destroy();
