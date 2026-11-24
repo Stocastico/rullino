@@ -16,7 +16,9 @@ const check = (ok, msg) => ok || failures.push(msg);
 try {
   const page = await browser.newPage();
   page.on('pageerror', (e) => failures.push(`page error: ${e.message}`));
-  page.on('console', (m) => m.type() === 'error' && failures.push(`console error: ${m.text()}`));
+  // While the test takes the short-link Worker down, the browser logs the failed request (as it would for a user).
+  let linksDown = false;
+  page.on('console', (m) => m.type() === 'error' && !(linksDown && m.text().startsWith('Failed to load resource')) && failures.push(`console error: ${m.text()}`));
 
   const frame = () => page.$eval('#status', (s) => Number(s.dataset.frame ?? 0));
   /** Runs an action and waits until at least one new frame has finished after it. */
@@ -82,20 +84,46 @@ try {
   await after(() => page.click('#redo'));
   check((await ev()) === '1.5' && (await differs()) > 0.3, `redo should restore +1.5 EV, slider ${await ev()}`);
 
-  // A share link opens the same edits in a fresh page.
-  await page.click('#share');
-  await page.waitForFunction(() => location.hash.startsWith('#s='));
-  const link = await page.evaluate(() => location.href);
-  {
+  // A share link opens the same edits in a fresh page: a short link (`#l=`) through a fake short-link
+  // store (CI must not depend on the real Worker), then, with the Worker unreachable, the long link.
+  const store = new Map();
+  const fakeLinks = (route) => {
+    const req = route.request();
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'content-type': 'application/json' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    if (req.method() === 'POST') {
+      const id = `fake${String(store.size).padStart(6, '0')}`;
+      store.set(id, req.postData());
+      return route.fulfill({ status: 201, headers: cors, body: JSON.stringify({ id }) });
+    }
+    const body = store.get(new URL(req.url()).pathname.slice(1));
+    return route.fulfill({ status: body ? 200 : 404, headers: cors, body: body ?? '{}' });
+  };
+  const LINKS = 'https://rullino-links.stocastico.workers.dev/**';
+  const opensShared = async (link, kind) => {
     const other = await browser.newPage();
-    other.on('pageerror', (e) => failures.push(`page error (shared link): ${e.message}`));
+    other.on('pageerror', (e) => failures.push(`page error (${kind} link): ${e.message}`));
+    await other.route(LINKS, fakeLinks);
     await other.goto(link);
     await other.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
     const sharedEv = await other.$eval('#chain [name=ev]', (el) => el.value);
-    check(sharedEv === '1.5', `shared link should open with +1.5 EV, slider ${sharedEv}`);
-    check(await other.$eval('#undo', (b) => b.disabled), 'a shared link should not start with an undo step');
+    check(sharedEv === '1.5', `${kind} link should open with +1.5 EV, slider ${sharedEv}`);
+    check(await other.$eval('#undo', (b) => b.disabled), `a ${kind} link should not start with an undo step`);
     await other.close();
-  }
+  };
+  await page.route(LINKS, fakeLinks);
+  await page.click('#share');
+  await page.waitForFunction(() => location.hash.startsWith('#l='));
+  check(store.size === 1, `sharing should store one document, stored ${store.size}`);
+  await opensShared(await page.evaluate(() => location.href), 'short');
+  await page.unroute(LINKS);
+  linksDown = true;
+  await page.route(LINKS, (route) => route.fulfill({ status: 503, body: '' }));
+  await page.click('#share');
+  await page.waitForFunction(() => location.hash.startsWith('#s='));
+  await opensShared(await page.evaluate(() => location.href), 'long');
+  await page.unroute(LINKS);
+  linksDown = false;
 
   // Copy as code: the dialog shows the current chain (+1.5 EV) as a document and as @rullino/web code.
   await page.click('#code');

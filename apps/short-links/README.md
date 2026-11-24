@@ -17,7 +17,12 @@ listing of links.
 Free-tier limits: 1 000 new links and 100 000 reads a day. Past them the playground falls back to the
 long link.
 
-**Deploy:** Actions → *Short links* → *Run workflow* (needs the `CLOUDFLARE_API_TOKEN` secret). The
-URL the deploy prints goes into `apps/playground/src/short-links.ts` (`SHORT_LINKS_URL`).
+**Live at** `https://rullino-links.stocastico.workers.dev` (deployed 24 Nov 2026; the playground's
+`SHORT_LINKS_URL` in `apps/playground/src/short-links.ts`).
+
+**Deploy:** Actions → *Short links* → *Run workflow* (needs the `CLOUDFLARE_API_TOKEN` secret). A
+redeploy keeps the address and the stored links; a new address must also go into `SHORT_LINKS_URL`.
+The playground's e2e test never calls the real Worker: it answers its requests with a fake store, then
+blocks them to check the fallback to long links.
 **Tests:** `npx vitest run apps/short-links` (the Worker with an in-memory KV, in Node) and
 `apps/playground/src/short-links.test.ts` (the playground against it).

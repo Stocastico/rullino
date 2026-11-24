@@ -200,6 +200,9 @@ function maskDocument(m: Mask): MaskDocument {
   return { ...rest, width: raster.width, height: raster.height, data: toBase64(bytes) };
 }
 
+/** A JSON number as is, anything else NaN (which the validators refuse); never `Number()` on untrusted values: it calls their `toString`. */
+const num = (v: unknown): number => (typeof v === 'number' ? v : NaN);
+
 const vec2 = (v: unknown): readonly [number, number] => {
   if (!Array.isArray(v) || v.length !== 2 || !v.every((x) => typeof x === 'number')) throw new ParseError('mask: points must be [x, y] number pairs');
   return [v[0] as number, v[1] as number];
@@ -210,7 +213,7 @@ export function parseMask(m: unknown): Mask {
   if (!isObject(m)) throw new ParseError('mask: not an object');
   const options = {
     ...(m.invert !== undefined ? { invert: m.invert === true } : {}),
-    ...(m.opacity !== undefined ? { opacity: Number(m.opacity) } : {}),
+    ...(m.opacity !== undefined ? { opacity: num(m.opacity) } : {}),
   };
   let mask: Mask;
   switch (m.kind) {
@@ -218,7 +221,7 @@ export function parseMask(m: unknown): Mask {
       mask = { kind: 'linear', from: vec2(m.from), to: vec2(m.to), ...options };
       break;
     case 'radial':
-      mask = { kind: 'radial', center: vec2(m.center), radius: vec2(m.radius), feather: Number(m.feather), ...options };
+      mask = { kind: 'radial', center: vec2(m.center), radius: vec2(m.radius), feather: num(m.feather), ...options };
       break;
     case 'raster': {
       const { width, height, data } = m;
@@ -243,8 +246,8 @@ export function parseGeometry(g: unknown): Geometry {
     rotate: g.rotate as Geometry['rotate'],
     flipH: g.flipH === true,
     flipV: g.flipV === true,
-    straighten: Number(g.straighten),
-    crop: { x: Number(x), y: Number(y), width: Number(width), height: Number(height) },
+    straighten: num(g.straighten),
+    crop: { x: num(x), y: num(y), width: num(width), height: num(height) },
     ...(g.perspective !== undefined
       ? {
           perspective: (() => {

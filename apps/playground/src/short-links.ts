@@ -3,8 +3,8 @@
 // go there, never an image. When the Worker is not configured, down, over its free quota or slow, the
 // Share button falls back to the long link, which works without it.
 
-/** The deployed Worker; empty until it is (then the Share button makes long links only). */
-export const SHORT_LINKS_URL = '';
+/** The deployed Worker (apps/short-links); empty would mean long links only. */
+export const SHORT_LINKS_URL = 'https://rullino-links.stocastico.workers.dev';
 
 const ID = /^[A-Za-z0-9_-]{10}$/;
 
