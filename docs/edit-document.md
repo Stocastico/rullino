@@ -4,7 +4,7 @@ A rullino edit is a piece of JSON: the steps to apply, optionally a frame for th
 
 - Current version: **2**. Version 1 documents (the same without `output`) are read and migrated.
 - Machine-readable description: [`@rullino/core/edit.schema.json`](../packages/core/edit.schema.json) (JSON Schema 2020-12), for validating documents outside JavaScript. The schema covers the shape only; `parseChain` in `@rullino/core` is the authority, because it also knows the filters (ids, parameter ranges and types), that a perspective quad is convex and that a crop lies inside the frame.
-- Documents are made by `serializeChain`, the playground (**Code** button, share links) or by hand, and rendered by `applyEdit` or by a renderer (`@rullino/web`, `@rullino/node`, `@rullino/konva`).
+- Documents are made by `serializeChain`, the playground (**Code** button, share links: a short link stores the document, never the photo, on rullino's [short-link service](https://github.com/Stocastico/rullino/tree/main/apps/short-links), the long one carries it in the URL) or by hand, and rendered by `applyEdit` or by a renderer (`@rullino/web`, `@rullino/node`, `@rullino/konva`).
 
 ## A complete document
 

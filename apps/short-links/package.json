@@ -1,0 +1,7 @@
+{
+  "name": "@rullino/short-links",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Short links for edit documents (#208): one Cloudflare Worker on the free tier, deployed by .github/workflows/short-links.yml. Stores documents, never images."
+}

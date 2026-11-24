@@ -1,0 +1,19 @@
+# Short links for edit documents (#208), deployed by .github/workflows/short-links.yml (by hand).
+# The account comes from the API token (secret CLOUDFLARE_API_TOKEN); the URL is
+# https://rullino-links.<account subdomain>.workers.dev (workers_dev).
+name = "rullino-links"
+main = "src/worker.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "LINKS"
+id = "26939b4c224d4188aacfabba14ce436b"
+
+[vars]
+# Origins that may create links: the playground on GitHub Pages and the dev / preview servers.
+ALLOWED_ORIGINS = "https://stefanomasneri.com,https://stocastico.github.io,http://localhost:5173,http://localhost:4173"
+
+[observability]
+# No logs of requests (and so of documents) are kept.
+enabled = false
