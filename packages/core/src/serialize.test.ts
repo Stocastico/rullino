@@ -6,7 +6,8 @@ import { createImage } from './image';
 import { identityLut } from './lut';
 import { createRasterMask } from './mask';
 import type { Step } from './pipeline/chain';
-import { CHAIN_VERSION, migrateChain, parseChain, serializeChain, type OutputSettings } from './serialize';
+import { ParseError } from './parse-error';
+import { CHAIN_VERSION, migrateChain, parseChain, parseGeometry, parseMask, serializeChain, type OutputSettings } from './serialize';
 
 const gain = defineFilter({
   id: 'gain',
@@ -159,5 +160,21 @@ describe('edit document v2', () => {
   it('refuses a version 3 document that is a real graph, and says what to use', () => {
     const graph = { version: 3, inputs: { photo: {} }, nodes: [{ id: 'a', from: 'photo', steps: [] }, { id: 'b', kind: 'resize', from: 'a', scale: 0.5 }] };
     expect(() => parseChain(graph, { filters })).toThrow(/parseChain: this document is a graph \(2 nodes\); use parseEdit/);
+  });
+});
+
+describe('numbers in masks and geometry', () => {
+  // Found by the fuzz job: Number() on an object whose toString is not a function throws a TypeError.
+  const hostile = { toString: {} };
+  const crop = { x: 0, y: 0, width: 1, height: 1 };
+  it('a non-number feather, opacity, straighten or crop value is a ParseError, not a TypeError', () => {
+    const radial = { kind: 'radial', center: [0.5, 0.5], radius: [0.3, 0.2], feather: 0.4 };
+    for (const v of [hostile, '0.5', null, [0.5]]) {
+      expect(() => parseMask({ ...radial, feather: v })).toThrow(ParseError);
+      expect(() => parseMask({ ...radial, opacity: v })).toThrow(ParseError);
+      expect(() => parseGeometry({ rotate: 0, straighten: v, crop })).toThrow(ParseError);
+      for (const k of Object.keys(crop)) expect(() => parseGeometry({ rotate: 0, straighten: 0, crop: { ...crop, [k]: v } })).toThrow(ParseError);
+    }
+    expect(parseMask(radial)).toMatchObject({ feather: 0.4 });
   });
 });
