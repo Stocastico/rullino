@@ -9,8 +9,10 @@ import { filters } from './index';
 // reads back to the same steps. RULLINO_FUZZ_RUNS raises the number of runs (the CI fuzz job).
 
 const RUNS = Number(process.env.RULLINO_FUZZ_RUNS ?? 300);
-// Hundreds of cases each: slower than a unit test by nature (and much slower under coverage).
-const SLOW = { timeout: 60_000 };
+// Hundreds of cases each: slower than a unit test by nature (and much slower under coverage). The
+// timeout grows with the runs: a describe's timeout overrides --testTimeout, so the fuzz job's
+// 20 000 runs must not be held to the 300 of `pnpm test`.
+const SLOW = { timeout: Math.max(60_000, (60_000 * RUNS) / 300) };
 // A failure prints its seed: RULLINO_FUZZ_SEED=<seed> replays it.
 if (process.env.RULLINO_FUZZ_SEED) fc.configureGlobal({ seed: Number(process.env.RULLINO_FUZZ_SEED) });
 const opts = { filters };

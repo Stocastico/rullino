@@ -12,8 +12,10 @@ import { planTiles, tileSideFor } from './tiles';
 
 const RUN = 'fn run(xy: vec2i, p: Params) -> vec4f { return load_input(xy); }';
 const RUNS = Number(process.env.RULLINO_FUZZ_RUNS ?? 300);
-// Hundreds of cases each: slower than a unit test by nature (and much slower under coverage).
-const SLOW = { timeout: 60_000 };
+// Hundreds of cases each: slower than a unit test by nature (and much slower under coverage). The
+// timeout grows with the runs: a describe's timeout overrides --testTimeout, so the fuzz job's
+// 20 000 runs must not be held to the 300 of `pnpm test`.
+const SLOW = { timeout: Math.max(60_000, (60_000 * RUNS) / 300) };
 // A failure prints its seed: RULLINO_FUZZ_SEED=<seed> replays it.
 if (process.env.RULLINO_FUZZ_SEED) fc.configureGlobal({ seed: Number(process.env.RULLINO_FUZZ_SEED) });
 
