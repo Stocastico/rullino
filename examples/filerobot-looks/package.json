@@ -7,7 +7,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@rullino/konva": "^0.7.0",
+    "@rullino/konva": "^0.8.0",
     "konva": "9.3.18",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

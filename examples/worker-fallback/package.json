@@ -7,7 +7,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@rullino/web": "^0.5.0"
+    "@rullino/web": "^0.8.0"
   },
   "devDependencies": {
     "vite": "^7.1.0"
