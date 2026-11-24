@@ -14,6 +14,9 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 ### Added
 - Playground: short share links (`#l=<id>`) through rullino's short-link service, a Cloudflare Worker on the free tier that stores the edit document and the sample's name, never a photo (#208). When it does not answer, Share makes the long link as before.
 
+### Fixed
+- **core**: a mask's `feather` / `opacity` or a geometry's `straighten` / `crop` that is not a JSON number is now a `ParseError` (an object such as `{ "toString": {} }` threw a `TypeError`, found by the fuzz job). Numeric strings such as `"0.5"`, accepted by accident until now, are refused like any other non-number.
+
 ## [0.8.0]
 
 Foundations for 1.0: the edit document becomes a graph (version 3), the GPU renders images larger than a texture and within a memory budget, the parsers and planners are fuzzed, `@rullino/web` is tested in Firefox and WebKit, and rullino tools has four pages that work offline. Documents written by 0.8 are version 3, which 0.7 cannot read.
