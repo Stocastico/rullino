@@ -1,0 +1,51 @@
+{
+  "name": "@rullino/codecs",
+  "version": "0.8.0",
+  "description": "Image decoders and encoders for rullino in pure TypeScript: PNG, JPEG, TIFF, the same pixels in every runtime.",
+  "keywords": [
+    "png",
+    "jpeg",
+    "tiff",
+    "decoder",
+    "encoder",
+    "image",
+    "16-bit",
+    "typescript",
+    "zero-dependency"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stocastico/rullino.git",
+    "directory": "packages/codecs"
+  },
+  "homepage": "https://stefanomasneri.com/rullino/",
+  "bugs": {
+    "url": "https://github.com/Stocastico/rullino/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "sharp": "0.35.5"
+  },
+  "scripts": {
+    "build": "node ../../scripts/fs.mjs rm dist && tsc -p tsconfig.build.json && node ../../scripts/fix-imports.mjs dist && node ../../scripts/fs.mjs cp ../../LICENSE LICENSE",
+    "prepublishOnly": "node ../../scripts/refuse-publish.mjs"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ]
+}

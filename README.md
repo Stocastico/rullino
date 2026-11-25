@@ -79,6 +79,7 @@ GPU and CPU agree within a tolerance each filter declares: see the [parity table
 | [`@rullino/web`](./packages/web/README.md) | Browser renderer: WebGPU, else the CPU in Web Workers (with band threads) | you render edits in a web page |
 | [`@rullino/node`](./packages/node/README.md) | Node renderer and the `rullino` command: the same shaders on Dawn, else the CPU (worker threads); files in and out through `sharp` | you render on a server, in a script or from a shell |
 | [`@rullino/konva`](./packages/konva/README.md) | `attachEdit(node)`: a `Konva.Image` edited with documents, previews at screen size, full-resolution export | you build on Konva |
+| [`@rullino/codecs`](./packages/codecs/README.md) | PNG, JPEG and TIFF decoders and encoders in TypeScript: the same pixels from the same file in every browser and in Node, 16-bit and float included; other formats through decoders you pass in | you want identical input everywhere, 16-bit or float files, or no native image library |
 | [`@rullino/core`](./packages/core/README.md) | The engine: edit documents, `Pipeline`, masks, geometry, LUTs, colour maths, export, `defineFilter` | you want the low-level API or to write filters |
 | [`@rullino/filters`](./packages/filters/README.md) | 51 filters, each a WGSL shader plus a TypeScript reference | you pick filters yourself (the renderers include them) |
 | [`@rullino/presets`](./packages/presets/README.md) | Ten looks (LUT + vignette + grain) as steps, edit documents and `.cube` baking | you want ready-made looks |

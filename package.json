@@ -24,6 +24,7 @@
     "bench": "vitest run --project bench && node scripts/fs.mjs cat packages/filters/bench/results.txt",
     "report:parity": "vitest run --project report && node scripts/fs.mjs cat packages/filters/report/parity-report.md",
     "bench:cpu": "node scripts/bench-cpu.mjs",
+    "bench:codecs": "node scripts/bench-codecs.mjs",
     "bench:threads": "node scripts/bench-threads.mjs",
     "bench:threads:web": "node scripts/bench-threads-web.mjs",
     "bench:web": "pnpm --filter @rullino/bench bench",

@@ -8,7 +8,8 @@
     "../../packages/ml",
     "../../packages/node",
     "../../packages/web",
-    "../../packages/konva"
+    "../../packages/konva",
+    "../../packages/codecs"
   ],
   "entryPointStrategy": "packages",
   "packageOptions": {
