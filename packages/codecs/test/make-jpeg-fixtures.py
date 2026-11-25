@@ -67,3 +67,15 @@ open(os.path.join(out, 'ycck-adobe1.jpg'), 'wb').write(data)
 for name in ['cmyk', 'ycck', 'ycck-adobe1']:
     with open(os.path.join(out, f'{name}.cmyk'), 'wb') as f:
         f.write(Image.open(os.path.join(out, f'{name}.jpg')).tobytes())
+
+# Encoder references (test/jpeg-encode/): PNG inputs and what libjpeg-turbo (Pillow, standard Huffman
+# tables) writes for them at a few qualities and every subsampling.
+enc = os.path.join(root, 'jpeg-encode')
+os.makedirs(enc, exist_ok=True)
+random.seed(1790)
+inputs = {'photo': crop, 'noise': noise(37, 29), 'tiny1x1': noise(1, 1), 'row17x1': noise(17, 1), 'column1x17': noise(1, 17), 'odd33x17': crop.resize((33, 17))}
+for name, img in inputs.items():
+    img.save(os.path.join(enc, f'{name}.png'))
+    for q in [1, 50, 75, 100]:
+        for sub, label in [(0, '444'), (1, '422'), (2, '420')]:
+            img.save(os.path.join(enc, f'{name}-q{q}-{label}.jpg'), 'JPEG', quality=q, subsampling=sub)
