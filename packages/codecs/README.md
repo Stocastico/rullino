@@ -4,7 +4,7 @@
 
 Image decoders for [rullino](https://github.com/Stocastico/rullino) in pure TypeScript, with no dependencies: the same file decodes to the same pixels in every browser, in Node, Deno and Bun. Browsers and native libraries decode the same file differently, so "the browser preview and the server render match" starts from the same input only when the decoder is the same.
 
-> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and JPEG and TIFF encoding are done; decoders you plug in (AVIF, HEIC, JPEG XL) come next. 0.x: the API may change between minor versions.
+> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and encoding (PNG encoding is in `@rullino/core`), and a `decode` that takes decoders for the other formats. 0.x: the API may change between minor versions.
 
 ```ts
 import { decodeJpeg, decodePng, CodecError } from '@rullino/codecs';
@@ -20,6 +20,20 @@ try {
   else throw e;
 }
 ```
+
+## Any format: `decode`
+
+```ts
+import { decode, detectFormat, type Decoder } from '@rullino/codecs';
+
+declare const bytes: Uint8Array;
+declare const myAvifDecoder: Decoder; // e.g. a WASM build: (bytes, { maxPixels }) => DecodedImage
+
+detectFormat(bytes); // 'png' | 'jpeg' | 'tiff' | 'webp' | 'avif' | 'heic' | 'jxl' | 'gif' | 'bmp' | undefined
+const image = await decode(bytes, { decoders: { avif: myAvifDecoder } }); // image.format says which
+```
+
+`decode` reads the format from the file's first bytes and uses the built-in decoder for PNG, JPEG and TIFF, or the one you pass in `decoders` (which can also replace a built-in one). There is no decoder of our own for AVIF, HEIC, JPEG XL, WebP, GIF or BMP: without one in `decoders` they are a `CodecError` that says so. What a decoder returns is checked like a built-in result (size, `maxPixels`, sample type and count), so a wrong one fails here, not later in a renderer.
 
 ## PNG
 
