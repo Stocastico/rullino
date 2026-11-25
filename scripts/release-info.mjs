@@ -1,10 +1,10 @@
 // Release gate, run by .github/workflows/release.yml on a `vX.Y.Z[-pre]` tag (and by hand:
-// `node scripts/release-info.mjs v0.1.0-rc.0`). Fails unless the tag is a semver version and all four
+// `node scripts/release-info.mjs v0.1.0-rc.0`). Fails unless the tag is a semver version and all the
 // packages carry exactly that version and are publishable; prints `version`, the npm dist-tag
 // (`next` for a pre-release, `latest` otherwise) and `prerelease` as GITHUB_OUTPUT-style lines.
 import { readFileSync } from 'node:fs';
 
-const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva'];
+const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva', 'codecs'];
 const SEMVER = /^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/;
 
 const tag = process.argv[2] ?? '';

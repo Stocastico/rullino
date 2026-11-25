@@ -20,7 +20,7 @@ import { build, preview } from 'vite';
 import { launchOptions } from './browser-launch.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url)); // not .pathname: it breaks Windows paths
-const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva'];
+const PACKAGES = ['core', 'filters', 'presets', 'ml', 'node', 'web', 'konva', 'codecs'];
 const version = JSON.parse(readFileSync(join(repo, 'packages/core/package.json'), 'utf8')).version;
 const failures = [];
 const check = (ok, msg) => ok || failures.push(msg);
@@ -76,7 +76,17 @@ import * as presets from '@rullino/presets';
 import * as ml from '@rullino/ml';
 import * as mlInternal from '@rullino/ml/internal';
 import { createRenderer } from '@rullino/node';
+import * as codecs from '@rullino/codecs';
 const out = {};
+// @rullino/codecs from its tarball: a JPEG and a 16-bit TIFF round trip, and decode() telling them apart.
+{
+  const rgba = { width: 9, height: 7, data: Uint8Array.from({ length: 9 * 7 * 4 }, (_, i) => (i % 4 === 3 ? 255 : (i * 37) % 256)) };
+  const jpeg = codecs.encodeJpeg(rgba, { quality: 0.95, subsampling: '4:4:4' });
+  const back = await codecs.decode(jpeg);
+  const tiff = await codecs.encodeTiff({ width: 2, height: 1, bitDepth: 16, data: Uint16Array.from([1, 2, 3, 65535, 40000, 5, 6, 65535]) });
+  const t = await codecs.decode(tiff);
+  out.codecs = back.format === 'jpeg' && back.width === 9 && Math.abs(back.data[4] - rgba.data[4]) < 12 && t.format === 'tiff' && t.bitDepth === 16 && t.data[4] === 40000 && codecs.detectFormat(new Uint8Array(4)) === undefined;
+}
 out.core = typeof core.defineFilter === 'function' && !('passShader' in core) && typeof internal.passShader === 'function';
 out.ml = typeof ml.createMiganInpainter === 'function' && !('samInput' in ml) && typeof mlInternal.samInput === 'function';
 out.presets = typeof presets.lookSteps === 'function';

@@ -44,12 +44,7 @@ function lzw(data: Uint8Array): Uint8Array {
   let table = new Map<number, number>();
   let next = 258;
   put(256);
-  if (data.length === 0) {
-    put(257);
-    if (n > 0) out.push((acc << (8 - n)) & 255);
-    return Uint8Array.from(out);
-  }
-  let prefix = data[0]!;
+  let prefix = data[0]!; // never empty: a strip holds at least one row
   const grow = () => {
     if (next === 4094) {
       put(256);

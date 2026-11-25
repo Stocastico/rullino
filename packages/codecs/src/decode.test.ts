@@ -20,6 +20,8 @@ describe('detectFormat', () => {
     // HEIC (HEVC) and JPEG XL by their signatures, as sharp's prebuilt binaries write neither.
     expect(detectFormat(Uint8Array.from([0, 0, 0, 24, ...new TextEncoder().encode('ftypheic'), 0, 0, 0, 0, ...new TextEncoder().encode('mif1heic')]))).toBe('heic');
     expect(detectFormat(Uint8Array.from([0, 0, 0, 24, ...new TextEncoder().encode('ftypmif1'), 0, 0, 0, 0, ...new TextEncoder().encode('mif1avif')]))).toBe('avif');
+    expect(detectFormat(Uint8Array.from([0, 0, 0, 24, ...new TextEncoder().encode('ftypmif1'), 0, 0, 0, 0, ...new TextEncoder().encode('mif1heix')]))).toBe('heic');
+    expect(detectFormat(Uint8Array.from([0, 0, 0, 20, ...new TextEncoder().encode('ftypmif1'), 0, 0, 0, 0, ...new TextEncoder().encode('mif1')]))).toBeUndefined();
     expect(detectFormat(Uint8Array.from([0xff, 0x0a, 0xfa, 0x18]))).toBe('jxl');
     expect(detectFormat(Uint8Array.from([0, 0, 0, 0x0c, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a]))).toBe('jxl');
     expect(detectFormat(Uint8Array.from([0x42, 0x4d, ...new Array(20).fill(0)]))).toBe('bmp');

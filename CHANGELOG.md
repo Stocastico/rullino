@@ -12,6 +12,7 @@ All notable changes to the `@rullino/*` packages (core, filters, presets, ml, no
 ## [Unreleased]
 
 ### Added
+- **codecs** (new package, `@rullino/codecs`, #179): image decoders and encoders in TypeScript with no dependencies, so a file decodes to the same pixels in every browser and in Node. `decodePng` (every colour type and bit depth, Adam7, tRNS, iCCP), `decodeJpeg` (baseline and progressive, any sampling, restarts, grey / YCbCr / RGB / CMYK / YCCK; a port of libjpeg-turbo's decoder that gives its bytes exactly), `encodeJpeg` (baseline, 4:4:4 / 4:2:2 / 4:2:0; libjpeg-turbo's file byte for byte for the same settings), `decodeTiff` and `encodeTiff` (strips and tiles, chunky and planar, none / LZW / Deflate / PackBits, predictors, 8 / 16-bit and 32-bit float, alpha, ICC), and `decode` / `detectFormat`, which take decoders you pass in for AVIF, HEIC, JPEG XL, WebP, GIF and BMP. Images come back as RGBA with straight alpha and the samples as stored (16-bit and float kept, `icc` alongside). Strict and bounded: malformed, truncated or too large files (`maxPixels`, checked before allocating) are a `CodecError`. Fuzzed in CI. `pnpm bench:codecs` compares it with sharp and the browser's decoder (12 MP: 1.6–2.2× the browser's decode and readback in Chromium, 4–6× sharp in Node).
 - Playground: short share links (`#l=<id>`) through rullino's short-link service, a Cloudflare Worker on the free tier that stores the edit document and the sample's name, never a photo (#208). When it does not answer, Share makes the long link as before.
 
 ### Fixed
