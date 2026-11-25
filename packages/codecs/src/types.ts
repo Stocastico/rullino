@@ -19,7 +19,12 @@ export type DecodedImage = {
   readonly height: number;
   /** The ICC profile embedded in the file, if any, as its raw bytes. */
   readonly icc?: Uint8Array;
-} & ({ readonly bitDepth: 8; readonly data: Uint8Array } | { readonly bitDepth: 16; readonly data: Uint16Array });
+} & (
+  | { readonly bitDepth: 8; readonly data: Uint8Array }
+  | { readonly bitDepth: 16; readonly data: Uint16Array }
+  /** Floating point (TIFF), as stored: values may lie outside [0, 1] (HDR); alpha 1 is opaque. */
+  | { readonly bitDepth: 32; readonly data: Float32Array }
+);
 
 export interface DecodeOptions {
   /**

@@ -4,7 +4,7 @@
 
 Image decoders for [rullino](https://github.com/Stocastico/rullino) in pure TypeScript, with no dependencies: the same file decodes to the same pixels in every browser, in Node, Deno and Bun. Browsers and native libraries decode the same file differently, so "the browser preview and the server render match" starts from the same input only when the decoder is the same.
 
-> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG and JPEG decoding and JPEG encoding are done; TIFF comes next. 0.x: the API may change between minor versions.
+> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and JPEG encoding are done; TIFF encoding comes next. 0.x: the API may change between minor versions.
 
 ```ts
 import { decodeJpeg, decodePng, CodecError } from '@rullino/codecs';
@@ -12,8 +12,8 @@ import { decodeJpeg, decodePng, CodecError } from '@rullino/codecs';
 declare const bytes: Uint8Array; // the file's bytes
 
 try {
-  const image = await decodePng(bytes); // or decodeJpeg(bytes)
-  // image.width, image.height, image.bitDepth (8 or 16), image.data: RGBA, straight alpha,
+  const image = await decodePng(bytes); // or decodeJpeg(bytes), decodeTiff(bytes)
+  // image.width, image.height, image.bitDepth (8, 16 or 32 = float), image.data: RGBA, straight alpha,
   // image.icc: the embedded ICC profile (if any)
 } catch (e) {
   if (e instanceof CodecError) console.error(e.message); // malformed, truncated or too large
@@ -48,3 +48,9 @@ const file = encodeJpeg(pixels, { quality: 0.9, subsampling: '4:2:0' }); // Uint
 ```
 
 Baseline JPEG in YCbCr, with 4:4:4, 4:2:2 or 4:2:0 subsampling (default 4:2:0), libjpeg's Annex K quantisation tables scaled by `quality` (0–1, libjpeg's quality / 100; default 0.9) and the standard Huffman tables, plus an optional ICC profile (`icc`). Alpha is dropped: flatten transparent images first. The encoder is libjpeg-turbo's C encoder step for step (colour conversion, edge padding, downsampling, integer forward DCT, quantisation, the dummy blocks at the edges), so the file is the one libjpeg-turbo writes for the same settings: the tests compare 72 files written by Pillow, byte for byte, and check that what it writes reads back alike through libjpeg-turbo and `decodeJpeg`. Optimised Huffman tables and progressive output are not offered yet.
+
+## TIFF
+
+The first image of a TIFF file: strips or tiles, chunky or planar samples, no compression, LZW, Deflate or PackBits, the horizontal and floating-point predictors, 1 / 2 / 4 / 8 / 16-bit integer and 32-bit float samples, grey (black or white is zero), RGB, palette and CMYK, associated (premultiplied) or unassociated alpha, both byte orders, an ICC profile. Up to 8 bits and palettes come back as 8-bit RGBA, 16-bit samples as 16-bit, float samples as `Float32Array` with the values as stored (HDR values above 1 are kept). Associated alpha is divided out. CMYK goes through the same naive formula as JPEG. JPEG-in-TIFF, CCITT fax, BigTIFF and signed or 16-bit float samples are refused with a `CodecError`.
+
+Tested on 36 files written by libtiff (through Pillow), ImageMagick and tifffile from known sources (every combination above): the decoded pixels must be the sources exactly. Fuzzed like the other decoders, including changes aimed at the IFD's types, counts and offsets.

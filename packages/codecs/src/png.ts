@@ -7,6 +7,7 @@
 // header implies, so a small file cannot make the decoder allocate more than the image it describes.
 
 import { CodecError, DEFAULT_MAX_PIXELS, type DecodedImage, type DecodeOptions } from './types';
+import { inflate } from './zlib';
 
 const fail = (message: string, cause?: unknown): never => {
   throw new CodecError('png', message, cause === undefined ? undefined : { cause });
@@ -46,39 +47,6 @@ export function crc32(bytes: Uint8Array, from = 0, to = bytes.length): number {
 }
 
 const u32 = (b: Uint8Array, at: number) => ((b[at]! << 24) | (b[at + 1]! << 16) | (b[at + 2]! << 8) | b[at + 3]!) >>> 0;
-
-/** Inflates zlib data: exactly `size` bytes (more is ignored, fewer is an error), or up to `limit` bytes when `size` is not known. */
-async function inflate(data: Uint8Array, what: string, size: number | { limit: number }): Promise<Uint8Array> {
-  const known = typeof size === 'number';
-  const cap = known ? size : size.limit;
-  let out = new Uint8Array(known ? size : Math.min(cap, Math.max(1024, data.length * 4)));
-  let n = 0;
-  const reader = new Blob([data as Uint8Array<ArrayBuffer>]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!known && n + value.length > out.length) {
-        if (n + value.length > cap) fail(`${what} inflates to more than ${cap} bytes`);
-        const grown = new Uint8Array(Math.min(cap, Math.max(out.length * 2, n + value.length)));
-        grown.set(out.subarray(0, n));
-        out = grown;
-      }
-      const take = Math.min(value.length, out.length - n);
-      out.set(value.subarray(0, take), n);
-      n += take;
-      if (known && n === size) {
-        reader.cancel().catch(() => {});
-        return out;
-      }
-    }
-  } catch (e) {
-    if (e instanceof CodecError) throw e;
-    fail(`corrupt ${what} (${(e as Error).message})`, e);
-  }
-  if (known) fail(`truncated image data: ${n} of ${size} bytes`);
-  return out.subarray(0, n);
-}
 
 interface Header {
   readonly width: number;
@@ -206,7 +174,7 @@ export async function decodePng(bytes: Uint8Array, options: DecodeOptions = {}):
         if (idat.length || palette) fail('iCCP after PLTE or IDAT');
         const zero = data.indexOf(0);
         if (zero < 1 || zero > 79 || data[zero + 1] !== 0) fail('malformed iCCP chunk');
-        icc = await inflate(data.subarray(zero + 2), 'ICC profile', { limit: MAX_ICC });
+        icc = await inflate(data.subarray(zero + 2), 'png', 'ICC profile', { limit: MAX_ICC });
         break;
       }
       case 'IDAT':
@@ -244,7 +212,7 @@ export async function decodePng(bytes: Uint8Array, options: DecodeOptions = {}):
       o += d.length;
     }
   }
-  const raw = await inflate(compressed, 'image data', total);
+  const raw = await inflate(compressed, 'png', 'image data', total);
 
   const sixteen = h.depth === 16;
   const max = sixteen ? 65535 : 255;

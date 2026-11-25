@@ -1,0 +1,160 @@
+[
+ {
+  "file": "rgb8-raw.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-tiff_lzw.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-tiff_adobe_deflate.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-packbits.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgba8-unassociated.tif",
+  "source": "rgba8.png"
+ },
+ {
+  "file": "grey8.tif",
+  "source": "grey8.png"
+ },
+ {
+  "file": "bilevel.tif",
+  "source": "bilevel.png"
+ },
+ {
+  "file": "bilevel-packbits.tif",
+  "source": "bilevel.png"
+ },
+ {
+  "file": "palette8.tif",
+  "source": "palette8.png"
+ },
+ {
+  "file": "fgrey.tif",
+  "source": "fgrey.f32",
+  "float": true,
+  "channels": 1
+ },
+ {
+  "file": "fgrey-deflate.tif",
+  "source": "fgrey.f32",
+  "float": true,
+  "channels": 1
+ },
+ {
+  "file": "cmyk8.tif",
+  "source": "cmyk8.cmyk",
+  "cmyk": true
+ },
+ {
+  "file": "rgb8-lzw-predictor.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-deflate-predictor.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-tiles.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-tiles-lzw.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-planar.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-planar-lzw.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-strips.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb8-msb.tif",
+  "source": "rgb8.png"
+ },
+ {
+  "file": "rgb16.tif",
+  "source": "rgb16.png"
+ },
+ {
+  "file": "rgb16-msb.tif",
+  "source": "rgb16.png"
+ },
+ {
+  "file": "rgb16-deflate-predictor.tif",
+  "source": "rgb16.png"
+ },
+ {
+  "file": "rgb16-lzw-predictor-msb.tif",
+  "source": "rgb16.png"
+ },
+ {
+  "file": "rgb16-tiles-planar.tif",
+  "source": "rgb16.png"
+ },
+ {
+  "file": "rgba16.tif",
+  "source": "rgba16.png"
+ },
+ {
+  "file": "grey16.tif",
+  "source": "grey16.png"
+ },
+ {
+  "file": "grey8-minisblack-lzw.tif",
+  "source": "grey8.png"
+ },
+ {
+  "file": "grey8-miniswhite.tif",
+  "source": "grey8-miniswhite.png"
+ },
+ {
+  "file": "rgba8-associated.tif",
+  "source": "rgba8-associated.stored",
+  "associated": true
+ },
+ {
+  "file": "palette4.tif",
+  "source": "palette4.png"
+ },
+ {
+  "file": "frgb.tif",
+  "source": "frgb.f32",
+  "float": true,
+  "channels": 3
+ },
+ {
+  "file": "frgb-deflate-predictor.tif",
+  "source": "frgb.f32",
+  "float": true,
+  "channels": 3
+ },
+ {
+  "file": "frgb-msb-tiles.tif",
+  "source": "frgb.f32",
+  "float": true,
+  "channels": 3
+ },
+ {
+  "file": "frgba-planar-predictor.tif",
+  "source": "frgba.f32",
+  "float": true,
+  "channels": 4
+ },
+ {
+  "file": "rgb16-predictor-tiles.tif",
+  "source": "rgb16.png"
+ }
+]
