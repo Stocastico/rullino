@@ -5,3 +5,6 @@ export { decodeJpeg } from './jpeg';
 export { decodeTiff } from './tiff';
 export { encodeTiff, type TiffEncodeOptions, type TiffImage } from './tiff-encode';
 export { encodeJpeg, type JpegEncodeOptions, type Rgba8 } from './jpeg-encode';
+export { readExif, type ExifEntry, type ExifIfd } from './exif';
+export { readIptc, writeIptc, type IptcDataset } from './iptc';
+export { readMetadata, type ImageMetadata } from './metadata';
