@@ -4,7 +4,7 @@
 
 Image decoders for [rullino](https://github.com/Stocastico/rullino) in pure TypeScript, with no dependencies: the same file decodes to the same pixels in every browser, in Node, Deno and Bun. Browsers and native libraries decode the same file differently, so "the browser preview and the server render match" starts from the same input only when the decoder is the same.
 
-> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and JPEG encoding are done; TIFF encoding comes next. 0.x: the API may change between minor versions.
+> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and JPEG and TIFF encoding are done; decoders you plug in (AVIF, HEIC, JPEG XL) come next. 0.x: the API may change between minor versions.
 
 ```ts
 import { decodeJpeg, decodePng, CodecError } from '@rullino/codecs';
@@ -54,3 +54,15 @@ Baseline JPEG in YCbCr, with 4:4:4, 4:2:2 or 4:2:0 subsampling (default 4:2:0), 
 The first image of a TIFF file: strips or tiles, chunky or planar samples, no compression, LZW, Deflate or PackBits, the horizontal and floating-point predictors, 1 / 2 / 4 / 8 / 16-bit integer and 32-bit float samples, grey (black or white is zero), RGB, palette and CMYK, associated (premultiplied) or unassociated alpha, both byte orders, an ICC profile. Up to 8 bits and palettes come back as 8-bit RGBA, 16-bit samples as 16-bit, float samples as `Float32Array` with the values as stored (HDR values above 1 are kept). Associated alpha is divided out. CMYK goes through the same naive formula as JPEG. JPEG-in-TIFF, CCITT fax, BigTIFF and signed or 16-bit float samples are refused with a `CodecError`.
 
 Tested on 36 files written by libtiff (through Pillow), ImageMagick and tifffile from known sources (every combination above): the decoded pixels must be the sources exactly. Fuzzed like the other decoders, including changes aimed at the IFD's types, counts and offsets.
+
+## TIFF encoding
+
+```ts
+import { encodeTiff } from '@rullino/codecs';
+
+declare const image: { width: number; height: number; bitDepth: 16; data: Uint16Array }; // RGBA
+
+const file = await encodeTiff(image, { compression: 'deflate' }); // or 'lzw', 'none'
+```
+
+RGB or RGBA (unassociated alpha, written only when some pixel is not opaque unless `alpha` says otherwise) at 8 or 16 bits or 32-bit float, in strips, uncompressed, Deflate (default) or LZW, with the horizontal predictor for integers and the floating-point one for floats when compressed, and an optional ICC profile. Every combination is read back exactly by libtiff (through sharp) and `decodeTiff` in the tests.
