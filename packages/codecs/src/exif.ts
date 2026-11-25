@@ -118,3 +118,125 @@ export function readExif(exif: Uint8Array): ExifEntry[] {
   const { little, view, ifds } = walkExif(exif);
   return ifds.flatMap((ifd) => ifd.entries.map((r) => ({ ifd: r.ifd, tag: r.tag, type: r.type, count: r.count, value: decode(view, little, r) })));
 }
+
+/** Tags that name or identify a person or a device, by IFD (removed by `remove: { personal: true }`). */
+export const PERSONAL_EXIF: Partial<Record<ExifIfd, readonly number[]>> = {
+  // Artist, HostComputer, XPComment, XPAuthor, CameraSerialNumber (DNG)
+  ifd0: [0x013b, 0x013c, 0x9c9c, 0x9c9d, 0xc62f],
+  // UserComment, ImageUniqueID, CameraOwnerName, BodySerialNumber, LensSerialNumber, MakerNote (holds serial numbers)
+  exif: [0x9286, 0xa420, 0xa430, 0xa431, 0xa435, 0x927c],
+};
+
+export interface ExifEdits {
+  /** Sets IFD0's Orientation, when the field is there. */
+  readonly orientation?: number;
+  /** Sets the Exif IFD's PixelXDimension / PixelYDimension, when they are there (removed when the value does not fit). */
+  readonly size?: { readonly width: number; readonly height: number };
+  /** Removes IFD1 and the thumbnail image it points to. */
+  readonly dropThumbnail?: boolean;
+  /** Removes the GPS IFD (and its pointer) and / or the fields of `PERSONAL_EXIF`. */
+  readonly remove?: { readonly gps?: boolean; readonly personal?: boolean };
+}
+
+/**
+ * A copy of an EXIF blob with `edits` applied in place: values are patched where they lie; removed
+ * entries leave their IFD (rewritten with fewer entries) and what they pointed to is zeroed, sub-IFDs
+ * and thumbnail data included. Nothing moves, so the offsets of what is kept stay valid. Throws a
+ * `CodecError` when the structure is broken.
+ */
+export function editExif(exif: Uint8Array, edits: ExifEdits): Uint8Array {
+  const out = exif.slice();
+  const { little, ifds } = walkExif(out);
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  const zero = (at: number, size: number) => out.fill(0, Math.max(0, at), Math.min(out.length, at + size));
+  const byName = (name: ExifIfd) => ifds.find((d) => d.name === name);
+  const find = (ifd: ExifIfd, tag: number) => byName(ifd)?.entries.find((e) => e.tag === tag);
+  const remove = new Map<Ifd, Set<number>>();
+  const drop = (ifd: Ifd | undefined, tag: number) => {
+    if (!ifd) return;
+    if (!remove.has(ifd)) remove.set(ifd, new Set());
+    remove.get(ifd)!.add(tag);
+  };
+
+  // 1. Values patched in place (before any entry moves).
+  const set = (r: Raw | undefined, v: number) => {
+    if (!r || r.count !== 1) return;
+    if (r.type === 3 && v <= 0xffff) view.setUint16(r.at, v, little);
+    else if (r.type === 4) view.setUint32(r.at, v, little);
+    else drop(byName(r.ifd), r.tag);
+  };
+  if (edits.orientation !== undefined) set(find('ifd0', 0x0112), edits.orientation);
+  if (edits.size) {
+    set(find('exif', 0xa002), edits.size.width);
+    set(find('exif', 0xa003), edits.size.height);
+  }
+
+  // 2. What goes.
+  if (edits.remove?.gps) drop(byName('ifd0'), 0x8825);
+  if (edits.remove?.personal) for (const [ifd, tags] of Object.entries(PERSONAL_EXIF)) for (const t of tags!) if (find(ifd as ExifIfd, t)) drop(byName(ifd as ExifIfd), t);
+
+  /** Zeroes a whole IFD: its table, its out-of-line values, its sub-IFDs and image data it points to. */
+  const wipe = (ifd: Ifd) => {
+    for (const e of ifd.entries) {
+      if (e.size > 4) zero(e.at, e.size);
+      const sub = SUB_IFD[e.tag];
+      const child = sub && ifds.find((d) => d.name === sub);
+      if (child) wipe(child);
+    }
+    if (ifd.name === 'ifd1') {
+      // The thumbnail: a JPEG (offset + length) or strips.
+      const value = (tag: number) => {
+        const r = ifd.entries.find((e) => e.tag === tag);
+        if (!r) return [];
+        return Array.from({ length: r.count }, (_, i) => (r.type === 3 ? view.getUint16(r.at + 2 * i, little) : view.getUint32(r.at + 4 * i, little)));
+      };
+      const [jpegAt] = value(0x0201);
+      const [jpegLength] = value(0x0202);
+      if (jpegAt !== undefined && jpegLength !== undefined) zero(jpegAt, jpegLength);
+      const strips = value(0x0111);
+      const counts = value(0x0117);
+      strips.forEach((at, i) => zero(at, counts[i] ?? 0));
+    }
+    zero(ifd.at, 2 + 12 * ifd.entries.length + 4);
+  };
+
+  // 3. IFD0's next pointer (IFD1) goes when the thumbnail does.
+  const ifd0 = byName('ifd0')!;
+  const ifd1 = byName('ifd1');
+  let next0 = view.getUint32(ifd0.at + 2 + 12 * entryCount(view, ifd0.at, little), little);
+  if (edits.dropThumbnail && ifd1) {
+    wipe(ifd1);
+    next0 = 0;
+  }
+
+  // 4. Rewrite the IFDs that lose entries (fewer entries, same place), zeroing what the removed ones held.
+  for (const ifd of ifds) {
+    const gone = remove.get(ifd);
+    const isIfd0 = ifd === ifd0;
+    if (!gone?.size && !isIfd0) continue;
+    if (ifd.name === 'ifd1' && edits.dropThumbnail) continue;
+    const n = entryCount(view, ifd.at, little);
+    const next = isIfd0 ? next0 : view.getUint32(ifd.at + 2 + 12 * n, little);
+    const kept: Uint8Array[] = [];
+    for (let i = 0; i < n; i++) {
+      const e = ifd.at + 2 + 12 * i;
+      const tag = view.getUint16(e, little);
+      const raw = ifd.entries.find((r) => r.entry === e);
+      if (gone?.has(tag)) {
+        if (raw && raw.size > 4) zero(raw.at, raw.size);
+        const sub = SUB_IFD[tag];
+        const child = sub && ifds.find((d) => d.name === sub);
+        if (child) wipe(child);
+        continue;
+      }
+      kept.push(out.slice(e, e + 12));
+    }
+    zero(ifd.at, 2 + 12 * n + 4);
+    view.setUint16(ifd.at, kept.length, little);
+    kept.forEach((k, i) => out.set(k, ifd.at + 2 + 12 * i));
+    view.setUint32(ifd.at + 2 + 12 * kept.length, next, little);
+  }
+  return out;
+}
+
+const entryCount = (view: DataView, at: number, little: boolean) => view.getUint16(at, little);

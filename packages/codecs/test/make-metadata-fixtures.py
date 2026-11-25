@@ -30,7 +30,7 @@ src.save(os.path.join(out, 'photo.webp'), lossless=True)
 src.save(os.path.join(out, 'photo.tif'))
 
 tags = [
-    '-Make=RullinoCam', '-Model=Test Model 1', '-Orientation#=6', '-DateTimeOriginal=2026:11:25 09:30:00', '-Software=fixture',
+    '-ExifImageWidth=64', '-ExifImageHeight=48', '-Make=RullinoCam', '-Model=Test Model 1', '-Orientation#=6', '-DateTimeOriginal=2026:11:25 09:30:00', '-Software=fixture',
     '-Artist=Jane Photographer', '-Copyright=CC0', '-OwnerName=Jane Doe', '-SerialNumber=SN-123456', '-LensSerialNumber=LSN-987',
     '-ImageUniqueID=0123456789abcdef0123456789abcdef', '-UserComment=private note', '-XPAuthor=Jane P',
     '-GPSLatitude=45.4642', '-GPSLatitudeRef=N', '-GPSLongitude=9.19', '-GPSLongitudeRef=E', '-GPSAltitude=120', '-GPSAltitudeRef=0',
