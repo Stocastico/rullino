@@ -78,6 +78,16 @@ describe('decodeTiff', () => {
     await expect(decodeTiff(tiff(tags, [whole[0]!, whole[1]!.subarray(0, 48)], { tiled: true }))).rejects.toThrow(/short/);
   });
 
+  it('refuses a tile far larger than the image before allocating it (found by the fuzz job)', async () => {
+    // A 20×3 image whose TileWidth says 2^28: a tile is a buffer, so it is bounded like the image.
+    const tags = { 256: [20], 257: [3], 258: [8], 259: [5], 262: [1], 277: [1], 322: [1 << 28], 323: [16] };
+    await expect(decodeTiff(tiff(tags, [Uint8Array.from([128, 0])], { tiled: true }))).rejects.toThrow(/tile of .* is larger than/);
+    // Real files tile small images generously: 100×100 in 256×256 tiles is fine.
+    const ok = { 256: [100], 257: [100], 258: [8], 259: [1], 262: [1], 277: [1], 322: [256], 323: [256] };
+    expect((await decodeTiff(tiff(ok, [new Uint8Array(256 * 256).fill(5)], { tiled: true }))).data[0]).toBe(5);
+    await expect(decodeTiff(tiff(ok, [new Uint8Array(256 * 256)], { tiled: true }), { maxPixels: 100 * 100 })).rejects.toThrow(/larger than/);
+  });
+
   it('refuses what it does not read, truncated files and sizes above maxPixels with a CodecError', async () => {
     const ok = read('rgb8-raw.tif');
     await expect(decodeTiff(read('rgb8.png'))).rejects.toThrow(/not a TIFF/);

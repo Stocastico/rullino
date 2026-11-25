@@ -243,6 +243,10 @@ export async function decodeTiff(bytes: Uint8Array, options: DecodeOptions = {})
   const ch = tiled ? one(TAG.tileLength) : Math.min(one(TAG.rowsPerStrip, height), height);
   if (cw === 0 || ch === 0) fail('zero tile or strip size');
   if (tiled && (cw % 16 || ch % 16)) fail('tile sizes must be multiples of 16');
+  // A tile is a buffer we allocate: bounded like the image (maxPixels), and to at most four times
+  // the image or 1 MP, which every real file stays within (small images in 256 × 256 tiles included).
+  const tileLimit = Math.min(maxPixels, Math.max(4 * width * height, 1 << 20));
+  if (tiled && cw * ch > tileLimit) fail(`a tile of ${cw}×${ch} is larger than the image allows (${tileLimit} pixels)`);
   const across = Math.ceil(width / cw);
   const down = Math.ceil(height / ch);
   const planes = planar ? spp : 1;
