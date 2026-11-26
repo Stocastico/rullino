@@ -310,6 +310,9 @@
         },
         {
           "if": {
+            "properties": {
+              "hdr": true
+            },
             "required": [
               "hdr"
             ]
@@ -425,6 +428,9 @@
         },
         {
           "if": {
+            "properties": {
+              "hdr": true
+            },
             "required": [
               "hdr"
             ]

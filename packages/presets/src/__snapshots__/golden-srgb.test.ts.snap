@@ -297,6 +297,15 @@ exports[`the sRGB path, bit for bit > filter levels at its preview params 1`] = 
 }
 `;
 
+exports[`the sRGB path, bit for bit > filter localToneMap at its preview params 1`] = `
+{
+  "jpeg": "b1cc73128471266c",
+  "linear": "23b41810926636da",
+  "srgb16": "c4598f064a09775c",
+  "srgb8": "035e6f804c44f08c",
+}
+`;
+
 exports[`the sRGB path, bit for bit > filter median at its preview params 1`] = `
 {
   "jpeg": "3c20b4f53a8d72c9",
@@ -384,6 +393,15 @@ exports[`the sRGB path, bit for bit > filter threshold at its preview params 1`]
   "linear": "17c415d51bab9d43",
   "srgb16": "92449184e20b0310",
   "srgb8": "534d10a00f389ea2",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter toneMap at its preview params 1`] = `
+{
+  "jpeg": "1c2dcb015160ab5d",
+  "linear": "9f398a1347a176d8",
+  "srgb16": "c8835ec3197b8603",
+  "srgb8": "ab521179315c9e3e",
 }
 `;
 
