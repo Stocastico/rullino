@@ -59,4 +59,29 @@ describe('@rullino/web render and colour management', { timeout: 120_000 }, () =
     expect(finer).toBeGreaterThan(100);
     renderer.destroy();
   });
+
+  it('files the codecs do not read (WebP) go through the browser, upright, as before', async () => {
+    const canvas = new OffscreenCanvas(6, 4);
+    const g = canvas.getContext('2d')!;
+    g.fillStyle = 'rgb(200, 50, 50)';
+    g.fillRect(0, 0, 6, 4);
+    const webp = await canvas.convertToBlob({ type: 'image/webp', quality: 1 });
+    const renderer = await createRenderer();
+    const out = await renderer.render(webp, doc({ format: 'png', metadata: 'strip' }));
+    const px = await firstPixel(out);
+    expect(Math.abs(px[0]! - 200)).toBeLessThan(6);
+    renderer.destroy();
+  });
+
+  it('reports a profile it cannot use through onWarning and still renders', async () => {
+    const messages: string[] = [];
+    const lab = new Uint8Array(await (await fetch(new URL('../../core/test/icc/ITULab.icc', import.meta.url))).arrayBuffer());
+    const bytes = (await writeMetadata(encodeJpeg({ width: 16, height: 16, data: new Uint8Array(16 * 16 * 4).fill(150) }), { icc: lab })).bytes;
+    const renderer = await createRenderer({ onWarning: (m) => messages.push(m) });
+    const out = await renderer.render(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'image/jpeg' }), doc({ format: 'png', metadata: 'strip' }));
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatch(/not supported/);
+    expect((await firstPixel(out))[0]).toBeGreaterThan(100);
+    renderer.destroy();
+  });
 });

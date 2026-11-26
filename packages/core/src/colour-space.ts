@@ -38,8 +38,6 @@ export function toLinearSrgb(space: ColorSpace, v: readonly number[]): number[] 
   return [m[0] * v[0]! + m[1] * v[1]! + m[2] * v[2]!, m[3] * v[0]! + m[4] * v[1]! + m[5] * v[2]!, m[6] * v[0]! + m[7] * v[1]! + m[8] * v[2]!];
 }
 
-/** The matrix of {@link fromLinearSrgb} (row-major). */
-export const linearSrgbTo = (space: ColorSpace): Mat3 => TO[space];
 
 const ADOBE = 563 / 256;
 const ALPHA = 1.09929682680944;
