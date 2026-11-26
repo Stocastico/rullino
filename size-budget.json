@@ -9,6 +9,6 @@
   "packages/node": 5700,
   "packages/web": 6100,
   "packages/konva": 3300,
-  "packages/node-cli": 3000,
+  "packages/node-cli": 4200,
   "packages/codecs": 42700
 }

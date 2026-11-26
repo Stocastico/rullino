@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
+import { readExif, readMetadata, readXmpEdit } from '@rullino/codecs';
+import { fileURLToPath } from 'node:url';
 import { runCli } from './cli';
 
 /** A small opaque PNG of one colour. */
@@ -71,6 +73,46 @@ describe('rullino CLI', { timeout: 60_000 }, () => {
     const smaller = await run(['render', '--edit', join(dir, 'graph.json'), join(dir, 'in', 'a.png'), '-o', join(dir, 'out2'), '--long-side', '8', '--backend', 'cpu']);
     expect(smaller.code).toBe(0);
     expect((await sharp(await readFile(join(dir, 'out2', 'a.png'))).metadata()).width).toBe(8);
+  });
+
+  it('--strip-metadata strips it all, =gps / =personal (comma-separated) only those; without it, everything stays', async () => {
+    const dir = await workspace();
+    const source = fileURLToPath(new URL('../../codecs/test/metadata/photo.jpg', import.meta.url));
+    const out = async (flags: string[]) => {
+      const target = join(dir, `out-${flags.join('-').replace(/[^a-z]/g, '') || 'keep'}`);
+      const r = await run(['render', '--look', 'golden', source, '-o', target, '--format', 'jpeg', '--backend', 'cpu', ...flags]);
+      expect(r.err).toBe('');
+      return readMetadata(new Uint8Array(await readFile(join(target, 'photo.jpg'))));
+    };
+    const kept = await out([]);
+    expect(readExif(kept.exif!).some((e) => e.ifd === 'gps')).toBe(true);
+    expect(kept.xmp).toContain('Jane Photographer');
+    expect(readXmpEdit(kept.xmp!)).toBeDefined();
+    expect(Object.keys(await out(['--strip-metadata']))).toEqual(['icc']);
+    const gps = await out(['--strip-metadata=gps']);
+    expect(readExif(gps.exif!).some((e) => e.ifd === 'gps')).toBe(false);
+    expect(gps.xmp).toContain('Jane Photographer');
+    const both = await out(['--strip-metadata=gps,personal']);
+    expect(both.xmp).not.toContain('Jane Photographer');
+    expect(readExif(both.exif!).some((e) => e.ifd === 'gps')).toBe(false);
+    const bad = await run(['render', '--look', 'golden', source, '-o', join(dir, 'x'), '--strip-metadata=faces']);
+    expect([bad.code, bad.err]).toEqual([2, expect.stringMatching(/--strip-metadata.*gps.*personal/)]);
+  });
+
+  it('info prints what a photo carries, and the edit document it was rendered with', async () => {
+    const dir = await workspace();
+    const source = fileURLToPath(new URL('../../codecs/test/metadata/photo.jpg', import.meta.url));
+    const plain = await run(['info', source]);
+    expect(plain.code).toBe(0);
+    for (const line of ['jpeg', 'RullinoCam Test Model 1', '2026:11:25 09:30:00', 'orientation 6', 'GPS: yes', 'ICC profile', 'edit document: none']) expect(plain.out).toContain(line);
+    await run(['render', '--look', 'golden', source, '-o', join(dir, 'out'), '--format', 'jpeg', '--backend', 'cpu']);
+    const rendered = await run(['info', join(dir, 'out', 'photo.jpg')]);
+    expect(rendered.out).toContain('orientation 1');
+    const json = rendered.out.slice(rendered.out.indexOf('{'));
+    expect(JSON.parse(json).nodes).toBeDefined();
+    expect((await run(['info'])).code).toBe(2);
+    const missing = await run(['info', join(dir, 'nope.jpg')]);
+    expect([missing.code, missing.err]).toEqual([1, expect.stringContaining('nope.jpg')]);
   });
 
   it('lists the looks', async () => {

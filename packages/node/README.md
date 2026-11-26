@@ -34,6 +34,8 @@ export async function renderFile(input: string, editJson: string, output: string
 
 `render` takes an image file (decoded by sharp, EXIF orientation applied) or 8-bit straight-alpha sRGB pixels `{ data, width, height }`, which needs no sharp. Documents come from `serializeChain` in `@rullino/core`, the playground's share links or `lookEdit` in `@rullino/presets`; every filter of `@rullino/filters` and every look (`look:<id>` LUTs) is available by default. PNG is written by rullino's own encoder (16 bit keeps the float pipeline's precision); JPEG and WebP by sharp, after flattening transparency onto `output.background` (white by default for JPEG) in linear light.
 
+**Metadata.** Rendering a file carries its metadata onto the export (EXIF, XMP, IPTC, ICC), as the document's `output.metadata` says: everything by default, GPS included; `"strip"` for none of it but the colour profile; `{ "strip": ["gps", "personal"] }` for all but those. What is kept is made true of the export: orientation 1 (the pixels are already upright), the export's size, no thumbnail of the unedited original. The document itself is embedded as XMP (`rullino:edit`) unless `output.embedEdit` is `false`, so the file carries its own recipe (`rullino info photo.jpg` prints it). Pixels in (`{ data, width, height }`) have no metadata to carry; the document is still embedded.
+
 - `createRenderer({ backend: 'gpu' })` fails with `WebGpuUnavailableError` instead of falling back; `'cpu'` never loads Dawn.
 - `renderer.apply(image, doc)` returns the linear image instead of a file (see `applyEdit` in `@rullino/core`).
 - `createRenderer({ threads: 4 })` (or `'auto'`: the cores, at most 8) spreads CPU renders over worker threads. The image is cut into bands that are rendered in parallel with the very same result, bit for bit; equalize, clahe and otsu, which need a histogram of the whole image, run in two phases (the bands count their rows, the counts are added, then the bands map their pixels), and small images stay on the calling thread (the threads start from about 2 MP, 80-240 ms; later renders use them from 0.5 MP). On 4 cores, 12 MP: blur + unsharp 5.8 s to 1.5 s, exposure + curves 2.2 s to 0.8 s, Kuwahara 14.4 s to 4.1 s (`pnpm bench:threads` in the repository measures your machine). Memory: two 12 MP images' worth of shared buffers are kept between renders; `destroy()` stops the threads and frees them. Ignored on the GPU backend and with custom `filters`.
@@ -70,10 +72,12 @@ Installing `@rullino/node` also installs a `rullino` command: no script needed t
 npm install @rullino/node sharp            # sharp reads the photos; add webgpu for the GPU
 npx rullino render --edit edit.json photos/ -o out/              # a document from the playground's Code button
 npx rullino render --look golden photo.jpg -o out/ --format jpeg --quality 0.9 --long-side 2048
+npx rullino render --look golden photos/ -o web/ --strip-metadata=gps,personal   # no location, no names
 npx rullino looks                                                 # the built-in looks
+npx rullino info out/photo.jpg                                    # camera, date, GPS, profiles, and the edit it was rendered with
 ```
 
-`--format`, `--quality` and `--long-side` override the document's `output`; `--backend auto|gpu|cpu` and `--threads <n|auto>` choose where it runs. Folders are read without descending into sub-folders. It never overwrites an input, and a bad document is reported once, before any photo is read. Exit code 0 when every photo rendered, 1 when one failed, 2 for a usage error.
+`--format`, `--quality`, `--long-side` and `--strip-metadata` (alone: all of it but the colour profile; `=gps`, `=personal` or both: only those) override the document's `output`; `--backend auto|gpu|cpu` and `--threads <n|auto>` choose where it runs. Folders are read without descending into sub-folders. It never overwrites an input, and a bad document is reported once, before any photo is read. Exit code 0 when every photo rendered, 1 when one failed, 2 for a usage error.
 
 ### A folder of photos
 
