@@ -52,6 +52,12 @@ describe('applyGainMap', () => {
     expect(factors[2]).toBeCloseTo(2 ** (2 * 0.75), 3);
   });
 
+  it('upsamples vertically the same way', () => {
+    const img = createImage(1, 4, new Float32Array(16).fill(1));
+    const out = applyGainMap(img, { data: Uint8Array.of(0, 255), width: 1, height: 2, channels: 1 }, meta());
+    expect([0, 1, 2, 3].map((y) => out.data[y * 4]!).map((v) => +Math.log2(v).toFixed(3))).toEqual([0, 0.5, 1.5, 2]);
+  });
+
   it('leaves transparent pixels alone and does not change its input', () => {
     const img = createImage(1, 1, Float32Array.of(0, 0, 0, 0));
     expect(Array.from(applyGainMap(img, map([255]), meta()).data)).toEqual([0, 0, 0, 0]);
@@ -71,6 +77,9 @@ describe('gainMapWeight', () => {
     expect(gainMapWeight(m, 10)).toBe(1);
     expect(gainMapWeight(m, -2)).toBe(0);
     expect(gainMapWeight(meta({ alternateHdrHeadroom: 0 }), 5)).toBe(1); // no range: all or nothing
+    const shifted = meta({ baseHdrHeadroom: 1, alternateHdrHeadroom: 3 });
+    expect(gainMapWeight(shifted, 1)).toBe(0);
+    expect(gainMapWeight(shifted, 2)).toBe(0.5);
   });
 });
 
@@ -164,6 +173,12 @@ describe('makeGainMap and applyGainMap together', () => {
     const src = hdr(64, 32);
     const { map: m } = makeGainMap(sdrFromHdr(src), src, { maxSide: 16 });
     expect([m.width, m.height, m.channels]).toEqual([16, 8, 3]);
+  });
+
+  it('does not let a dark pixel signal a huge gain (2.3 stops at most): a little noise there would blow up', () => {
+    const sdr = createImage(2, 1, Float32Array.of(0, 0, 0, 1, 0.5, 0.5, 0.5, 1));
+    const hdr = createImage(2, 1, Float32Array.of(5, 5, 5, 1, 0.5, 0.5, 0.5, 1));
+    expect(makeGainMap(sdr, hdr, { channels: 1 }).metadata.gainMapMax[0]).toBeLessThanOrEqual(2.3 + 1e-9);
   });
 
   it('refuses pictures of different sizes', () => {
