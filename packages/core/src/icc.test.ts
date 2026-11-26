@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { srgbToLinear } from './color';
-import { evalCurve, isSrgbProfile, parseIcc, profileImage, profileToXyz, XYZ_D50_TO_LINEAR_SRGB, type IccProfile } from './icc';
+import { evalCurve, isSrgbProfile, manageSource, parseIcc, profileImage, profileToXyz, XYZ_D50_TO_LINEAR_SRGB, type IccProfile } from './icc';
 
 // Fixtures and littleCMS's conversions of them: test/icc/make-icc-fixtures.py.
 const dir = new URL('../test/icc/', import.meta.url);
@@ -127,5 +127,68 @@ describe('profileImage', () => {
 
   it('refuses an unsupported profile', () => {
     expect(() => profileImage({ data: new Uint8Array(4), width: 1, height: 1, bitDepth: 8 }, parseIcc(load('ITULab.icc')))).toThrow(/unsupported/);
+  });
+});
+
+describe('manageSource', () => {
+  const eight = (data: number[], icc?: Uint8Array) => ({ data: Uint8Array.from(data), width: data.length / 4, height: 1, bitDepth: 8 as const, ...(icc ? { icc } : {}) });
+
+  it('keeps 8-bit images without a profile, or with an sRGB one, as 8-bit pixels: the plain sRGB path', () => {
+    for (const icc of [undefined, load('sRGB.icc')]) {
+      const m = manageSource(eight([10, 20, 30, 255, 40, 50, 60, 128], icc));
+      expect(m.wide).toBe(false);
+      expect(m.warning).toBeUndefined();
+      expect('data' in m.image && m.image.data instanceof Uint8ClampedArray).toBe(true);
+      expect(Array.from(m.image.data)).toEqual([10, 20, 30, 255, 40, 50, 60, 128]);
+    }
+  });
+
+  it('converts a wide-gamut profile to extended linear sRGB and says the source was wide', () => {
+    const m = manageSource(eight([255, 0, 0, 255], load('display-p3-v4.icc')));
+    expect(m.wide).toBe(true);
+    expect(m.image.data).toBeInstanceOf(Float32Array);
+    expect(m.image.data[1]).toBeLessThan(0);
+    expect(m.image.data[0]).toBeGreaterThan(1);
+  });
+
+  it('turns 16-bit and float samples without a profile into linear light through the sRGB curve', () => {
+    const m = manageSource({ data: Uint16Array.of(65535, 0, 32896, 65535), width: 1, height: 1, bitDepth: 16 });
+    expect(m.wide).toBe(false);
+    expect(Array.from(m.image.data)).toEqual([1, 0, Math.fround(srgbToLinear(32896 / 65535)), 1]);
+    const f = manageSource({ data: Float32Array.of(0.5, 2, -0.1, 0.5), width: 1, height: 1, bitDepth: 32 });
+    expect(f.image.data[0]).toBeCloseTo(srgbToLinear(0.5) * 0.5, 6);
+    expect(f.image.data[1]).toBeCloseTo(srgbToLinear(2) * 0.5, 5); // HDR survives
+    expect(f.image.data[2]).toBeLessThan(0);
+    expect(f.image.data[3]).toBe(0.5);
+  });
+
+  it('applies a wide profile to float samples as well', () => {
+    const m = manageSource({ data: Float32Array.of(1, 0, 0, 1), width: 1, height: 1, bitDepth: 32, icc: load('display-p3-v4.icc') });
+    const ref = manageSource(eight([255, 0, 0, 255], load('display-p3-v4.icc')));
+    for (let k = 0; k < 4; k++) expect(m.image.data[k]).toBeCloseTo(ref.image.data[k]!, 6);
+  });
+
+  it('treats a profile it cannot use as sRGB and says so, never fails', () => {
+    const m = manageSource(eight([1, 2, 3, 255], load('ITULab.icc')));
+    expect(m.warning).toMatch(/ITULab|Lab|unsupported/i);
+    expect(m.wide).toBe(false);
+    expect(Array.from(m.image.data)).toEqual([1, 2, 3, 255]);
+    expect(manageSource(eight([1, 2, 3, 255], new Uint8Array(40))).warning).toMatch(/short|unsupported/i);
+  });
+
+  it('a grey profile is not wide', () => {
+    expect(manageSource({ data: Uint8Array.of(128, 128, 128, 255), width: 1, height: 1, bitDepth: 8, icc: load('Gray.icc') }).wide).toBe(false);
+  });
+});
+
+describe('profileImage on floats outside [0, 1]', () => {
+  it('continues the curve linearly past 1 and mirrors it below 0, monotonically', () => {
+    const p = parseIcc(load('display-p3-v4.icc'));
+    const at = (v: number) => profileImage({ data: Float32Array.of(v, v, v, 1), width: 1, height: 1, bitDepth: 32 }, p).data[0]!;
+    expect(at(1)).toBeCloseTo(1, 4);
+    expect(at(2)).toBeGreaterThan(at(1));
+    expect(at(4)).toBeGreaterThan(at(2));
+    expect(at(-0.5)).toBeCloseTo(-at(0.5), 6);
+    expect(at(1.001) - at(1)).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,8 @@
 // floating point (unbounded, no black point compensation). LUT-based profiles (A2B / B2A), CMYK and
 // Lab profiles are reported as `unsupported` with a reason: never thrown, a decoder's caller decides.
 
-import { createImage, type LinearImage } from './image';
+import { srgbToLinear } from './color';
+import { createImage, type LinearImage, type Rgba8Image } from './image';
 import type { Mat3 } from './geometry';
 
 /** A tone reproduction curve: device value in [0, 1] to linear. */
@@ -235,10 +236,10 @@ const encode = (v: number) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.
 
 /** Straight RGBA samples as decoders produce them (`@rullino/codecs`' `DecodedImage` fits). */
 export interface ProfiledSamples {
-  readonly data: Uint8Array | Uint8ClampedArray | Uint16Array;
+  readonly data: Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array;
   readonly width: number;
   readonly height: number;
-  readonly bitDepth: 8 | 16;
+  readonly bitDepth: 8 | 16 | 32;
 }
 
 /**
@@ -248,6 +249,7 @@ export interface ProfiledSamples {
  */
 export function profileImage(img: ProfiledSamples, p: IccProfile): LinearImage {
   if (p.kind === 'unsupported') throw new Error(`icc: unsupported profile (${p.reason})`);
+  if (img.bitDepth === 32) return profileFloats(img, p);
   const max = img.bitDepth === 16 ? 65535 : 255;
   const tables = (p.kind === 'gray' ? [0] : [0, 1, 2]).map((k) => {
     const t = new Float64Array(max + 1);
@@ -344,4 +346,76 @@ export function writeIcc(primaries: Primaries, curve: Extract<IccCurve, { type: 
   for (const sig of all) table.push(...Array.from(sig, (c) => c.charCodeAt(0)), ...u32(placed.get(sig)![0]), ...u32(placed.get(sig)![1]));
   const header = cat(u32(offset), [0, 0, 0, 0], [4, 0x30, 0, 0], 'mntr', 'RGB ', 'XYZ ', [0x07, 0xea, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0], 'acsp', new Array(24).fill(0), u32(0), s15(D50[0]), s15(D50[1]), s15(D50[2]), 'rlno', new Array(16 + 28).fill(0));
   return cat(header, u32(all.length), table, ...body);
+}
+
+/** {@link profileImage} for floating point samples (no tables: each sample through its curve; values may leave [0, 1]). */
+function profileFloats(img: ProfiledSamples, p: IccProfile): LinearImage {
+  const src = img.data;
+  const out = createImage(img.width, img.height);
+  const dst = out.data;
+  const curve = (k: number, v: number) => (p.kind === 'gray' ? greyY(p, v) : evalCurve(p.curves![k]!, v));
+  // A curve is defined on [0, 1]; HDR and negative samples continue it linearly with its slope at the edge (mirrored below 0).
+  const lin = (k: number, v: number) => {
+    const t = Math.abs(v);
+    const y = t <= 1 ? curve(k, t) : curve(k, 1) + (t - 1) * (curve(k, 1) - curve(k, 1 - 1 / 256)) * 256;
+    return v < 0 ? -y : y;
+  };
+  const m = p.kind === 'matrix-trc' ? mul3(XYZ_D50_TO_LINEAR_SRGB, p.matrix!) : undefined;
+  for (let i = 0; i < dst.length; i += 4) {
+    const a = src[i + 3]!;
+    const r = lin(0, src[i]!);
+    const g = p.kind === 'gray' ? r : lin(1, src[i + 1]!);
+    const b = p.kind === 'gray' ? r : lin(2, src[i + 2]!);
+    if (m) {
+      dst[i] = (m[0] * r + m[1] * g + m[2] * b) * a;
+      dst[i + 1] = (m[3] * r + m[4] * g + m[5] * b) * a;
+      dst[i + 2] = (m[6] * r + m[7] * g + m[8] * b) * a;
+    } else {
+      dst[i] = r * a;
+      dst[i + 1] = r * a;
+      dst[i + 2] = r * a;
+    }
+    dst[i + 3] = a;
+  }
+  return out;
+}
+
+/** What a decoded image becomes in the pipeline (RFC #181). */
+export interface ManagedSource {
+  /** 8-bit sRGB pixels as decoders give them (decoded on the GPU), or linear premultiplied floats for everything else. */
+  readonly image: Rgba8Image | LinearImage;
+  /** The source's profile has a gamut wider than sRGB's (its colours were converted, so some may be outside sRGB). */
+  readonly wide: boolean;
+  /** Why the profile was not used (it was treated as sRGB). */
+  readonly warning?: string;
+}
+
+/** A decoded image with the ICC profile it came with (`@rullino/codecs`' `DecodedImage` fits). */
+export type ProfiledImage = ProfiledSamples & { readonly icc?: Uint8Array | undefined };
+
+/**
+ * Brings a decoded image into the pipeline. Without a profile, or with an sRGB one, 8-bit stays plain
+ * 8-bit sRGB (the old path, bit for bit) and 16-bit / float samples go through the sRGB curve to linear
+ * light. A matrix/TRC or grey profile converts to extended linear sRGB. A profile that cannot be used
+ * (LUT-based, CMYK, broken) is treated as sRGB and reported in `warning`.
+ */
+export function manageSource(img: ProfiledImage): ManagedSource {
+  let profile: IccProfile | undefined;
+  let warning: string | undefined;
+  if (img.icc) {
+    const parsed = parseIcc(img.icc);
+    if (parsed.kind === 'unsupported') warning = `the embedded colour profile${parsed.description ? ` "${parsed.description}"` : ''} is not supported (${parsed.reason}), so the colours are read as sRGB`;
+    else if (!isSrgbProfile(parsed)) profile = parsed;
+  }
+  if (profile) return { image: profileImage(img, profile), wide: profile.kind === 'matrix-trc' };
+  const base = warning === undefined ? {} : { warning };
+  if (img.bitDepth === 8) return { image: { data: new Uint8ClampedArray(img.data.buffer as ArrayBuffer, img.data.byteOffset, img.data.length), width: img.width, height: img.height }, wide: false, ...base };
+  const out = createImage(img.width, img.height);
+  const max = img.bitDepth === 16 ? 65535 : 1;
+  for (let i = 0; i < out.data.length; i += 4) {
+    const a = img.data[i + 3]! / max;
+    for (let c = 0; c < 3; c++) out.data[i + c] = srgbToLinear(img.data[i + c]! / max) * a;
+    out.data[i + 3] = a;
+  }
+  return { image: out, wide: false, ...base };
 }

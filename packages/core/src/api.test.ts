@@ -11,7 +11,7 @@ describe('@rullino/core public API', () => {
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
     'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
     'formatCube', 'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
-    'isIdentityGeometry', 'isSrgbProfile', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
+    'isIdentityGeometry', 'isSrgbProfile', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand', 'manageSource',
     'maskImage', 'maskValue', 'migrateChain', 'migrateEdit', 'oklabToLinear', 'outputProfile', 'paintStroke', 'parseChain', 'parseCube', 'parseEdit', 'parseHald', 'parseIcc', 'profileImage',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',
     'runChainCpu', 'runFilter', 'sampleCurve', 'sampleImage', 'serializeChain', 'srgbToLinear',
