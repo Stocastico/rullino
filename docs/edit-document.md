@@ -132,12 +132,14 @@ How to encode the result. Everything is optional; unknown keys are rejected so a
 | `bitDepth` | `8` (default), `16` | 16-bit PNG only: keeps the precision of the float16 pipeline. |
 | `background` | `[r, g, b]` in [0, 1] | Flatten transparency onto this sRGB colour, composited in linear light. JPEG has no alpha and defaults to white. |
 | `longSide` | integer ≥ 1 | Shrink so the longer side is at most this many pixels (never enlarges). Done after the steps, in linear light, so pixel-sized parameters keep their full-resolution meaning. |
+| `metadata` | `"keep"` (default), `"strip"`, `{ "strip": ["gps", "personal"] }` | What the export keeps of the source file's EXIF, XMP, IPTC and ICC when a renderer renders from a file. `"keep"` keeps everything, GPS included; `"strip"` keeps only the colour profile (it says how to read the pixels); `{ "strip": [...] }` removes GPS coordinates and / or the fields that name or identify a person or a device (artist, creator, owner, serial numbers, comments). Whatever is kept is made true of the export: orientation 1 (the pixels are already upright), the export's size, no thumbnail (it would show the unedited original). |
+| `embedEdit` | `true` (default), `false` | Embed this document in the exported file as XMP (`rullino:edit`), so the file carries its own recipe; never with `"metadata": "strip"`. A document over about 64 KB (large raster masks) does not fit in a JPEG's XMP and is left out. |
 
 ```json
 {
   "version": 2,
   "steps": [{ "filter": "unsharpMask", "params": { "amount": 0.6 } }],
-  "output": { "format": "png", "bitDepth": 16, "background": [1, 1, 1], "longSide": 4096 }
+  "output": { "format": "png", "bitDepth": 16, "background": [1, 1, 1], "longSide": 4096, "metadata": { "strip": ["gps"] } }
 }
 ```
 

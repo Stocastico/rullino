@@ -26,7 +26,7 @@ describe('edit.schema.json', () => {
         { filter: gain, mask: { kind: 'radial', center: [0.5, 0.5], radius: [0.2, 0.3], feather: 0.4, invert: true, opacity: 0.5 } },
         { filter: gain, mask: { kind: 'raster', raster: createRasterMask(2, 1, Float32Array.of(0, 1)) } },
       ],
-      { geometry: { ...IDENTITY_GEOMETRY, perspective: [[0, 0], [1, 0], [1, 1], [0, 1]] }, output: { format: 'png', bitDepth: 16, longSide: 4000 } },
+      { geometry: { ...IDENTITY_GEOMETRY, perspective: [[0, 0], [1, 0], [1, 1], [0, 1]] }, output: { format: 'png', bitDepth: 16, longSide: 4000, metadata: { strip: ['gps', 'personal'] }, embedEdit: false } },
     );
     expect(validate(JSON.parse(JSON.stringify(doc))), JSON.stringify(validate.errors)).toBe(true);
   });
@@ -39,6 +39,9 @@ describe('edit.schema.json', () => {
       { version: 2, steps: [], output: { format: 'gif' } },
       { version: 2, steps: [], output: { longSide: 0 } },
       { version: 2, steps: [], output: { format: 'jpeg', bitDepth: 16 } },
+      { version: 2, steps: [], output: { metadata: 'drop' } },
+      { version: 2, steps: [], output: { metadata: { strip: ['faces'] } } },
+      { version: 2, steps: [], output: { embedEdit: 'yes' } },
       { version: 2, steps: [], extra: true },
       { version: 2, steps: [{ filter: 'gain', params: {}, mask: { kind: 'blob' } }] },
       { version: 2, steps: [], geometry: { rotate: 45, flipH: false, flipV: false, straighten: 0, crop: { x: 0, y: 0, width: 1, height: 1 } } },
@@ -56,7 +59,7 @@ describe('edit.schema.json', () => {
       { id: 'small', kind: 'resize', from: 'blend', longSide: 2048 },
       { id: 'half', kind: 'resize', from: 'logo', scale: 0.5 },
     ],
-    output: { node: 'small', format: 'jpeg', quality: 0.9 },
+    output: { node: 'small', format: 'jpeg', quality: 0.9, metadata: 'strip' },
   };
 
   it('accepts version 3 graphs with every node kind', () => {

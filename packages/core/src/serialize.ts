@@ -31,10 +31,17 @@ export interface StepDocument {
   readonly mask?: MaskDocument;
 }
 
+/** What an export keeps of its source's metadata (#180): everything (default), nothing, or all but GPS and / or personal fields. */
+export type MetadataPolicy = 'keep' | 'strip' | { readonly strip: readonly ('gps' | 'personal')[] };
+
 /** How to export the result: the encoding options plus an optional size. */
 export interface OutputSettings extends ExportOptions {
   /** Shrink (in linear light, after the chain) so the long side is at most this many pixels. Never enlarges. */
   readonly longSide?: number;
+  /** The source file's metadata (EXIF, XMP, IPTC, ICC) on export: default 'keep'. Renderers apply it when they render from a file. */
+  readonly metadata?: MetadataPolicy;
+  /** Embed this document in the exported file as XMP (rullino:edit). Default true (not with metadata 'strip'). */
+  readonly embedEdit?: boolean;
 }
 
 export interface ChainDocument {
@@ -164,13 +171,13 @@ export function parseSteps(raw: readonly unknown[], options: ParseOptions, where
   });
 }
 
-const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide']);
+const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide', 'metadata', 'embedEdit']);
 
 /** Validates output settings and rebuilds them from known fields; `extra` keys are left to the caller (v3's `node`). */
 export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSettings {
   if (!isObject(o)) throw new ParseError('output: not an object');
   for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key) && !extra.includes(key)) throw new ParseError(`output: unknown setting "${key}"`);
-  const { format, quality, bitDepth, background, longSide } = o;
+  const { format, quality, bitDepth, background, longSide, metadata, embedEdit } = o;
   if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new ParseError(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
   if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new ParseError('output: quality must be a number in [0, 1]');
   if (bitDepth !== undefined && bitDepth !== 8 && bitDepth !== 16) throw new ParseError('output: bitDepth must be 8 or 16');
@@ -179,13 +186,20 @@ export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSe
   if (background !== undefined && !(Array.isArray(background) && background.length === 3 && background.every((c) => typeof c === 'number' && c >= 0 && c <= 1))) {
     throw new ParseError('output: background must be [r, g, b] in [0, 1]');
   }
+  const policyError = () => new ParseError(`output: metadata must be 'keep', 'strip' or { "strip": ["gps", "personal"] }, got ${JSON.stringify(metadata)}`);
+  if (metadata !== undefined && metadata !== 'keep' && metadata !== 'strip') {
+    if (!isObject(metadata) || Object.keys(metadata).some((k) => k !== 'strip') || !Array.isArray(metadata.strip) || !metadata.strip.every((x) => x === 'gps' || x === 'personal')) throw policyError();
+  }
+  if (embedEdit !== undefined && typeof embedEdit !== 'boolean') throw new ParseError('output: embedEdit must be true or false');
   return {
     ...(format !== undefined ? { format } : {}),
     ...(quality !== undefined ? { quality: quality as number } : {}),
     ...(bitDepth !== undefined ? { bitDepth } : {}),
     ...(background !== undefined ? { background: [...(background as number[])] as [number, number, number] } : {}),
     ...(longSide !== undefined ? { longSide: longSide as number } : {}),
-  };
+    ...(metadata !== undefined ? { metadata: typeof metadata === 'string' ? metadata : { strip: [...(metadata as { strip: ('gps' | 'personal')[] }).strip] } } : {}),
+    ...(embedEdit !== undefined ? { embedEdit } : {}),
+  } as OutputSettings;
 }
 
 export function isObject(x: unknown): x is Record<string, unknown> {
