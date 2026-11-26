@@ -1,8 +1,8 @@
 # Filter reference
 
-51 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
+53 filters. Generated from the filters' schemas (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it. Every filter has a WGSL (GPU) and a TypeScript (CPU) implementation, and the tests check that they agree. Pixel lengths are given for the full-resolution image and scale with previews.
 
-## Adjust (18)
+## Adjust (20)
 
 ### Exposure (`exposure`)
 
@@ -133,6 +133,37 @@ Brightens or darkens the midtones without moving pure black or pure white.
 | Parameter | Label | Type | Range / options | Default | Notes |
 |---|---|---|---|---|---|
 | `gamma` | Gamma | number | 0.2 … 5 (step 0.01) | 1 | Above 1 lightens the midtones, below 1 darkens them; 1 changes nothing. |
+
+### Tone map (`toneMap`)
+
+Pointwise, straight alpha.
+
+Squeezes very bright light (HDR files, or a big exposure push) into what a screen can show, keeping detail in the highlights instead of clipping them.
+
+**Try this:** Open an HDR file, or raise Exposure by 3 stops, then add this and compare the three methods.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `method` | Method | choice | `filmic` Filmic (ACES), `reinhard` Reinhard, `log` Log (AgX-like) | `filmic` | Filmic is punchy and desaturates highlights, Reinhard keeps colours in proportion, Log spreads a wide range of stops evenly. |
+| `ev` | Exposure (EV) | number | −5 … 5 (step 0.05) | 0 | Stops of light added before the curve: raise it to lift the shadows, lower it to save highlights. |
+| `white` | White point | number | 1 … 64 (step 0.1) | 8 | Reinhard only: the scene brightness (1 is paper white) that comes out as pure white. |
+| `blackEv` | Black point (EV) | number | −16 … −4 (step 0.1) | −10 | Log only: stops below mid grey that come out black. |
+| `whiteEv` | White point (EV) | number | 2 … 12 (step 0.1) | 6.5 | Log only: stops above mid grey that come out white. |
+| `contrast` | Contrast | number | 0.25 … 3 (step 0.05) | 1 | Log only: how steep the curve is through the midtones. |
+
+### Local tone map (`localToneMap`)
+
+Multipass (4 passes).
+
+Evens out bright and dark areas locally, lifting shadows and taming highlights while keeping the fine detail, like the brilliance slider of a photo app.
+
+**Try this:** Raise Strength on a high-contrast scene, then use Detail to bring back the crispness.
+
+| Parameter | Label | Type | Range / options | Default | Notes |
+|---|---|---|---|---|---|
+| `strength` | Strength | number | 0 … 1 (step 0.01) | 0.5 | How much the broad brightness differences are flattened: 0 leaves them, 1 brings every area to mid grey. |
+| `detail` | Detail | number | 0.25 … 3 (step 0.01) | 1 | Local contrast: above 1 boosts fine detail, below 1 softens it; 1 leaves it as it is. |
+| `sigma` | Scale σ (px) | number | 1 … 100 (step 0.5), in pixels of the full-resolution image | 20 | Size of the areas whose brightness is evened out, in pixels. Larger areas mean fewer halos at edges. |
 
 ### Saturation (`saturation`)
 

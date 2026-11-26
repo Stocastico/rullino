@@ -149,7 +149,7 @@ async function renderEdit<T>(
   if (side !== undefined) {
     // Tiled (#176): every value in CPU memory as half floats, the same pixels as below.
     options.onTiling?.({ side });
-    const inputs = new Map(sources.map(({ name, image, scale }) => [name, { image: isLinear(image) ? { width: image.width, height: image.height, data: toFloat16Array(image.data) } : image, scale }]));
+    const inputs = new Map(sources.map(({ name, image, scale }) => [name, { image: isLinear(image) ? { width: image.width, height: image.height, data: toFloat16Array(image.data, true) } : image, scale }]));
     const out = await runGraphTiled(ctx, graph, inputs, { side });
     const [w, h] = longSide ? fitWithin(out.width, out.height, longSide) : [out.width, out.height];
     return readTiled(ctx, w === out.width && h === out.height ? out : await downscaleTiled(ctx, out, w, h, side), side);

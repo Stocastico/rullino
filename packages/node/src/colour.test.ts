@@ -97,6 +97,25 @@ describe('@rullino/node render and colour management', { timeout: 120_000 }, () 
     expect((await firstPixel(out.bytes)).slice(0, 3).map((v, i) => Math.abs(v - want[i]!))).toEqual([0, 0, 0]);
     renderer.destroy();
   });
+
+  it('reads OpenEXR and Radiance files as linear HDR light: a bright pixel survives a 5 stop cut, with its colours', async () => {
+    const hdr = (name: string) => new Uint8Array(readFileSync(fileURLToPath(new URL(`../../codecs/test/hdr/${name}`, import.meta.url))));
+    const reference = (name: string) => new Float32Array(hdr(name).buffer.slice(0));
+    const renderer = await createRenderer({ backend: 'cpu' });
+    for (const [file, ref, w] of [['block-none-half.exr', 'block-none-half.f32', 64], ['rle-40x20.hdr', 'rle-40x20.f32', 40]] as const) {
+      const out = await renderer.render(hdr(file), doc({ format: 'png', metadata: 'strip' }, [{ filter: 'exposure', params: { ev: -5 } }]));
+      const png = await decodePng(out.bytes);
+      const f = reference(ref);
+      for (const [x, y] of [[3, 2], [10, 1], [w - 1, 0]] as const) {
+        const i = y * w + x;
+        for (let c = 0; c < 3; c++) {
+          const want = Math.round(linearToSrgb(Math.min(1, f[i * 4 + c]! * 2 ** -5)) * 255);
+          expect(Math.abs((png.data as Uint8Array)[i * 4 + c]! - want), `${file} (${x}, ${y}) channel ${c}`).toBeLessThanOrEqual(2);
+        }
+      }
+    }
+    renderer.destroy();
+  });
 });
 
 const srgbDecode = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);

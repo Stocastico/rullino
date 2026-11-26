@@ -16,9 +16,9 @@ const read = (path: string) => new Uint8Array(readFileSync(path));
 
 describe('encodeJpeg against libjpeg-turbo (Pillow)', () => {
   it.each(references)('%s: the same file, byte for byte', async (name) => {
-    const [, image, q, sub] = /^(.+)-q(\d+)-(\d+)\.jpg$/.exec(name)!;
+    const [, image, q, sub] = /^(.+)-q(\d+)-(\d+|grey)\.jpg$/.exec(name)!;
     const input = await decodePng(read(`${dir}${image}.png`));
-    const ours = encodeJpeg(input as { width: number; height: number; data: Uint8Array }, { quality: Number(q) / 100, subsampling: `${sub![0]}:${sub![1]}:${sub![2]}` as '4:4:4' });
+    const ours = encodeJpeg(input as { width: number; height: number; data: Uint8Array }, sub === 'grey' ? { quality: Number(q) / 100, grey: true } : { quality: Number(q) / 100, subsampling: `${sub![0]}:${sub![1]}:${sub![2]}` as '4:4:4' });
     const theirs = read(dir + name);
     if (ours.length !== theirs.length || ours.some((v, i) => v !== theirs[i])) {
       const first = ours.findIndex((v, i) => v !== theirs[i]);

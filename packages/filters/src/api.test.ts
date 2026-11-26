@@ -5,13 +5,7 @@ import * as api from './index';
 describe('@rullino/filters public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'adaptiveThreshold', 'applyLut', 'ascii', 'autoAdjust', 'bilateral', 'blackPoint', 'bloom', 'boxBlur',
-    'brightness', 'canny', 'channelMixer', 'chromaticAberration', 'clahe', 'colorGrading', 'colorMixer',
-    'contrast', 'convolve', 'curves', 'dither', 'emboss', 'equalize', 'exposure', 'filters', 'gamma',
-    'gaussianBlur', 'gradient', 'gradientMap', 'grain', 'grayscale', 'halftone', 'hue', 'inpaint', 'invert', 'kuwahara', 'laplacian', 'lensBlur',
-    'levels', 'median', 'morphology', 'otsu', 'patch', 'pixelate', 'posterize', 'saturation',
-    'shadowsHighlights', 'sharpen', 'sketch', 'threshold', 'transparency', 'unsharpMask', 'vibrance',
-    'vignette', 'whiteBalance',
+    'adaptiveThreshold', 'applyLut', 'ascii', 'autoAdjust', 'bilateral', 'blackPoint', 'bloom', 'boxBlur', 'brightness', 'canny', 'channelMixer', 'chromaticAberration', 'clahe', 'colorGrading', 'colorMixer', 'contrast', 'convolve', 'curves', 'dither', 'emboss', 'equalize', 'exposure', 'filters', 'gamma', 'gaussianBlur', 'gradient', 'gradientMap', 'grain', 'grayscale', 'halftone', 'hue', 'inpaint', 'invert', 'kuwahara', 'laplacian', 'lensBlur', 'levels', 'localToneMap', 'median', 'morphology', 'otsu', 'patch', 'pixelate', 'posterize', 'saturation', 'shadowsHighlights', 'sharpen', 'sketch', 'threshold', 'toneMap', 'transparency', 'unsharpMask', 'vibrance', 'vignette', 'whiteBalance',
     ]);
   });
 });

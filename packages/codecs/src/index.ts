@@ -1,8 +1,11 @@
-export { CodecError, DEFAULT_MAX_PIXELS, type DecodedImage, type DecodeOptions } from './types';
+export { CodecError, DEFAULT_MAX_PIXELS, type Chromaticities, type DecodedImage, type DecodeOptions } from './types';
 export { decodePng } from './png';
 export { decode, detectFormat, type DecodeAnyOptions, type Decoder, type ImageFormat } from './decode';
 export { decodeJpeg } from './jpeg';
 export { decodeTiff } from './tiff';
+export { decodeHdr } from './hdr';
+export { decodeExr } from './exr';
+export { readUltraHdr, writeUltraHdr, type GainMapMetadata, type UltraHdr } from './gainmap';
 export { encodeTiff, type TiffEncodeOptions, type TiffImage } from './tiff-encode';
 export { encodeJpeg, type JpegEncodeOptions, type Rgba8 } from './jpeg-encode';
 export { editExif, PERSONAL_EXIF, readExif, type ExifEdits, type ExifEntry, type ExifIfd } from './exif';

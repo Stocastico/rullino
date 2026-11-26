@@ -65,3 +65,4 @@ export { CHAIN_VERSION, migrateChain, parseChain, serializeChain, type ChainDocu
 export { applyEdit, type ApplyEditOptions, type EditSources } from './edit';
 export { isSrgbProfile, manageSource, parseIcc, profileImage, type IccCurve, type IccProfile, type ManagedSource, type Primaries, type ProfiledImage, type ProfiledSamples } from './icc';
 export { COLOR_SPACES, outputProfile, type ColorSpace, type GamutMapping } from './colour-space';
+export { applyGainMap, gainMapWeight, makeGainMap, reconstructHdr, sdrFromHdr, type GainMapMetadata, type GainMapSamples } from './gainmap';

@@ -1,4 +1,4 @@
-import { applyEdit, createGpuContext, manageSource, outputProfile, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type OutputSettings, type Rgba8Image } from '@rullino/core';
+import { applyEdit, createGpuContext, makeGainMap, manageSource, outputProfile, parseEdit, reconstructHdr, sdrFromHdr, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type OutputSettings, type Rgba8Image } from '@rullino/core';
 import { chainDocument, encodeSamples, exportSamples, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
@@ -108,10 +108,23 @@ function loadSharp(why: string): Promise<Sharp> {
  * browser; 16-bit kept; EXIF orientation applied; an embedded colour profile converted), anything
  * else through sharp. A file the codecs refuse (a variant they do not read) falls back to sharp.
  */
-async function loadSource(file: Uint8Array, warn: ((message: string) => void) | undefined): Promise<Source> {
+async function loadSource(file: Uint8Array, warn: ((message: string) => void) | undefined, hdr: boolean): Promise<Source> {
   const codecs = await import('@rullino/codecs');
   const format = codecs.detectFormat(file);
-  if (format === 'png' || format === 'jpeg' || format === 'tiff') {
+  if (hdr && format === 'jpeg') {
+    // An Ultra HDR file starts from its HDR rendition (the SDR picture and its gain map): both turned upright like the file.
+    const uhdr = codecs.readUltraHdr(file);
+    if (uhdr) {
+      const orientation = codecs.exifOrientation((await codecs.readMetadata(uhdr.primary).catch(() => ({}) as { exif?: Uint8Array })).exif);
+      const sdr = codecs.orient(await codecs.decodeJpeg(uhdr.primary), orientation);
+      const gain = codecs.orient(await codecs.decodeJpeg(uhdr.gainMap), orientation);
+      if (sdr.bitDepth !== 8 || gain.bitDepth !== 8) throw new Error('an Ultra HDR file needs 8-bit JPEGs');
+      const m = reconstructHdr(sdr, gain, uhdr.metadata);
+      if (m.warning) warn?.(m.warning);
+      return m;
+    }
+  }
+  if (format === 'png' || format === 'jpeg' || format === 'tiff' || format === 'hdr' || format === 'exr') {
     try {
       const m = manageSource(await codecs.decodeOriented(file));
       if (m.warning) warn?.(m.warning);
@@ -215,7 +228,7 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     async render(input, edit) {
       const { output } = parseEdit(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
-      const source: Source = 'width' in input ? { image: input, wide: false, converted: false } : await loadSource(input, options.onWarning);
+      const source: Source = 'width' in input ? { image: input, wide: false, converted: false } : await loadSource(input, options.onWarning, output.hdr === 'gain-map');
       const out = await applyInternal(source.image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)
       // The output colour space (RFC #181) and what to do with colours it cannot hold: sRGB documents on sRGB photos clip, as they always did.
       const space = output.colorSpace ?? 'srgb';
@@ -224,6 +237,20 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       const icc = space !== 'srgb' ? outputProfile(space) : source.converted ? null : undefined;
       // The source file's metadata, as output.metadata says, and the document itself (#180).
       const done = async (bytes: Uint8Array) => ({ bytes: await carry('width' in input ? undefined : input, bytes, edit, output, out, icc), format, width: out.width, height: out.height });
+      if (output.hdr === 'gain-map') {
+        // Ultra HDR (#182): the result is HDR light; the SDR picture rolls the highlights off, the gain map brings them back.
+        const sdr = sdrFromHdr(out);
+        const { map, metadata } = makeGainMap(sdr, out);
+        const sharp = await loadSharp('JPEG output');
+        const q = output.quality === undefined ? {} : { quality: Math.max(1, Math.round(output.quality * 100)) };
+        const base = new Uint8Array(await sharp(exportSamples(sdr, settings) as Uint8ClampedArray, { raw: { width: out.width, height: out.height, channels: 4 } }).jpeg(q).toBuffer());
+        const carried = await carry('width' in input ? undefined : input, base, edit, output, out, icc);
+        const codecs = await import('@rullino/codecs');
+        const rgba = new Uint8Array(map.width * map.height * 4).fill(255);
+        for (let i = 0; i < map.width * map.height; i++) for (let c = 0; c < 3; c++) rgba[i * 4 + c] = map.data[i * map.channels + (map.channels === 1 ? 0 : c)]!;
+        const gainJpeg = codecs.encodeJpeg({ width: map.width, height: map.height, data: rgba }, { quality: 0.9, ...(map.channels === 1 ? { grey: true } : { subsampling: '4:4:4' as const }) });
+        return { bytes: codecs.writeUltraHdr({ primary: carried, gainMap: gainJpeg, metadata }), format, width: out.width, height: out.height };
+      }
       const samples = exportSamples(out, settings);
       if (format === 'png') return done(new Uint8Array(await (await encodeSamples(samples, out.width, out.height, settings)).arrayBuffer()));
       const sharp = await loadSharp(`${format.toUpperCase()} output`);

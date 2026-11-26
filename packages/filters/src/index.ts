@@ -36,6 +36,7 @@ import { invert } from './invert';
 import { kuwahara } from './kuwahara';
 import { lensBlur } from './lensBlur';
 import { levels } from './levels';
+import { localToneMap } from './localToneMap';
 import { median } from './median';
 import { morphology } from './morphology';
 import { otsu } from './otsu';
@@ -46,6 +47,7 @@ import { shadowsHighlights } from './shadowsHighlights';
 import { sharpen } from './sharpen';
 import { sketch } from './sketch';
 import { threshold } from './threshold';
+import { toneMap } from './toneMap';
 import { transparency } from './transparency';
 import { unsharpMask } from './unsharpMask';
 import { vibrance } from './vibrance';
@@ -89,6 +91,7 @@ export {
   kuwahara,
   lensBlur,
   levels,
+  localToneMap,
   median,
   morphology,
   otsu,
@@ -99,6 +102,7 @@ export {
   sharpen,
   sketch,
   threshold,
+  toneMap,
   transparency,
   unsharpMask,
   vibrance,
@@ -118,6 +122,8 @@ export const filters: readonly Filter<any>[] = [
   equalize,
   clahe,
   gamma,
+  toneMap,
+  localToneMap,
   saturation,
   vibrance,
   hue,

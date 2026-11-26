@@ -9,6 +9,14 @@ export class CodecError extends Error {
   }
 }
 
+/** CIE 1931 xy chromaticities of a set of RGB primaries and its white point. */
+export interface Chromaticities {
+  readonly red: readonly [number, number];
+  readonly green: readonly [number, number];
+  readonly blue: readonly [number, number];
+  readonly white: readonly [number, number];
+}
+
 /**
  * A decoded image: RGBA interleaved, straight (not premultiplied) alpha, the samples as the file
  * stores them (encoded with the file's transfer curve, usually sRGB; colour management is the
@@ -19,6 +27,13 @@ export type DecodedImage = {
   readonly height: number;
   /** The ICC profile embedded in the file, if any, as its raw bytes. */
   readonly icc?: Uint8Array;
+  /**
+   * HDR formats (OpenEXR, Radiance): the samples are linear scene light, not encoded with a transfer
+   * curve, and may be far above 1. Absent for the formats that store encoded values.
+   */
+  readonly linear?: true;
+  /** CIE xy chromaticities of the colour values, when the file says (HDR formats); absent means Rec. 709 / sRGB. */
+  readonly primaries?: Chromaticities;
 } & (
   | { readonly bitDepth: 8; readonly data: Uint8Array }
   | { readonly bitDepth: 16; readonly data: Uint16Array }

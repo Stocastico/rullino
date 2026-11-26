@@ -1,0 +1,377 @@
+{
+ "block-none-half.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 64,
+  "lossless": true,
+  "reference": "block-none-half.f32",
+  "width": 64
+ },
+ "block-piz-half.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 64,
+  "lossless": true,
+  "reference": "block-piz-half.f32",
+  "width": 64
+ },
+ "block-zip-half.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 64,
+  "lossless": true,
+  "reference": "block-zip-half.f32",
+  "width": 64
+ },
+ "cv-300x4.hdr": {
+  "format": "hdr",
+  "height": 4,
+  "reader": "opencv",
+  "reference": "cv-300x4.f32",
+  "width": 300
+ },
+ "cv-40x20.hdr": {
+  "format": "hdr",
+  "height": 20,
+  "reader": "opencv",
+  "reference": "cv-40x20.f32",
+  "width": 40
+ },
+ "cv-9x5.hdr": {
+  "format": "hdr",
+  "height": 5,
+  "reader": "opencv",
+  "reference": "cv-9x5.f32",
+  "width": 9
+ },
+ "flat-40x20.hdr": {
+  "format": "hdr",
+  "height": 20,
+  "reader": "formula",
+  "reference": "flat-40x20.f32",
+  "width": 40
+ },
+ "flat-5x7.hdr": {
+  "format": "hdr",
+  "height": 7,
+  "reader": "formula",
+  "reference": "flat-5x7.f32",
+  "width": 5
+ },
+ "fliph-40x20.hdr": {
+  "format": "hdr",
+  "height": 20,
+  "reader": "formula",
+  "reference": "fliph-40x20.f32",
+  "width": 40
+ },
+ "flipv-40x20.hdr": {
+  "format": "hdr",
+  "height": 20,
+  "reader": "formula",
+  "reference": "flipv-40x20.f32",
+  "width": 40
+ },
+ "grey-none-half.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 20,
+  "lossless": true,
+  "reference": "grey-none-half.f32",
+  "width": 20
+ },
+ "grey-piz-half.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 20,
+  "lossless": true,
+  "reference": "grey-piz-half.f32",
+  "width": 20
+ },
+ "grey-zip-half.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 20,
+  "lossless": true,
+  "reference": "grey-zip-half.f32",
+  "width": 20
+ },
+ "header-40x20.hdr": {
+  "format": "hdr",
+  "height": 20,
+  "primaries": [
+   0.64,
+   0.33,
+   0.3,
+   0.6,
+   0.15,
+   0.06,
+   0.3127,
+   0.329
+  ],
+  "reader": "formula",
+  "reference": "header-40x20.f32",
+  "width": 40
+ },
+ "old-runs-600x3.hdr": {
+  "format": "hdr",
+  "height": 3,
+  "reader": "formula",
+  "reference": "old-runs-600x3.f32",
+  "width": 600
+ },
+ "one-none-half.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 1,
+  "lossless": true,
+  "reference": "one-none-half.f32",
+  "width": 1
+ },
+ "one-piz-half.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 1,
+  "lossless": true,
+  "reference": "one-piz-half.f32",
+  "width": 1
+ },
+ "one-zip-half.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 1,
+  "lossless": true,
+  "reference": "one-zip-half.f32",
+  "width": 1
+ },
+ "ramp-piz-float16.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 128,
+  "lossless": true,
+  "reference": "ramp-piz-float16.f32",
+  "width": 256
+ },
+ "ramp-piz-float32.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 128,
+  "lossless": true,
+  "reference": "ramp-piz-float32.f32",
+  "width": 256
+ },
+ "rgb-none-float.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 35,
+  "lossless": true,
+  "reference": "rgb-none-float.f32",
+  "width": 40
+ },
+ "rgb-piz-float.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 35,
+  "lossless": true,
+  "reference": "rgb-piz-float.f32",
+  "width": 40
+ },
+ "rgb-zip-float.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 35,
+  "lossless": true,
+  "reference": "rgb-zip-float.f32",
+  "width": 40
+ },
+ "rgba-b44-float16.exr": {
+  "compression": 6,
+  "format": "exr",
+  "height": 53,
+  "lossless": false,
+  "reference": "rgba-b44-float16.f32",
+  "width": 37
+ },
+ "rgba-b44-float32.exr": {
+  "compression": 6,
+  "format": "exr",
+  "height": 53,
+  "lossless": false,
+  "reference": "rgba-b44-float32.f32",
+  "width": 37
+ },
+ "rgba-dwaa-float16.exr": {
+  "compression": 8,
+  "format": "exr",
+  "height": 53,
+  "lossless": false,
+  "reference": "rgba-dwaa-float16.f32",
+  "width": 37
+ },
+ "rgba-dwaa-float32.exr": {
+  "compression": 8,
+  "format": "exr",
+  "height": 53,
+  "lossless": false,
+  "reference": "rgba-dwaa-float32.f32",
+  "width": 37
+ },
+ "rgba-none-float16.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-none-float16.f32",
+  "width": 37
+ },
+ "rgba-none-float32.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-none-float32.f32",
+  "width": 37
+ },
+ "rgba-piz-float16.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-piz-float16.f32",
+  "width": 37
+ },
+ "rgba-piz-float32.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-piz-float32.f32",
+  "width": 37
+ },
+ "rgba-pxr24-float16.exr": {
+  "compression": 5,
+  "format": "exr",
+  "height": 53,
+  "lossless": false,
+  "reference": "rgba-pxr24-float16.f32",
+  "width": 37
+ },
+ "rgba-pxr24-float32.exr": {
+  "compression": 5,
+  "format": "exr",
+  "height": 53,
+  "lossless": false,
+  "reference": "rgba-pxr24-float32.f32",
+  "width": 37
+ },
+ "rgba-rle-float16.exr": {
+  "compression": 1,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-rle-float16.f32",
+  "width": 37
+ },
+ "rgba-rle-float32.exr": {
+  "compression": 1,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-rle-float32.f32",
+  "width": 37
+ },
+ "rgba-zip-float16.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-zip-float16.f32",
+  "width": 37
+ },
+ "rgba-zip-float32.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-zip-float32.f32",
+  "width": 37
+ },
+ "rgba-zips-float16.exr": {
+  "compression": 2,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-zips-float16.f32",
+  "width": 37
+ },
+ "rgba-zips-float32.exr": {
+  "compression": 2,
+  "format": "exr",
+  "height": 53,
+  "lossless": true,
+  "reference": "rgba-zips-float32.f32",
+  "width": 37
+ },
+ "rle-40x20.hdr": {
+  "format": "hdr",
+  "height": 20,
+  "reader": "formula",
+  "reference": "rle-40x20.f32",
+  "width": 40
+ },
+ "rle-8x4.hdr": {
+  "format": "hdr",
+  "height": 4,
+  "reader": "formula",
+  "reference": "rle-8x4.f32",
+  "width": 8
+ },
+ "tall-none-half.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 70,
+  "lossless": true,
+  "reference": "tall-none-half.f32",
+  "width": 5
+ },
+ "tall-piz-half.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 70,
+  "lossless": true,
+  "reference": "tall-piz-half.f32",
+  "width": 5
+ },
+ "tall-zip-half.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 70,
+  "lossless": true,
+  "reference": "tall-zip-half.f32",
+  "width": 5
+ },
+ "wide-none-half.exr": {
+  "compression": 0,
+  "format": "exr",
+  "height": 3,
+  "lossless": true,
+  "reference": "wide-none-half.f32",
+  "width": 300
+ },
+ "wide-piz-half.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 3,
+  "lossless": true,
+  "reference": "wide-piz-half.f32",
+  "width": 300
+ },
+ "wide-zip-half.exr": {
+  "compression": 3,
+  "format": "exr",
+  "height": 3,
+  "lossless": true,
+  "reference": "wide-zip-half.f32",
+  "width": 300
+ }
+}

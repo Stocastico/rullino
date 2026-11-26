@@ -2,9 +2,12 @@ import {
   applyEdit,
   createGpuContext,
   createImage,
+  makeGainMap,
   manageSource,
   outputProfile,
   parseEdit,
+  reconstructHdr,
+  sdrFromHdr,
   WebGpuUnavailableError,
   type Filter,
   type GpuContext,
@@ -157,10 +160,23 @@ interface Source {
 }
 
 /** A file as pixels: PNG, JPEG and TIFF through `@rullino/codecs` (a file it refuses falls back to the browser), the rest through the browser. */
-async function loadSource(file: Blob, bytes: Uint8Array, warn: ((message: string) => void) | undefined): Promise<Source> {
+async function loadSource(file: Blob, bytes: Uint8Array, warn: ((message: string) => void) | undefined, hdr: boolean): Promise<Source> {
   const codecs = await import('@rullino/codecs'); // loaded only here: pages that never render a file do not pay for it
   const format = codecs.detectFormat(bytes);
-  if (format === 'png' || format === 'jpeg' || format === 'tiff') {
+  if (hdr && format === 'jpeg') {
+    // An Ultra HDR file starts from its HDR rendition (the SDR picture and its gain map): both turned upright like the file.
+    const uhdr = codecs.readUltraHdr(bytes);
+    if (uhdr) {
+      const orientation = codecs.exifOrientation((await codecs.readMetadata(uhdr.primary).catch(() => ({}) as { exif?: Uint8Array })).exif);
+      const sdr = codecs.orient(await codecs.decodeJpeg(uhdr.primary), orientation);
+      const gain = codecs.orient(await codecs.decodeJpeg(uhdr.gainMap), orientation);
+      if (sdr.bitDepth !== 8 || gain.bitDepth !== 8) throw new Error('an Ultra HDR file needs 8-bit JPEGs');
+      const m = reconstructHdr(sdr, gain, uhdr.metadata);
+      if (m.warning) warn?.(m.warning);
+      return m;
+    }
+  }
+  if (format === 'png' || format === 'jpeg' || format === 'tiff' || format === 'hdr' || format === 'exr') {
     try {
       const m = manageSource(await codecs.decodeOriented(bytes));
       if (m.warning) warn?.(m.warning);
@@ -224,20 +240,28 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     async render(input, edit) {
       const { output } = parseEdit(edit, { filters, resolveLut });
       const bytes = input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : undefined;
-      const source: Source = bytes ? await loadSource(input as Blob, bytes, options.onWarning) : { image: input as ImageData, wide: false, converted: false };
+      const source: Source = bytes ? await loadSource(input as Blob, bytes, options.onWarning, output.hdr === 'gain-map') : { image: input as ImageData, wide: false, converted: false };
       const out = await apply(source.image, edit); // decoded where it renders: on the GPU, or in the worker
       // The output colour space (RFC #181) and what to do with colours it cannot hold: sRGB documents on sRGB photos clip, as they always did.
       const space = output.colorSpace ?? 'srgb';
       const settings = { ...output, colorSpace: space, gamut: output.gamut ?? (space !== 'srgb' || source.wide ? ('map' as const) : ('clip' as const)) };
-      const blob = await encodeSamples(exportSamples(out, settings), out.width, out.height, settings);
       // The profile that describes the samples: the output space's, or none when sRGB comes from a converted source; else the source's own.
       const icc = space !== 'srgb' ? outputProfile(space) : source.converted ? null : undefined;
+      // Ultra HDR (#182): the result is HDR light; the SDR picture rolls the highlights off, the gain map brings them back.
+      const sdr = output.hdr === 'gain-map' ? sdrFromHdr(out) : undefined;
+      const gain = sdr ? makeGainMap(sdr, out) : undefined;
+      const blob = await encodeSamples(exportSamples(sdr ?? out, settings), out.width, out.height, settings);
       // The source file's metadata, as output.metadata says, and the document itself (#180).
       const embed = output.embedEdit !== false;
-      if (!bytes && !embed && icc === undefined) return blob;
-      const { carryMetadata } = await import('@rullino/codecs');
-      const carried = await carryMetadata(bytes, new Uint8Array(await blob.arrayBuffer()), { metadata: output.metadata ?? 'keep', width: out.width, height: out.height, ...(embed ? { edit: JSON.stringify(edit) } : {}), ...(icc !== undefined ? { icc } : {}) });
-      return new Blob([carried as Uint8Array<ArrayBuffer>], { type: blob.type });
+      if (!bytes && !embed && icc === undefined && !gain) return blob;
+      const codecs = await import('@rullino/codecs');
+      const carried = await codecs.carryMetadata(bytes, new Uint8Array(await blob.arrayBuffer()), { metadata: output.metadata ?? 'keep', width: out.width, height: out.height, ...(embed ? { edit: JSON.stringify(edit) } : {}), ...(icc !== undefined ? { icc } : {}) });
+      if (!gain) return new Blob([carried as Uint8Array<ArrayBuffer>], { type: blob.type });
+      const { map, metadata } = gain;
+      const rgba = new Uint8Array(map.width * map.height * 4).fill(255);
+      for (let i = 0; i < map.width * map.height; i++) for (let c = 0; c < 3; c++) rgba[i * 4 + c] = map.data[i * map.channels + (map.channels === 1 ? 0 : c)]!;
+      const gainJpeg = codecs.encodeJpeg({ width: map.width, height: map.height, data: rgba }, { quality: 0.9, ...(map.channels === 1 ? { grey: true } : { subsampling: '4:4:4' as const }) });
+      return new Blob([codecs.writeUltraHdr({ primary: carried, gainMap: gainJpeg, metadata }) as Uint8Array<ArrayBuffer>], { type: 'image/jpeg' });
     },
     destroy() {
       destroyed = true;
