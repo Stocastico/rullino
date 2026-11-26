@@ -19,6 +19,14 @@ export interface ExportMetadataOptions {
   readonly height: number;
   /** The edit document (JSON text) to embed as XMP `rullino:edit` (not with 'strip'). */
   readonly edit?: string;
+  /**
+   * The ICC profile that describes the export's samples (RFC #181). Absent: the source's profile is
+   * kept, as it describes pixels rullino did not convert. Bytes: the output was converted to this
+   * colour space (Display P3, Adobe RGB…), whose profile replaces the source's, even with 'strip' (it
+   * says how to read the pixels). `null`: the output is plain sRGB (a wide source was converted), so no
+   * profile is written. Either way EXIF's ColorSpace says sRGB (1) or uncalibrated (0xFFFF).
+   */
+  readonly icc?: Uint8Array | null;
 }
 
 /** IPTC datasets that name or reach a person: By-line, By-line Title, Contact, Writer/Editor. */
@@ -48,8 +56,9 @@ const orDrop = <T>(f: () => T): T | undefined => {
 };
 
 /**
- * The metadata an export of an image with `input`'s metadata should carry. The ICC profile always
- * stays: it says how to read the pixel values, which rullino does not convert. With 'strip' nothing
+ * The metadata an export of an image with `input`'s metadata should carry. An ICC profile always
+ * stays: the source's (it says how to read pixel values rullino did not convert) or, when the output
+ * was converted, `options.icc`. With 'strip' nothing
  * else stays (no edit either). Otherwise EXIF gets orientation 1, the export's size and no thumbnail;
  * GPS and personal fields go from EXIF, XMP, IPTC and PNG's text as the policy says; the edit is
  * embedded in XMP. A block that cannot be read is dropped rather than copied unchecked.
@@ -57,11 +66,12 @@ const orDrop = <T>(f: () => T): T | undefined => {
 export function exportMetadata(input: ImageMetadata, options: ExportMetadataOptions): ImageMetadata {
   const p = parts(options.metadata ?? 'keep');
   const out: { -readonly [K in keyof ImageMetadata]: ImageMetadata[K] } = {};
-  if (input.icc) out.icc = input.icc;
+  if (options.icc) out.icc = options.icc;
+  else if (options.icc === undefined && input.icc) out.icc = input.icc;
   if (p.strip) return out;
   const remove = { gps: p.gps, personal: p.personal };
   if (input.exif) {
-    const exif = orDrop(() => editExif(input.exif!, { orientation: 1, size: { width: options.width, height: options.height }, dropThumbnail: true, remove }));
+    const exif = orDrop(() => editExif(input.exif!, { orientation: 1, size: { width: options.width, height: options.height }, dropThumbnail: true, remove, ...(options.icc === undefined ? {} : { colorSpace: options.icc === null ? 1 : 0xffff }) }));
     if (exif) out.exif = exif;
   }
   const xmp = input.xmp !== undefined ? orDrop(() => editXmp(input.xmp, { remove, orientation: 1, ...(options.edit !== undefined ? { edit: options.edit } : {}) })) : undefined;
