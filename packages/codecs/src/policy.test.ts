@@ -69,3 +69,28 @@ describe('exportMetadata', () => {
     expect(() => exportMetadata(jpeg, { metadata: { strip: ['faces' as 'gps'] }, width: 1, height: 1 })).toThrow(/faces/);
   });
 });
+
+describe('exportMetadata and the output colour profile (#181)', () => {
+  const P3 = Uint8Array.of(1, 2, 3, 4);
+
+  it('replaces the source profile with the output profile, even with strip, and says the colour space is uncalibrated', () => {
+    for (const metadata of ['keep', 'strip'] as const) {
+      const out = exportMetadata(jpeg, { metadata, width: 8, height: 6, icc: P3 });
+      expect(Array.from(out.icc!)).toEqual([1, 2, 3, 4]);
+    }
+    expect(exifValue(exportMetadata(jpeg, { width: 8, height: 6, icc: P3 }), 'exif', 0xa001)).toBe(0xffff);
+  });
+
+  it('icc: null drops the profile (the output is plain sRGB, untagged) and says sRGB in EXIF', () => {
+    const out = exportMetadata(jpeg, { width: 8, height: 6, icc: null });
+    expect(out.icc).toBeUndefined();
+    expect(exifValue(out, 'exif', 0xa001)).toBe(1);
+    expect(exportMetadata(png, { metadata: 'strip', width: 8, height: 6, icc: null })).toEqual({});
+  });
+
+  it('without icc the source profile and its colour space tag are kept as they were', () => {
+    const out = exportMetadata(jpeg, { width: 8, height: 6 });
+    expect(Array.from(out.icc!)).toEqual(Array.from(jpeg.icc!));
+    expect(exifValue(out, 'exif', 0xa001)).toBe(exifValue(jpeg, 'exif', 0xa001));
+  });
+});

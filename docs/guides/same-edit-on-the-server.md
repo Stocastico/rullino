@@ -73,7 +73,7 @@ For a whole folder without writing code, `npx rullino render --edit edit.json ph
 - The preview and the server run the same shaders when both have a GPU; CI renders every look and mixed edits on Chromium's WebGPU and on Dawn in Node and checks they agree within |Δ| ≤ 4e-3 + 4e-3·|v| per channel.
 - A CPU render (either side) agrees with the GPU within each filter's [published tolerance](../parity.md): usually well under one 8-bit step, a few filters with hard decisions (thresholds, halftone) allow a small share of outlier pixels.
 - Grain and other noise patterns differ between a preview and the full-size render (their statistics match, not the pixels): preview at `scale`, judge the export.
-- Input is decoded to 8-bit sRGB by sharp with the EXIF orientation applied; 16-bit and HDR input are not supported yet. PNG output can be 16 bit.
+- PNG, JPEG and TIFF files are decoded by `@rullino/codecs` (EXIF orientation applied, an embedded ICC profile converted, 16 bits kept), other formats by sharp as 8-bit sRGB; HDR formats are not supported yet. PNG output can be 16 bit, and `output.colorSpace` writes Display P3, Adobe RGB or Rec. 2020 with the profile embedded.
 
 ## Next
 

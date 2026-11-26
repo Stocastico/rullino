@@ -1,3 +1,4 @@
+import { mul3, rgbToXyzD50, XYZ_D50_TO_LINEAR_SRGB } from '@rullino/core/internal';
 import { createImage, fromFloat16Array, linearToOklab, lutFromFunction, oklabToLinear, toFloat16Array, type Mask, type ParamSchema, type PointwiseFilter, type Rgba } from '@rullino/core';
 
 /** Runs a filter's CPU reference on a single premultiplied pixel. */
@@ -133,4 +134,33 @@ export function specialImage() {
     img.data.set([r! * a, g! * a, b! * a, a], i * 4);
   }
   return img;
+}
+
+/**
+ * Colours from wider gamuts in rullino's working space (extended linear sRGB, RFC #181): Display P3
+ * and Rec. 2020 primaries, secondaries and saturation ramps, which have negative channels, some
+ * above 1, a few at partial alpha; 37 x 29, float16-quantised like the other parity images.
+ */
+export function wideImage() {
+  const spaces = [
+    { red: [0.68, 0.32], green: [0.265, 0.69], blue: [0.15, 0.06], white: [0.3127, 0.329] },
+    { red: [0.708, 0.292], green: [0.17, 0.797], blue: [0.131, 0.046], white: [0.3127, 0.329] },
+  ] as const;
+  const toSrgb = spaces.map((p) => mul3(XYZ_D50_TO_LINEAR_SRGB, rgbToXyzD50(p)));
+  const w = 37;
+  const h = 29;
+  const data = new Float32Array(w * h * 4);
+  const hues = [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1], [1, 0.5, 0], [0.2, 1, 0.4]];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const m = toSrgb[y % 2]!;
+      const hue = hues[(x + y) % hues.length]!;
+      const sat = (x % 9) / 8; // grey -> fully saturated
+      const level = 0.05 + 1.2 * (y / (h - 1)); // dark -> above white
+      const c = hue.map((v) => level * (1 - sat + sat * v));
+      const rgb = [0, 1, 2].map((i) => m[i * 3]! * c[0]! + m[i * 3 + 1]! * c[1]! + m[i * 3 + 2]! * c[2]!);
+      const a = (x * 7 + y * 3) % 11 === 0 ? 0.35 : 1;
+      data.set([rgb[0]! * a, rgb[1]! * a, rgb[2]! * a, a], (y * w + x) * 4);
+    }
+  return createImage(w, h, fromFloat16Array(toFloat16Array(data)));
 }

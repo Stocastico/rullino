@@ -34,7 +34,9 @@ What you should not assume: bit-identical files across backends. If you need a p
 
 Pictures enter as 8-bit sRGB (what browsers and decoders give), are converted to **linear light with premultiplied alpha**, and are processed as 16-bit floats on the GPU (32-bit on the CPU). They return to sRGB only when they are shown or encoded. Working in linear light is why blurs, resizes and blends do not darken edges the way canvas filters do; perceptual adjustments (contrast, saturation, curves, vibrance) work in OKLab or in sRGB-encoded units, where people judge tone. Values above 1 (HDR headroom) survive between steps and are clipped only at export.
 
-Not covered yet: 16-bit or HDR *input* files (decoding gives 8 bits). 16-bit PNG *output* is supported.
+**Wide gamut.** The working space is *extended* linear sRGB: sRGB's primaries and white, with values below 0 and above 1 allowed. A Display P3 or Adobe RGB photo is converted into it when `render()` reads the file (PNG, JPEG and TIFF are decoded by `@rullino/codecs`, with their embedded ICC profile and EXIF orientation), so its saturated colours arrive as negative channels instead of being clipped on the way in. Filters work on them as on any other value (OKLab and the luminance weights are exact for them; per-channel tools such as the channel mixer or per-channel curves act on sRGB's primaries). The document's `output.colorSpace` (`srgb`, `display-p3`, `adobe-rgb`, `rec2020`) chooses what is written, with its profile embedded, and `output.gamut` what happens to colours the output cannot hold: `"clip"` or `"map"` (CSS Color 4: chroma is reduced at the same lightness and hue). An sRGB photo exported as sRGB renders as it always did. Profiles that are not matrix/TRC ones (CMYK, print profiles with lookup tables) are read as sRGB, with a warning. See the [design](./design/colour-management.md).
+
+16-bit PNG and TIFF input keep their 16 bits (and float TIFF its range) through the pipeline; HDR formats (OpenEXR, gain maps) come with #182. 16-bit PNG *output* is supported.
 
 ## Pixel sizes and `scale`
 

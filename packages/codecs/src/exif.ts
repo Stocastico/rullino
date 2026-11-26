@@ -133,6 +133,8 @@ export interface ExifEdits {
   readonly orientation?: number;
   /** Sets the Exif IFD's PixelXDimension / PixelYDimension, when they are there (removed when the value does not fit). */
   readonly size?: { readonly width: number; readonly height: number };
+  /** Sets the Exif IFD's ColorSpace (1 sRGB, 0xFFFF uncalibrated), when the field is there. */
+  readonly colorSpace?: number;
   /** Removes IFD1 and the thumbnail image it points to. */
   readonly dropThumbnail?: boolean;
   /** Removes the GPS IFD (and its pointer) and / or the fields of `PERSONAL_EXIF`. */
@@ -167,6 +169,7 @@ export function editExif(exif: Uint8Array, edits: ExifEdits): Uint8Array {
     else drop(byName(r.ifd), r.tag);
   };
   if (edits.orientation !== undefined) set(find('ifd0', 0x0112), edits.orientation);
+  if (edits.colorSpace !== undefined) set(find('exif', 0xa001), edits.colorSpace);
   if (edits.size) {
     set(find('exif', 0xa002), edits.size.width);
     set(find('exif', 0xa003), edits.size.height);

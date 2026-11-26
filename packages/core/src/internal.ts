@@ -31,3 +31,6 @@ export { applyEditPixels } from './edit';
 export { bindSources, checkMixSizes, mixMask, resizeSize, runGraphCpu, walkGraph, type GraphCpuOptions, type GraphSources, type GraphValue } from './graph-cpu';
 export { runGraphGpu, type GraphGpuResult } from './graph-gpu';
 export { chainDocument } from './graph';
+export { evalCurve, inv3, mul3, profileToXyz, rgbToXyzD50, SRGB_PRIMARIES, XYZ_D50_TO_LINEAR_SRGB } from './icc';
+export { decodeTransfer, encodeColour, encodeTransfer, fromLinearSrgb, gamutMapOklab, inGamut, PRIMARIES, toLinearSrgb } from './colour-space';
+export { writeIcc } from './icc';

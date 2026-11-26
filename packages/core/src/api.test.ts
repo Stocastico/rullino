@@ -5,14 +5,14 @@ import * as api from './index';
 describe('@rullino/core public API', () => {
   it('exports exactly these runtime names', () => {
     expect(Object.keys(api).sort()).toEqual([
-    'CHAIN_VERSION', 'EDIT_VERSION', 'GpuError', 'IDENTITY_GEOMETRY', 'MAX_IMAGE_SIDE', 'MAX_LUT_SIZE', 'NODE_KINDS', 'ParseError', 'Pipeline',
+    'CHAIN_VERSION', 'COLOR_SPACES', 'EDIT_VERSION', 'GpuError', 'IDENTITY_GEOMETRY', 'MAX_IMAGE_SIDE', 'MAX_LUT_SIZE', 'NODE_KINDS', 'ParseError', 'Pipeline',
     'ShaderCompileError', 'WebGpuUnavailableError', 'activeSteps', 'applyEdit', 'applyGeometry', 'applyGeometryCpu',
     'applyLutCpu', 'blendMasked', 'compareImages', 'createGpuContext', 'createImage', 'createLut',
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
     'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
     'formatCube', 'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
-    'isIdentityGeometry', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
-    'maskImage', 'maskValue', 'migrateChain', 'migrateEdit', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseEdit', 'parseHald',
+    'isIdentityGeometry', 'isSrgbProfile', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand', 'manageSource',
+    'maskImage', 'maskValue', 'migrateChain', 'migrateEdit', 'oklabToLinear', 'outputProfile', 'paintStroke', 'parseChain', 'parseCube', 'parseEdit', 'parseHald', 'parseIcc', 'profileImage',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',
     'runChainCpu', 'runFilter', 'sampleCurve', 'sampleImage', 'serializeChain', 'srgbToLinear',
     'toFloat16Array', 'turnGeometry', 'uploadImage', 'uploadSrgb8', 'validateGeometry', 'validateMask',
@@ -22,12 +22,7 @@ describe('@rullino/core public API', () => {
   it('keeps the plumbing under the unstable "./internal" subpath', async () => {
     const internal = await import('./internal');
     expect(Object.keys(internal).sort()).toEqual([
-    'CURVE_SAMPLES', 'WORKING_FORMAT', 'applyEditPixels', 'bandReach', 'bindSources', 'blendMask', 'chainDocument', 'checkMixSizes', 'colorWgsl', 'createWorkingTexture', 'curveLut',
-    'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'exportSamples',
-    'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
-    'lutSamplerWgsl', 'lutTexture', 'mixMask', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
-    'passShader', 'planBands', 'planSegments', 'planTiles', 'poolStats', 'readTextureBytes', 'renderMask', 'reportGpuError', 'resizeSize', 'runChainBand', 'runChainBandRows', 'runChainBands', 'runChainTiled', 'runFused',
-    'runGraphCpu', 'runGraphGpu', 'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'setPoolLimit', 'stepReach', 'sumStats', 'toGpuError', 'twoPhaseStat', 'uploadHalves', 'uploadSrgb8Rect', 'validateSchema', 'walkGraph', 'wholeFrame',
+    'CURVE_SAMPLES', 'PRIMARIES', 'SRGB_PRIMARIES', 'WORKING_FORMAT', 'XYZ_D50_TO_LINEAR_SRGB', 'applyEditPixels', 'bandReach', 'bindSources', 'blendMask', 'chainDocument', 'checkMixSizes', 'colorWgsl', 'createWorkingTexture', 'curveLut', 'curveSamplerWgsl', 'curveSamplersWgsl', 'decodeTransfer', 'effectiveParams', 'encodeColour', 'encodeSamples', 'encodeToTexture', 'encodeTransfer', 'evalCurve', 'exportSamples', 'float16ToFloat32', 'float32ToFloat16', 'fromLinearSrgb', 'fusedShader', 'gamutMapOklab', 'imageSamplerWgsl', 'imageTexture', 'inGamut', 'inv3', 'lutSamplerWgsl', 'lutTexture', 'mixMask', 'mul3', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl', 'passShader', 'planBands', 'planSegments', 'planTiles', 'poolStats', 'profileToXyz', 'readTextureBytes', 'renderMask', 'reportGpuError', 'resizeSize', 'rgbToXyzD50', 'runChainBand', 'runChainBandRows', 'runChainBands', 'runChainTiled', 'runFused', 'runGraphCpu', 'runGraphGpu', 'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'setPoolLimit', 'stepReach', 'sumStats', 'toGpuError', 'toLinearSrgb', 'twoPhaseStat', 'uploadHalves', 'uploadSrgb8Rect', 'validateSchema', 'walkGraph', 'wholeFrame', 'writeIcc',
     ]);
     const publicNames = new Set(Object.keys(api));
     for (const name of Object.keys(internal)) expect(publicNames.has(name), `${name} is public and internal`).toBe(false);

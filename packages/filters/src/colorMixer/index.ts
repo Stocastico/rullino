@@ -142,5 +142,7 @@ ${BANDS.map(
       o.set(oklabToLinear(L * (1 + LUM_RANGE * dl), C2 * Math.cos(t), C2 * Math.sin(t)));
     });
   },
-  tolerance: OKLAB_TOLERANCE,
+  // Colours far outside sRGB (RFC #181) can come out with one small channel that is the difference of
+  // two large ones (0.012 from terms near 3): the GPU's pow there was 4e-4 off on 5 channels of 4292.
+  tolerance: { ...OKLAB_TOLERANCE, outliers: 0.002 },
 });

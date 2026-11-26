@@ -1,5 +1,5 @@
-import { applyEdit, createGpuContext, encodeImage, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type OutputSettings, type Rgba8Image } from '@rullino/core';
-import { chainDocument, exportSamples, setPoolLimit } from '@rullino/core/internal';
+import { applyEdit, createGpuContext, manageSource, outputProfile, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type OutputSettings, type Rgba8Image } from '@rullino/core';
+import { chainDocument, encodeSamples, exportSamples, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import { createThreadedExecutor, DEFAULT_WORKER_URL, resolveThreads } from './threads';
@@ -12,6 +12,11 @@ export interface RendererOptions {
    * tiled. Ignored on the CPU.
    */
   readonly memoryBudget?: number | undefined;
+  /**
+   * Called with a message when `render()` could not use something in a file, e.g. an embedded colour
+   * profile it does not support (the colours are then read as sRGB). Default: nothing (the CLI prints it).
+   */
+  readonly onWarning?: ((message: string) => void) | undefined;
   /**
    * 'auto' (default): Dawn through the `webgpu` package if it is installed and finds an adapter,
    * else the CPU (see `reason`). 'gpu': Dawn or an error. 'cpu': the CPU reference.
@@ -57,6 +62,15 @@ export interface Rendered {
   readonly height: number;
 }
 
+/** What `render()` made of the source file's colours. */
+interface Source {
+  readonly image: RgbaImage | LinearImage;
+  /** The source had a profile wider than sRGB. */
+  readonly wide: boolean;
+  /** Its pixels were converted from a profile: the source's own profile must not be copied. */
+  readonly converted: boolean;
+}
+
 export interface Renderer {
   readonly backend: 'gpu' | 'cpu';
   /** Worker threads in use for the CPU backend: 1 means the calling thread. */
@@ -69,7 +83,7 @@ export interface Renderer {
   apply(image: LinearImage | Rgba8Image, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
   /**
    * Renders an edit document and encodes the result as the document's `output` says. The input is
-   * 8-bit RGBA pixels, or an encoded image file (JPEG, PNG, WebP, AVIF, TIFF... decoded by sharp,
+   * 8-bit RGBA pixels, or an encoded image file: PNG, JPEG and TIFF are decoded by @rullino/codecs (embedded colour profiles converted, 16 bits kept), the others (WebP, AVIF...) by sharp,
    * EXIF orientation applied). PNG is written by rullino (8 or 16 bit); JPEG and WebP by sharp.
    */
   render(input: RgbaImage | Uint8Array, edit: unknown): Promise<Rendered>;
@@ -87,6 +101,26 @@ function loadSharp(why: string): Promise<Sharp> {
     sharpModule = undefined;
     throw new Error(`${why} needs the optional sharp package: npm install sharp (${e.message})`);
   });
+}
+
+/**
+ * A file as pixels (RFC #181): PNG, JPEG and TIFF through `@rullino/codecs` (the same pixels as in the
+ * browser; 16-bit kept; EXIF orientation applied; an embedded colour profile converted), anything
+ * else through sharp. A file the codecs refuse (a variant they do not read) falls back to sharp.
+ */
+async function loadSource(file: Uint8Array, warn: ((message: string) => void) | undefined): Promise<Source> {
+  const codecs = await import('@rullino/codecs');
+  const format = codecs.detectFormat(file);
+  if (format === 'png' || format === 'jpeg' || format === 'tiff') {
+    try {
+      const m = manageSource(await codecs.decodeOriented(file));
+      if (m.warning) warn?.(m.warning);
+      return m;
+    } catch (e) {
+      if (!(e instanceof codecs.CodecError)) throw e;
+    }
+  }
+  return { image: await decodeFile(file), wide: false, converted: false };
 }
 
 async function decodeFile(file: Uint8Array): Promise<RgbaImage> {
@@ -118,11 +152,11 @@ function loadDawn(): Promise<GPU> {
  * An export with the metadata it should carry (#180): the source file's as `output.metadata` says, and
  * the document as XMP unless `output.embedEdit` is false. `@rullino/codecs` is loaded only here.
  */
-async function carry(source: Uint8Array | undefined, encoded: Uint8Array, edit: unknown, output: OutputSettings, size: { width: number; height: number }): Promise<Uint8Array> {
+async function carry(source: Uint8Array | undefined, encoded: Uint8Array, edit: unknown, output: OutputSettings, size: { width: number; height: number }, icc: Uint8Array | null | undefined): Promise<Uint8Array> {
   const embed = output.embedEdit !== false;
-  if (!source && !embed) return encoded;
+  if (!source && !embed && icc === undefined) return encoded;
   const { carryMetadata } = await import('@rullino/codecs');
-  return carryMetadata(source, encoded, { metadata: output.metadata ?? 'keep', width: size.width, height: size.height, ...(embed ? { edit: JSON.stringify(edit) } : {}) });
+  return carryMetadata(source, encoded, { metadata: output.metadata ?? 'keep', width: size.width, height: size.height, ...(embed ? { edit: JSON.stringify(edit) } : {}), ...(icc !== undefined ? { icc } : {}) });
 }
 
 export async function createRenderer(options: RendererOptions = {}): Promise<Renderer> {
@@ -181,13 +215,19 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     async render(input, edit) {
       const { output } = parseEdit(edit, parse); // validates first: a bad document gets its own message
       const format = output.format ?? 'png';
-      const image = 'width' in input ? input : await decodeFile(input);
-      const out = await applyInternal(image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)
+      const source: Source = 'width' in input ? { image: input, wide: false, converted: false } : await loadSource(input, options.onWarning);
+      const out = await applyInternal(source.image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)
+      // The output colour space (RFC #181) and what to do with colours it cannot hold: sRGB documents on sRGB photos clip, as they always did.
+      const space = output.colorSpace ?? 'srgb';
+      const settings = { ...output, colorSpace: space, gamut: output.gamut ?? (space !== 'srgb' || source.wide ? ('map' as const) : ('clip' as const)) };
+      // The profile that describes the samples: the output space's, or none when sRGB comes from a converted source; else the source's own.
+      const icc = space !== 'srgb' ? outputProfile(space) : source.converted ? null : undefined;
       // The source file's metadata, as output.metadata says, and the document itself (#180).
-      const done = async (bytes: Uint8Array) => ({ bytes: await carry('width' in input ? undefined : input, bytes, edit, output, out), format, width: out.width, height: out.height });
-      if (format === 'png') return done(new Uint8Array(await (await encodeImage(out, output)).arrayBuffer()));
+      const done = async (bytes: Uint8Array) => ({ bytes: await carry('width' in input ? undefined : input, bytes, edit, output, out, icc), format, width: out.width, height: out.height });
+      const samples = exportSamples(out, settings);
+      if (format === 'png') return done(new Uint8Array(await (await encodeSamples(samples, out.width, out.height, settings)).arrayBuffer()));
       const sharp = await loadSharp(`${format.toUpperCase()} output`);
-      const encoder = sharp(exportSamples(out, output) as Uint8ClampedArray, { raw: { width: out.width, height: out.height, channels: 4 } });
+      const encoder = sharp(samples as Uint8ClampedArray, { raw: { width: out.width, height: out.height, channels: 4 } });
       const quality = output.quality === undefined ? undefined : Math.max(1, Math.round(output.quality * 100)); // sharp takes 1-100
       const file = format === 'jpeg' ? encoder.jpeg(quality === undefined ? {} : { quality }) : encoder.webp(quality === undefined ? {} : { quality });
       return done(new Uint8Array(await file.toBuffer()));

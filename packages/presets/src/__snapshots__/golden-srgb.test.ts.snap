@@ -1,0 +1,523 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the sRGB path, bit for bit > a chain that leaves the gamut (saturation, then exposure above white) clips as it always has 1`] = `
+{
+  "jpeg": "2afaf0698722e344",
+  "linear": "a3dcae5e813c2f6e",
+  "srgb16": "ea014904fda911e4",
+  "srgb8": "7f5df77e6932a288",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter adaptiveThreshold at its preview params 1`] = `
+{
+  "jpeg": "8fe2723bb6885cc0",
+  "linear": "d8cb299f553125f7",
+  "srgb16": "1a5146c62ccb1e20",
+  "srgb8": "a49bf14f05e690d5",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter ascii at its preview params 1`] = `
+{
+  "jpeg": "b6a8e9b40b182c1a",
+  "linear": "44cc1e0a0a2adbf4",
+  "srgb16": "1f4f859d458a5c1e",
+  "srgb8": "1bd8c9d193a7b038",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter bilateral at its preview params 1`] = `
+{
+  "jpeg": "41451a6adfc2ddef",
+  "linear": "4f64e4c5e347883c",
+  "srgb16": "771df407fcf5b192",
+  "srgb8": "78ffbd9baf02ffc5",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter blackPoint at its preview params 1`] = `
+{
+  "jpeg": "04f299b7beb7be4d",
+  "linear": "c1ee1211f82f240f",
+  "srgb16": "e529e318ccb8340e",
+  "srgb8": "b5c1626ac68ea4df",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter bloom at its preview params 1`] = `
+{
+  "jpeg": "1f6774b8e3fb6f99",
+  "linear": "e65ff45fefc28e4a",
+  "srgb16": "3fa848a9ff645b30",
+  "srgb8": "bcb0be6ca4e15702",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter boxBlur at its preview params 1`] = `
+{
+  "jpeg": "c1b280350df0112e",
+  "linear": "829caa3d51bec02c",
+  "srgb16": "a34c11152a6c3c7d",
+  "srgb8": "e75cfb859b02c2cc",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter brightness at its preview params 1`] = `
+{
+  "jpeg": "2173988b96bb01ec",
+  "linear": "4a198ea9bf34ee3a",
+  "srgb16": "83fc8609af517d77",
+  "srgb8": "c0458fcf9272f662",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter canny at its preview params 1`] = `
+{
+  "jpeg": "68daac98032a7fca",
+  "linear": "e4f90cef16260627",
+  "srgb16": "06de0b4b588992bc",
+  "srgb8": "45c8d70be11bca30",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter channelMixer at its preview params 1`] = `
+{
+  "jpeg": "fac5a58394aa0856",
+  "linear": "08e1145a4d9bdaa8",
+  "srgb16": "ac40f0151a2d1347",
+  "srgb8": "7102ddbb274fec4a",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter chromaticAberration at its preview params 1`] = `
+{
+  "jpeg": "b2ab4727f587667e",
+  "linear": "8a7256944ff78164",
+  "srgb16": "4c7800f99430b19a",
+  "srgb8": "f933fa4a95675bff",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter clahe at its preview params 1`] = `
+{
+  "jpeg": "62814e801a42da84",
+  "linear": "db9b7ea4f6357637",
+  "srgb16": "ac72e68823417eeb",
+  "srgb8": "59be96f4f1736e34",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter colorGrading at its preview params 1`] = `
+{
+  "jpeg": "0623460659d7107f",
+  "linear": "f3ed141d52210538",
+  "srgb16": "0ca5f429289f72a6",
+  "srgb8": "3392f299a9f4b6f5",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter colorMixer at its preview params 1`] = `
+{
+  "jpeg": "d703c5d820918642",
+  "linear": "d42e4639efcf2ee5",
+  "srgb16": "0df3a97d76e5afcb",
+  "srgb8": "007a6d6d92b7fed6",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter contrast at its preview params 1`] = `
+{
+  "jpeg": "79e6ca6a6912f712",
+  "linear": "b5c594fc13118583",
+  "srgb16": "9f00f7de84781902",
+  "srgb8": "8ea7259ef5a1e319",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter convolve at its preview params 1`] = `
+{
+  "jpeg": "7ab212b281c34de9",
+  "linear": "2b202af341bd2115",
+  "srgb16": "3883cdfb2d859d3e",
+  "srgb8": "54bbbb4035089066",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter curves at its preview params 1`] = `
+{
+  "jpeg": "61cd244d62e93093",
+  "linear": "fa749cb340ad5ac2",
+  "srgb16": "b64b9d66d04f785b",
+  "srgb8": "eea62f700a058215",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter dither at its preview params 1`] = `
+{
+  "jpeg": "60e6a70355f0da3f",
+  "linear": "cb3d1d07bf8b0de3",
+  "srgb16": "c2e4d6a1985d5014",
+  "srgb8": "83ee5f4d473a3948",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter emboss at its preview params 1`] = `
+{
+  "jpeg": "5107fb2414624668",
+  "linear": "be95b660ba21ae06",
+  "srgb16": "83dbe8c04e59b4f0",
+  "srgb8": "e72dba221a3f7246",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter equalize at its preview params 1`] = `
+{
+  "jpeg": "0b7416b9b935f0b1",
+  "linear": "95dc4ab35706449a",
+  "srgb16": "80cf1ee3931a5ecc",
+  "srgb8": "456cefe75d24ff34",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter exposure at its preview params 1`] = `
+{
+  "jpeg": "c64927e3ef3f1a5c",
+  "linear": "aaf04c03ff6b14c1",
+  "srgb16": "6660dba0fb1a4a9f",
+  "srgb8": "74a82f9e88cb8693",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter gamma at its preview params 1`] = `
+{
+  "jpeg": "46e8636adbb9b47d",
+  "linear": "fb87c0a7969d270c",
+  "srgb16": "d55dbe523edc7cbd",
+  "srgb8": "f485f783061bc2ea",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter gaussianBlur at its preview params 1`] = `
+{
+  "jpeg": "98bae3b42b59fabd",
+  "linear": "747691d5a35e031c",
+  "srgb16": "e8fb53adf246b691",
+  "srgb8": "96f786f4f3faf25e",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter gradient at its preview params 1`] = `
+{
+  "jpeg": "a5dcd31e00b3ffcc",
+  "linear": "60f14262a998dc2c",
+  "srgb16": "01bada806cbf8e08",
+  "srgb8": "9d8a10fe08353552",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter gradientMap at its preview params 1`] = `
+{
+  "jpeg": "08484bb9c316edb7",
+  "linear": "179b030722263443",
+  "srgb16": "00eee461a950c28a",
+  "srgb8": "06cc26e062091add",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter grain at its preview params 1`] = `
+{
+  "jpeg": "c082e9641b903308",
+  "linear": "033a362538e07832",
+  "srgb16": "5362d20026737600",
+  "srgb8": "feccd653fa5c4225",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter grayscale at its preview params 1`] = `
+{
+  "jpeg": "7c1c675be29036ca",
+  "linear": "bbf4b99c47b6b3a6",
+  "srgb16": "11ec58a0e268cca3",
+  "srgb8": "336a04779d3fe7eb",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter halftone at its preview params 1`] = `
+{
+  "jpeg": "d4b21917f8740ea1",
+  "linear": "6f021a658207a2e5",
+  "srgb16": "1d7645fa22843d93",
+  "srgb8": "9d8e1db2b49acaee",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter hue at its preview params 1`] = `
+{
+  "jpeg": "a06708a7aaf5472d",
+  "linear": "01afb707b0bc5872",
+  "srgb16": "c53861bdde335c63",
+  "srgb8": "001bb15167e75b5b",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter invert at its preview params 1`] = `
+{
+  "jpeg": "e76ec6f8b5e3f4b7",
+  "linear": "45f7250cd20f7a0f",
+  "srgb16": "fddb71e7d24ca2fe",
+  "srgb8": "898c4777afe2d377",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter kuwahara at its preview params 1`] = `
+{
+  "jpeg": "c61220b748f8985b",
+  "linear": "6475547993ae5582",
+  "srgb16": "7f885c6294cc0e1e",
+  "srgb8": "264de7bb79400385",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter laplacian at its preview params 1`] = `
+{
+  "jpeg": "d2880e2d8671e4e4",
+  "linear": "c1d3b29e961e3d67",
+  "srgb16": "1b29085d739dfdb9",
+  "srgb8": "8d86ad6ee9c43954",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter levels at its preview params 1`] = `
+{
+  "jpeg": "2d48a9469a090a2d",
+  "linear": "0b0497fc2eafb7e6",
+  "srgb16": "c19c03a28d9743e2",
+  "srgb8": "e512a09cf76e8dd9",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter median at its preview params 1`] = `
+{
+  "jpeg": "3c20b4f53a8d72c9",
+  "linear": "f5ed3971c9c6b001",
+  "srgb16": "1bf836982160516f",
+  "srgb8": "2be5e6d701e515e5",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter morphology at its preview params 1`] = `
+{
+  "jpeg": "7de79c94e33dfec5",
+  "linear": "d4a5c947e2a09fed",
+  "srgb16": "4db2f045fcd3dbde",
+  "srgb8": "395299bf949db353",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter otsu at its preview params 1`] = `
+{
+  "jpeg": "dfd135803c1dfdba",
+  "linear": "bd3dbac91eb1e807",
+  "srgb16": "c0b7f78d2fb91dfe",
+  "srgb8": "c6b80ffe92d91759",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter pixelate at its preview params 1`] = `
+{
+  "jpeg": "621716b89831eae5",
+  "linear": "8fff3a46d271eeef",
+  "srgb16": "9a13bbbe586de60f",
+  "srgb8": "61e9515277c0dc15",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter posterize at its preview params 1`] = `
+{
+  "jpeg": "f75024c568caeea6",
+  "linear": "f9976d3559f6295d",
+  "srgb16": "4c310d9b463ef347",
+  "srgb8": "3fca7658c70b61f2",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter saturation at its preview params 1`] = `
+{
+  "jpeg": "6dc4351648cf7a7c",
+  "linear": "f35e59dc8b87cdf4",
+  "srgb16": "f7e0e62f2f52ebf5",
+  "srgb8": "a000650fb277d917",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter shadowsHighlights at its preview params 1`] = `
+{
+  "jpeg": "c65a8313d26c1457",
+  "linear": "4b743c6e66753c56",
+  "srgb16": "090444e953d5cb6a",
+  "srgb8": "511d9492053acc3d",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter sharpen at its preview params 1`] = `
+{
+  "jpeg": "dbace8dd51cdd1d2",
+  "linear": "b3ca527d056d7180",
+  "srgb16": "9518b0ad64cc87d2",
+  "srgb8": "78373e58bf3514a7",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter sketch at its preview params 1`] = `
+{
+  "jpeg": "0c82f911f6c6c968",
+  "linear": "66682f1c9157353b",
+  "srgb16": "fef5d2de45761aa7",
+  "srgb8": "679e84d05d674201",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter threshold at its preview params 1`] = `
+{
+  "jpeg": "cf26efb55f55b896",
+  "linear": "17c415d51bab9d43",
+  "srgb16": "92449184e20b0310",
+  "srgb8": "534d10a00f389ea2",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter transparency at its preview params 1`] = `
+{
+  "jpeg": "2cc6c9bba2bcfaf3",
+  "linear": "df2a49e8ad39fc1d",
+  "srgb16": "ec81b7c7740e017e",
+  "srgb8": "c1a644a68322e923",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter unsharpMask at its preview params 1`] = `
+{
+  "jpeg": "73e7e81fed811a90",
+  "linear": "42f2621e3b83bf54",
+  "srgb16": "08bdb798159fecb8",
+  "srgb8": "fc3c52807d028f15",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter vibrance at its preview params 1`] = `
+{
+  "jpeg": "54f76f0bbf03c926",
+  "linear": "e7d340b7627a3ec4",
+  "srgb16": "86cc829472628c4d",
+  "srgb8": "adff496bbeffe85c",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter vignette at its preview params 1`] = `
+{
+  "jpeg": "78578c7d29ce09f4",
+  "linear": "f38abdfc60cab8ca",
+  "srgb16": "233aef6bd4f35963",
+  "srgb8": "c131eb2064289546",
+}
+`;
+
+exports[`the sRGB path, bit for bit > filter whiteBalance at its preview params 1`] = `
+{
+  "jpeg": "d4b4ff8ab6a9ba1f",
+  "linear": "12f07e3df1c83e24",
+  "srgb16": "c232d992c4c14d19",
+  "srgb8": "64ba3678b314b8be",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look cool 1`] = `
+{
+  "jpeg": "65e8ce06abb4494a",
+  "linear": "8368cd9fceb6ad31",
+  "srgb16": "57493bf05662e892",
+  "srgb8": "f43dab3fbfca3a7f",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look crossProcess 1`] = `
+{
+  "jpeg": "3ce38ec186210973",
+  "linear": "6483227b15a49d1e",
+  "srgb16": "b982e0cc35259792",
+  "srgb8": "c16207a47a0471c3",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look fade 1`] = `
+{
+  "jpeg": "eb69a6d29b82cdb9",
+  "linear": "9f3fa87861bc1666",
+  "srgb16": "f0cb89d837f5385b",
+  "srgb8": "8a7194b72e5a6a6a",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look golden 1`] = `
+{
+  "jpeg": "47f2811c390eb58c",
+  "linear": "2a7d8f35773304df",
+  "srgb16": "7ed203e483e4faed",
+  "srgb8": "fae728c6010ea74f",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look matte 1`] = `
+{
+  "jpeg": "ca63fdb5ec07261e",
+  "linear": "e67d74e19be3e186",
+  "srgb16": "c4aecdc39772faf6",
+  "srgb8": "4fb5f791034d1ea7",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look noir 1`] = `
+{
+  "jpeg": "b331f6609c296370",
+  "linear": "95f17b43811966ba",
+  "srgb16": "04d40023e515e24b",
+  "srgb8": "7437622e027a33cb",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look sepia 1`] = `
+{
+  "jpeg": "43ed4df82a33fd29",
+  "linear": "eafad6cb759cfd89",
+  "srgb16": "7c62d917d67e2adf",
+  "srgb8": "3e4fe9caef3374d7",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look tealOrange 1`] = `
+{
+  "jpeg": "47506354f69ad9da",
+  "linear": "4079561cf26605d2",
+  "srgb16": "5ce20d24e31f7fc0",
+  "srgb8": "76ff33964ecaf603",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look vivid 1`] = `
+{
+  "jpeg": "f3fcf6b2e6e56681",
+  "linear": "2b4e9fbbc13dca28",
+  "srgb16": "e56e3bf220b7f99c",
+  "srgb8": "54f34bd2898c6b2f",
+}
+`;
+
+exports[`the sRGB path, bit for bit > look warm 1`] = `
+{
+  "jpeg": "1a8532cd95c46205",
+  "linear": "4aa889de74dc9465",
+  "srgb16": "5fc47e34ace5f8b3",
+  "srgb8": "1ac3813afb457d3c",
+}
+`;

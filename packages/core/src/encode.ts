@@ -1,6 +1,7 @@
 import { encodeSrgb16, encodeSrgb8, srgbToLinear } from './color';
 import { createImage, type LinearImage } from './image';
 import { encodePng } from './png';
+import { encodeColour, type ColorSpace, type GamutMapping } from './colour-space';
 
 export interface ExportOptions {
   /** Default 'png'. */
@@ -14,6 +15,18 @@ export interface ExportOptions {
    * so it defaults to white there; other formats keep alpha unless a background is given.
    */
   readonly background?: readonly [number, number, number];
+  /**
+   * The colour space of the samples written (RFC #181): primaries and transfer function. Default
+   * 'srgb'. `encodeImage` writes no ICC profile, so it only takes 'srgb'; the renderers' `render()`
+   * embeds the profile of the others.
+   */
+  readonly colorSpace?: ColorSpace;
+  /**
+   * Colours the output space cannot hold: 'clip' clamps each channel, 'map' is the CSS Color 4
+   * mapping in OKLCh (chroma reduced at constant lightness and hue). Default 'map' for a space other
+   * than sRGB, 'clip' for sRGB (what rullino always did).
+   */
+  readonly gamut?: GamutMapping;
 }
 
 /** The background an export flattens onto, if any. */
@@ -61,10 +74,32 @@ export function exportSamples(img: LinearImage, options: ExportOptions = {}): Ui
   const background = exportBackground(options);
   const flat = background ? flatten(img, background) : img;
   const wide = (options.format ?? 'png') === 'png' && options.bitDepth === 16;
-  return wide ? encodeSrgb16(flat) : encodeSrgb8(flat);
+  const space = options.colorSpace ?? 'srgb';
+  const gamut = options.gamut ?? (space === 'srgb' ? 'clip' : 'map');
+  if (space === 'srgb' && gamut === 'clip') return wide ? encodeSrgb16(flat) : encodeSrgb8(flat);
+  return encodeSpace(flat, space, gamut, wide);
+}
+
+/** Like `encodeSrgb8` / `encodeSrgb16`, in any output space: straight samples of the space's encoded values. */
+function encodeSpace(img: LinearImage, space: ColorSpace, gamut: GamutMapping, wide: boolean): Uint8ClampedArray | Uint16Array {
+  const src = img.data;
+  const out = wide ? new Uint16Array(src.length) : new Uint8ClampedArray(src.length);
+  const max = wide ? 65535 : 255;
+  const q = wide ? (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 65535) : (v: number) => v * 255;
+  for (let i = 0; i < src.length; i += 4) {
+    const a = src[i + 3]!;
+    if (a <= 0) continue;
+    const e = encodeColour(space, gamut, [src[i]! / a, src[i + 1]! / a, src[i + 2]! / a]);
+    out[i] = q(e[0]!);
+    out[i + 1] = q(e[1]!);
+    out[i + 2] = q(e[2]!);
+    out[i + 3] = wide ? q(a) : a * max;
+  }
+  return out;
 }
 
 /** Encodes a linear premultiplied image as PNG / JPEG / WebP (the CPU path of `exportImage`). */
 export function encodeImage(img: LinearImage, options: ExportOptions = {}): Promise<Blob> {
+  if ((options.colorSpace ?? 'srgb') !== 'srgb') return Promise.reject(new Error(`encodeImage writes no ICC profile, so it cannot write ${options.colorSpace} samples: render the document with @rullino/web or @rullino/node, whose render() embeds the profile`));
   return encodeSamples(exportSamples(img, options), img.width, img.height, options);
 }

@@ -164,4 +164,15 @@ describe('rullino CLI', { timeout: 60_000 }, () => {
     expect(r.out).not.toMatch(/Rendering/);
     expect(await readdir(dir)).not.toContain('out');
   });
+
+  it('prints what render could not use in a file (an unsupported colour profile) and still renders it (#181)', async () => {
+    const dir = await workspace();
+    const icc = new Uint8Array(await readFile(fileURLToPath(new URL('../../core/test/icc/ITULab.icc', import.meta.url))));
+    const jpeg = (await writeMetadata(encodeJpeg({ width: 16, height: 16, data: new Uint8Array(16 * 16 * 4).fill(150) }), { icc })).bytes;
+    await writeFile(join(dir, 'in', 'lab.jpg'), jpeg);
+    const r = await run(['render', '--edit', join(dir, 'edit.json'), join(dir, 'in', 'lab.jpg'), '-o', join(dir, 'out'), '--backend', 'cpu']);
+    expect(r.code).toBe(0);
+    expect(r.err).toMatch(/rullino: .*not supported.*read as sRGB/);
+    expect(await readdir(join(dir, 'out'))).toEqual(['lab.png']);
+  });
 });

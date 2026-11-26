@@ -145,7 +145,7 @@ async function render(values: ReturnType<typeof parse>['values'], inputs: string
   if (photos.length === 0) throw new UsageError('no input photos (give files or a folder with images in it)');
 
   const outDir = values.out ?? 'rullino-out';
-  const renderer = await createRenderer({ backend, threads });
+  const renderer = await createRenderer({ backend, threads, onWarning: (m) => io.err(`rullino: ${m}`) });
   try {
     io.out(`Rendering on ${renderer.backend === 'gpu' ? 'the GPU (Dawn)' : `the CPU${renderer.reason ? ` (${renderer.reason})` : ''}`}`);
     await mkdir(outDir, { recursive: true });

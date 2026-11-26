@@ -2,7 +2,8 @@ import {
   applyEdit,
   createGpuContext,
   createImage,
-  encodeImage,
+  manageSource,
+  outputProfile,
   parseEdit,
   WebGpuUnavailableError,
   type Filter,
@@ -12,7 +13,7 @@ import {
   type Lut,
   type Rgba8Image,
 } from '@rullino/core';
-import { applyEditPixels, setPoolLimit } from '@rullino/core/internal';
+import { applyEditPixels, encodeSamples, exportSamples, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
 import type { PoolOptions, RenderRequest, RenderResponse } from './protocol';
@@ -37,6 +38,11 @@ export interface RendererOptions {
   readonly gpu?: GPU | undefined;
   /** GPU errors (shaders that do not compile, validation, out of memory). Default: console.error. */
   readonly onError?: ((error: GpuError) => void) | undefined;
+  /**
+   * Called with a message when `render()` could not use something in a file, e.g. an embedded colour
+   * profile it does not support (the colours are then read as sRGB). Default: nothing.
+   */
+  readonly onWarning?: ((message: string) => void) | undefined;
   /**
    * The filters documents may use. Default: every filter of `@rullino/filters`. Functions cannot
    * be sent to a worker, so with custom filters the CPU backend runs on the main thread.
@@ -70,8 +76,10 @@ export interface Renderer {
    */
   apply(image: LinearImage | Rgba8Image, edit: unknown, options?: { readonly scale?: number }): Promise<LinearImage>;
   /**
-   * Renders an edit document on 8-bit pixels (`ImageData`) or an image file the browser can decode
-   * (a `Blob`), and encodes the result as the document's `output` says (PNG by default).
+   * Renders an edit document on 8-bit pixels (`ImageData`) or an image file (a `Blob`), and encodes
+   * the result as the document's `output` says (PNG by default). PNG, JPEG and TIFF files are decoded
+   * by `@rullino/codecs`: the same pixels in every browser, 16 bits kept, EXIF orientation applied and
+   * an embedded colour profile (Display P3, Adobe RGB…) converted; other formats by the browser.
    */
   render(input: ImageData | Blob, edit: unknown): Promise<Blob>;
   /**
@@ -139,6 +147,31 @@ async function decodeFile(file: Blob): Promise<ImageData> {
   return g.getImageData(0, 0, canvas.width, canvas.height);
 }
 
+/** What `render()` made of the source file's colours (RFC #181). */
+interface Source {
+  readonly image: ImageData | LinearImage;
+  /** The source had a profile wider than sRGB. */
+  readonly wide: boolean;
+  /** Its pixels were converted from a profile: the source's own profile must not be copied. */
+  readonly converted: boolean;
+}
+
+/** A file as pixels: PNG, JPEG and TIFF through `@rullino/codecs` (a file it refuses falls back to the browser), the rest through the browser. */
+async function loadSource(file: Blob, bytes: Uint8Array, warn: ((message: string) => void) | undefined): Promise<Source> {
+  const codecs = await import('@rullino/codecs'); // loaded only here: pages that never render a file do not pay for it
+  const format = codecs.detectFormat(bytes);
+  if (format === 'png' || format === 'jpeg' || format === 'tiff') {
+    try {
+      const m = manageSource(await codecs.decodeOriented(bytes));
+      if (m.warning) warn?.(m.warning);
+      return { image: 'width' in m.image && m.image.data instanceof Uint8ClampedArray ? new ImageData(m.image.data as Uint8ClampedArray<ArrayBuffer>, m.image.width, m.image.height) : (m.image as LinearImage), wide: m.wide, converted: m.converted };
+    } catch (e) {
+      if (!(e instanceof codecs.CodecError)) throw e;
+    }
+  }
+  return { image: await decodeFile(file), wide: false, converted: false };
+}
+
 export async function createRenderer(options: RendererOptions = {}): Promise<Renderer> {
   const backend = options.backend ?? 'auto';
   const filters = options.filters ?? allFilters;
@@ -190,16 +223,21 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
     },
     async render(input, edit) {
       const { output } = parseEdit(edit, { filters, resolveLut });
-      const pixels = input instanceof Blob ? await decodeFile(input) : input;
-      const out = await apply(pixels, edit); // decoded where it renders: on the GPU, or in the worker
-      const blob = await encodeImage(out, output);
+      const bytes = input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : undefined;
+      const source: Source = bytes ? await loadSource(input as Blob, bytes, options.onWarning) : { image: input as ImageData, wide: false, converted: false };
+      const out = await apply(source.image, edit); // decoded where it renders: on the GPU, or in the worker
+      // The output colour space (RFC #181) and what to do with colours it cannot hold: sRGB documents on sRGB photos clip, as they always did.
+      const space = output.colorSpace ?? 'srgb';
+      const settings = { ...output, colorSpace: space, gamut: output.gamut ?? (space !== 'srgb' || source.wide ? ('map' as const) : ('clip' as const)) };
+      const blob = await encodeSamples(exportSamples(out, settings), out.width, out.height, settings);
+      // The profile that describes the samples: the output space's, or none when sRGB comes from a converted source; else the source's own.
+      const icc = space !== 'srgb' ? outputProfile(space) : source.converted ? null : undefined;
       // The source file's metadata, as output.metadata says, and the document itself (#180).
       const embed = output.embedEdit !== false;
-      if (!(input instanceof Blob) && !embed) return blob;
-      const { carryMetadata } = await import('@rullino/codecs'); // loaded only here: pages that never render a file do not pay for it
-      const source = input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : undefined;
-      const bytes = await carryMetadata(source, new Uint8Array(await blob.arrayBuffer()), { metadata: output.metadata ?? 'keep', width: out.width, height: out.height, ...(embed ? { edit: JSON.stringify(edit) } : {}) });
-      return new Blob([bytes as Uint8Array<ArrayBuffer>], { type: blob.type });
+      if (!bytes && !embed && icc === undefined) return blob;
+      const { carryMetadata } = await import('@rullino/codecs');
+      const carried = await carryMetadata(bytes, new Uint8Array(await blob.arrayBuffer()), { metadata: output.metadata ?? 'keep', width: out.width, height: out.height, ...(embed ? { edit: JSON.stringify(edit) } : {}), ...(icc !== undefined ? { icc } : {}) });
+      return new Blob([carried as Uint8Array<ArrayBuffer>], { type: blob.type });
     },
     destroy() {
       destroyed = true;

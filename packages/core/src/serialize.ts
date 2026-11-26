@@ -1,3 +1,4 @@
+import { COLOR_SPACES, type ColorSpace } from './colour-space';
 import { asParseError, ParseError } from './parse-error';
 import type { ExportOptions } from './encode';
 import type { Filter } from './filter';
@@ -171,13 +172,13 @@ export function parseSteps(raw: readonly unknown[], options: ParseOptions, where
   });
 }
 
-const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide', 'metadata', 'embedEdit']);
+const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide', 'metadata', 'embedEdit', 'colorSpace', 'gamut']);
 
 /** Validates output settings and rebuilds them from known fields; `extra` keys are left to the caller (v3's `node`). */
 export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSettings {
   if (!isObject(o)) throw new ParseError('output: not an object');
   for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key) && !extra.includes(key)) throw new ParseError(`output: unknown setting "${key}"`);
-  const { format, quality, bitDepth, background, longSide, metadata, embedEdit } = o;
+  const { format, quality, bitDepth, background, longSide, metadata, embedEdit, colorSpace, gamut } = o;
   if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new ParseError(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
   if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new ParseError('output: quality must be a number in [0, 1]');
   if (bitDepth !== undefined && bitDepth !== 8 && bitDepth !== 16) throw new ParseError('output: bitDepth must be 8 or 16');
@@ -190,6 +191,8 @@ export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSe
   if (metadata !== undefined && metadata !== 'keep' && metadata !== 'strip') {
     if (!isObject(metadata) || Object.keys(metadata).some((k) => k !== 'strip') || !Array.isArray(metadata.strip) || !metadata.strip.every((x) => x === 'gps' || x === 'personal')) throw policyError();
   }
+  if (colorSpace !== undefined && !(COLOR_SPACES as readonly unknown[]).includes(colorSpace)) throw new ParseError(`output: colorSpace must be ${COLOR_SPACES.map((c) => `'${c}'`).join(', ')}, got ${JSON.stringify(colorSpace)}`);
+  if (gamut !== undefined && gamut !== 'map' && gamut !== 'clip') throw new ParseError(`output: gamut must be 'map' or 'clip', got ${JSON.stringify(gamut)}`);
   if (embedEdit !== undefined && typeof embedEdit !== 'boolean') throw new ParseError('output: embedEdit must be true or false');
   return {
     ...(format !== undefined ? { format } : {}),
@@ -199,6 +202,8 @@ export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSe
     ...(longSide !== undefined ? { longSide: longSide as number } : {}),
     ...(metadata !== undefined ? { metadata: typeof metadata === 'string' ? metadata : { strip: [...(metadata as { strip: ('gps' | 'personal')[] }).strip] } } : {}),
     ...(embedEdit !== undefined ? { embedEdit } : {}),
+    ...(colorSpace !== undefined ? { colorSpace: colorSpace as ColorSpace } : {}),
+    ...(gamut !== undefined ? { gamut } : {}),
   } as OutputSettings;
 }
 
