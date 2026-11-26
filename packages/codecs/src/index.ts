@@ -9,4 +9,4 @@ export { editExif, PERSONAL_EXIF, readExif, type ExifEdits, type ExifEntry, type
 export { readIptc, writeIptc, type IptcDataset } from './iptc';
 export { readMetadata, writeMetadata, type ImageMetadata, type MetadataBlock } from './metadata';
 export { editXmp, readXmpEdit, RULLINO_NS, type XmpEdits } from './xmp';
-export { exportMetadata, type ExportMetadataOptions, type MetadataPolicy } from './policy';
+export { carryMetadata, exportMetadata, type ExportMetadataOptions, type MetadataPolicy } from './policy';

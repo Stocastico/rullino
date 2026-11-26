@@ -35,6 +35,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@rullino/codecs": "workspace:*",
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*",
     "@rullino/presets": "workspace:*"

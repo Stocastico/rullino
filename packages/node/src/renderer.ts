@@ -1,4 +1,4 @@
-import { applyEdit, createGpuContext, encodeImage, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type Rgba8Image } from '@rullino/core';
+import { applyEdit, createGpuContext, encodeImage, parseEdit, WebGpuUnavailableError, type Filter, type GpuContext, type GpuError, type LinearImage, type Lut, type OutputSettings, type Rgba8Image } from '@rullino/core';
 import { chainDocument, exportSamples, setPoolLimit } from '@rullino/core/internal';
 import { filters as allFilters } from '@rullino/filters';
 import { resolveLookLut } from '@rullino/presets';
@@ -114,6 +114,17 @@ function loadDawn(): Promise<GPU> {
   });
 }
 
+/**
+ * An export with the metadata it should carry (#180): the source file's as `output.metadata` says, and
+ * the document as XMP unless `output.embedEdit` is false. `@rullino/codecs` is loaded only here.
+ */
+async function carry(source: Uint8Array | undefined, encoded: Uint8Array, edit: unknown, output: OutputSettings, size: { width: number; height: number }): Promise<Uint8Array> {
+  const embed = output.embedEdit !== false;
+  if (!source && !embed) return encoded;
+  const { carryMetadata } = await import('@rullino/codecs');
+  return carryMetadata(source, encoded, { metadata: output.metadata ?? 'keep', width: size.width, height: size.height, ...(embed ? { edit: JSON.stringify(edit) } : {}) });
+}
+
 export async function createRenderer(options: RendererOptions = {}): Promise<Renderer> {
   const backend = options.backend ?? 'auto';
   const parse = { filters: options.filters ?? allFilters, resolveLut: options.resolveLut ?? resolveLookLut };
@@ -172,7 +183,8 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       const format = output.format ?? 'png';
       const image = 'width' in input ? input : await decodeFile(input);
       const out = await applyInternal(image, edit, {}, true); // decoded where it renders (on Dawn: on the GPU)
-      const done = (bytes: Uint8Array) => ({ bytes, format, width: out.width, height: out.height });
+      // The source file's metadata, as output.metadata says, and the document itself (#180).
+      const done = async (bytes: Uint8Array) => ({ bytes: await carry('width' in input ? undefined : input, bytes, edit, output, out), format, width: out.width, height: out.height });
       if (format === 'png') return done(new Uint8Array(await (await encodeImage(out, output)).arrayBuffer()));
       const sharp = await loadSharp(`${format.toUpperCase()} output`);
       const encoder = sharp(exportSamples(out, output) as Uint8ClampedArray, { raw: { width: out.width, height: out.height, channels: 4 } });

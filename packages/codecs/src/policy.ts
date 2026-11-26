@@ -5,7 +5,7 @@
 
 import { editExif } from './exif';
 import { readIptc, writeIptc } from './iptc';
-import type { ImageMetadata } from './metadata';
+import { readMetadata, writeMetadata, type ImageMetadata } from './metadata';
 import { CodecError } from './types';
 import { editXmp } from './xmp';
 
@@ -76,4 +76,23 @@ export function exportMetadata(input: ImageMetadata, options: ExportMetadataOpti
     if (text.length) out.text = text;
   }
   return out;
+}
+
+/**
+ * An encoded export (JPEG, PNG or WebP) with the metadata it should carry: the source file's (when
+ * given and readable), through `exportMetadata`, written by `writeMetadata`. Returns `encoded` itself
+ * when there is nothing to write.
+ */
+export async function carryMetadata(source: Uint8Array | undefined, encoded: Uint8Array, options: ExportMetadataOptions): Promise<Uint8Array> {
+  let input: ImageMetadata = {};
+  if (source) {
+    try {
+      input = await readMetadata(source);
+    } catch (e) {
+      if (!(e instanceof CodecError)) throw e;
+    }
+  }
+  const meta = exportMetadata(input, options);
+  if (Object.keys(meta).length === 0) return encoded;
+  return (await writeMetadata(encoded, meta)).bytes;
 }
