@@ -123,6 +123,14 @@ describe('edit document v2', () => {
     expect(serializeChain([])).not.toHaveProperty('output');
   });
 
+  it('carries the metadata policy and embedEdit (#180), and round-trips them', () => {
+    for (const metadata of ['keep', 'strip', { strip: ['gps'] }, { strip: ['gps', 'personal'] }] as const) {
+      const output: OutputSettings = { format: 'jpeg', metadata, embedEdit: false };
+      const doc = viaJson(serializeChain([], { output }));
+      expect(parseChain(doc, { filters }).output).toEqual(output);
+    }
+  });
+
   it('rejects invalid output settings with a useful message', () => {
     const bad: [unknown, RegExp][] = [
       [{ format: 'gif' }, /format/],
@@ -133,6 +141,11 @@ describe('edit document v2', () => {
       [{ longSide: 10.5 }, /longSide/],
       [{ background: [1, 2, 0] }, /background/],
       [{ size: 3 }, /size/],
+      [{ metadata: 'drop' }, /metadata/],
+      [{ metadata: { strip: ['faces'] } }, /metadata/],
+      [{ metadata: { strip: 'gps' } }, /metadata/],
+      [{ metadata: { strip: ['gps'], also: 1 } }, /metadata/],
+      [{ embedEdit: 'yes' }, /embedEdit/],
     ];
     for (const [output, message] of bad) {
       expect(() => parseChain({ version: 2, steps: [], output }, { filters }), JSON.stringify(output)).toThrow(message);

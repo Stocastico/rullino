@@ -43,6 +43,7 @@
     "node": ">=22.12"
   },
   "dependencies": {
+    "@rullino/codecs": "workspace:*",
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*",
     "@rullino/presets": "workspace:*"

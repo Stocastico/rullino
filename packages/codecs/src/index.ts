@@ -5,3 +5,8 @@ export { decodeJpeg } from './jpeg';
 export { decodeTiff } from './tiff';
 export { encodeTiff, type TiffEncodeOptions, type TiffImage } from './tiff-encode';
 export { encodeJpeg, type JpegEncodeOptions, type Rgba8 } from './jpeg-encode';
+export { editExif, PERSONAL_EXIF, readExif, type ExifEdits, type ExifEntry, type ExifIfd } from './exif';
+export { readIptc, writeIptc, type IptcDataset } from './iptc';
+export { readMetadata, writeMetadata, type ImageMetadata, type MetadataBlock } from './metadata';
+export { editXmp, readXmpEdit, RULLINO_NS, type XmpEdits } from './xmp';
+export { carryMetadata, exportMetadata, type ExportMetadataOptions, type MetadataPolicy } from './policy';

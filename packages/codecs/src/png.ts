@@ -6,7 +6,7 @@
 // Sizes are checked on the header before anything is allocated, and inflating stops at the size the
 // header implies, so a small file cannot make the decoder allocate more than the image it describes.
 
-import { CodecError, DEFAULT_MAX_PIXELS, type DecodedImage, type DecodeOptions } from './types';
+import { CodecError, DEFAULT_MAX_PIXELS, plain, type DecodedImage, type DecodeOptions } from './types';
 import { inflate } from './zlib';
 
 const fail = (message: string, cause?: unknown): never => {
@@ -112,7 +112,8 @@ function unfilter(raw: Uint8Array, rows: number, rowBytes: number, bpp: number):
  * than `maxPixels`. gAMA, cHRM, sRGB, sBIT, bKGD and text chunks are read past (colour management
  * from them is not done here); an iCCP profile is returned as `icc`.
  */
-export async function decodePng(bytes: Uint8Array, options: DecodeOptions = {}): Promise<DecodedImage> {
+export async function decodePng(input: Uint8Array, options: DecodeOptions = {}): Promise<DecodedImage> {
+  const bytes = plain(input);
   const maxPixels = options.maxPixels ?? DEFAULT_MAX_PIXELS;
   if (bytes.length < 8 || SIGNATURE.some((b, i) => bytes[i] !== b)) fail('not a PNG file (bad signature)');
 

@@ -6,7 +6,7 @@
 // bit for bit, and the same in every runtime. Arithmetic coding, lossless and hierarchical JPEG and
 // 12-bit samples are refused with a CodecError, as is anything malformed or truncated.
 
-import { CodecError, DEFAULT_MAX_PIXELS, type DecodedImage, type DecodeOptions } from './types';
+import { CodecError, DEFAULT_MAX_PIXELS, plain, type DecodedImage, type DecodeOptions } from './types';
 
 const fail = (message: string): never => {
   throw new CodecError('jpeg', message);
@@ -579,7 +579,8 @@ const u16 = (b: Uint8Array, at: number) => (b[at]! << 8) | b[at + 1]!;
  * R = (255 − C)(255 − K) / 255 (and so on): without colour management (their ICC profile is returned
  * as `icc`) that is an approximation. Rejects with a `CodecError` for what it cannot decode.
  */
-export async function decodeJpeg(bytes: Uint8Array, options: DecodeOptions = {}): Promise<DecodedImage> {
+export async function decodeJpeg(input: Uint8Array, options: DecodeOptions = {}): Promise<DecodedImage> {
+  const bytes = plain(input);
   const maxPixels = options.maxPixels ?? DEFAULT_MAX_PIXELS;
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) fail('not a JPEG file (no SOI marker)');
   const quant: (Uint16Array | undefined)[] = [];

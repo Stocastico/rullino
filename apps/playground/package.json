@@ -13,6 +13,7 @@
     "smoke:base": "node scripts/smoke-base.mjs"
   },
   "dependencies": {
+    "@rullino/codecs": "workspace:*",
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*",
     "@rullino/ml": "workspace:*",

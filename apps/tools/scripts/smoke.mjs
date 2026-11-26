@@ -11,6 +11,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crc32, deflateSync, inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
+import { editXmp, encodeJpeg, writeMetadata } from '../../../packages/codecs/dist/index.js';
 import { launchOptions } from '../../../scripts/browser-launch.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
@@ -171,6 +172,17 @@ try {
   await page.selectOption('#look', 'paste');
   await page.fill('#document', '{ "version": 2, ');
   if (!/not JSON/.test((await page.textContent('#problem')) ?? '') || !(await page.isDisabled('#export'))) failures.push('look folder: a bad document is not reported, or export stays enabled');
+  // The recipe taken from a photo exported with rullino (#180), and a photo without one.
+  {
+    const recipe = { version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps: [{ filter: 'grayscale', params: {} }] }] };
+    const plain = encodeJpeg({ width: 4, height: 4, data: new Uint8Array(64).fill(120) });
+    const carrying = (await writeMetadata(plain, { xmp: editXmp(undefined, { edit: JSON.stringify(recipe) }) })).bytes;
+    await page.setInputFiles('#from-photo', { name: 'plain.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(plain) });
+    await page.waitForFunction(() => /carries no rullino edit/.test(document.getElementById('problem').textContent), null, { timeout: 10000 }).catch(() => failures.push('look folder: a photo without a recipe is not reported'));
+    await page.setInputFiles('#from-photo', { name: 'exported.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(carrying) });
+    await page.waitForFunction(() => document.getElementById('document').value.includes('grayscale'), null, { timeout: 10000 }).catch(() => failures.push('look folder: the recipe of an exported photo was not taken'));
+    if ((await page.textContent('#problem'))?.trim() || (await page.isDisabled('#export'))) failures.push(`look folder: the recipe from a photo does not render: ${await page.textContent('#problem')}`);
+  }
   await page.selectOption('#look', 'noir');
   if (!((await page.textContent('#code')) ?? '').includes('npx rullino render --edit edit.json')) failures.push('look folder: no code shown');
   await page.click('#export');

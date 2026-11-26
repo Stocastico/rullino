@@ -20,6 +20,9 @@
       ],
       "@rullino/presets": [
         "../presets/dist/index.d.ts"
+      ],
+      "@rullino/codecs": [
+        "../codecs/dist/index.d.ts"
       ]
     }
   },

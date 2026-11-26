@@ -53,19 +53,21 @@ jobs:
       - run: pnpm size
       - run: pnpm test:pack
 
+      # @rullino/codecs goes first: @rullino/web and @rullino/node depend on it, and a release that
+      # stopped after them would leave versions on npm whose dependency cannot be installed.
       # Publish the tarballs `pnpm pack` makes (dist exports, workspace ranges resolved), never the
       # package directories: see scripts/refuse-publish.mjs. Re-running a half-failed release skips
       # what is already on npm.
       - name: Pack
         run: |
           mkdir tarballs
-          for p in core filters presets ml node web konva codecs; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
+          for p in codecs core filters presets ml node web konva; do (cd "packages/$p" && pnpm pack --pack-destination ../../tarballs); done
       - name: Publish
         env:
           VERSION: ${{ steps.info.outputs.version }}
           NPM_TAG: ${{ steps.info.outputs.tag }}
         run: |
-          for p in core filters presets ml node web konva codecs; do
+          for p in codecs core filters presets ml node web konva; do
             if npm view "@rullino/$p@$VERSION" version >/dev/null 2>&1; then
               echo "@rullino/$p@$VERSION is already on npm, skipping"
               continue

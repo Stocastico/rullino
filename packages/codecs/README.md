@@ -4,7 +4,7 @@
 
 Image decoders for [rullino](https://github.com/Stocastico/rullino) in pure TypeScript, with no dependencies: the same file decodes to the same pixels in every browser, in Node, Deno and Bun. Browsers and native libraries decode the same file differently, so "the browser preview and the server render match" starts from the same input only when the decoder is the same.
 
-> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and encoding (PNG encoding is in `@rullino/core`), and a `decode` that takes decoders for the other formats. 0.x: the API may change between minor versions.
+> Work in progress for rullino 0.9 ([#179](https://github.com/Stocastico/rullino/issues/179)): PNG, JPEG and TIFF decoding and encoding (PNG encoding is in `@rullino/core`), a `decode` that takes decoders for the other formats, and metadata (EXIF, XMP, IPTC, ICC) read, edited and written. 0.x: the API may change between minor versions.
 
 ```ts
 import { decodeJpeg, decodePng, CodecError } from '@rullino/codecs';
@@ -80,3 +80,24 @@ const file = await encodeTiff(image, { compression: 'deflate' }); // or 'lzw', '
 ```
 
 RGB or RGBA (unassociated alpha, written only when some pixel is not opaque unless `alpha` says otherwise) at 8 or 16 bits or 32-bit float, in strips, uncompressed, Deflate (default) or LZW, with the horizontal predictor for integers and the floating-point one for floats when compressed, and an optional ICC profile. Every combination is read back exactly by libtiff (through sharp) and `decodeTiff` in the tests.
+
+## Metadata
+
+```ts
+import { carryMetadata, exportMetadata, readMetadata, readXmpEdit, writeMetadata } from '@rullino/codecs';
+
+declare const original: Uint8Array; // the photo's file
+declare const exported: Uint8Array; // the edited image, encoded (JPEG, PNG or WebP)
+
+const meta = await readMetadata(original); // { exif?, xmp?, iptc?, icc?, text? }
+const clean = exportMetadata(meta, { metadata: { strip: ['gps', 'personal'] }, width: 1600, height: 1200, edit: '{"version":3}' });
+const { bytes } = await writeMetadata(exported, clean); // or, in one call:
+const same = await carryMetadata(original, exported, { metadata: 'keep', width: 1600, height: 1200 });
+readXmpEdit(clean.xmp!); // the edit document embedded as rullino:edit
+```
+
+`readMetadata` reads EXIF, XMP, IPTC and the ICC profile from JPEG (APP1, APP13, APP2), PNG (eXIf, iTXt, iCCP, ImageMagick's raw profiles, and the other text chunks), WebP (EXIF, XMP, ICCP chunks) and TIFF (XMP, IPTC, ICC; TIFF's own EXIF is not read yet). `writeMetadata` replaces a JPEG's, PNG's or WebP's metadata with the given blocks without touching the image data; a block too large for its JPEG segment is dropped and named in `dropped`, never truncated.
+
+`exportMetadata` is the policy `@rullino/web` and `@rullino/node` apply on `render`: `'keep'` (the default: everything, GPS included), `'strip'` (only the colour profile, which says how to read the pixels), or `{ strip: ['gps', 'personal'] }`. Whatever is kept is made true of the export: orientation 1, the export's size, no thumbnail (it would show the unedited, uncropped original). GPS is the GPS IFD and XMP's `exif:GPS…`; personal fields are those that name or identify a person or a device (`PERSONAL_EXIF`: artist, owner, serial numbers, comments, MakerNote; XMP's creator, serial numbers and owner; IPTC's by-line, contact and writer; PNG's Author and Artist), while camera, copyright and location names stay. EXIF is edited **in place** (`editExif`): removed entries leave their directory and their values are zeroed, nothing moves, so the offsets of what is kept, a MakerNote's included, stay valid. XMP is edited by namespace with the rest of the packet left byte for byte (`editXmp`). A block that cannot be read is dropped, never copied unchecked.
+
+The fixtures were written by exiftool (camera, orientation, personal fields, GPS, thumbnail, XMP, IPTC and ICC in every format), with exiftool's reading as the reference; the stripped results are checked byte by byte (the removed names appear nowhere), and the written files pass `exiftool -validate`.

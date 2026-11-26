@@ -6,7 +6,7 @@
 // the file, short strips or tiles and unsupported fields are CodecErrors; sizes are checked against
 // maxPixels before anything is allocated, and every chunk is inflated only to the size it must have.
 
-import { CodecError, DEFAULT_MAX_PIXELS, type DecodedImage, type DecodeOptions } from './types';
+import { CodecError, DEFAULT_MAX_PIXELS, plain, type DecodedImage, type DecodeOptions } from './types';
 import { inflate } from './zlib';
 
 const fail = (message: string): never => {
@@ -163,7 +163,8 @@ function packBits(src: Uint8Array, size: number): Uint8Array {
  * divided out), the samples as stored otherwise. CMYK is converted with the naive formula
  * R = (max − C)(max − K) / max. Rejects with a `CodecError` for what it cannot decode.
  */
-export async function decodeTiff(bytes: Uint8Array, options: DecodeOptions = {}): Promise<DecodedImage> {
+export async function decodeTiff(input: Uint8Array, options: DecodeOptions = {}): Promise<DecodedImage> {
+  const bytes = plain(input);
   const maxPixels = options.maxPixels ?? DEFAULT_MAX_PIXELS;
   if (bytes.length < 8) fail('not a TIFF file');
   const order = String.fromCharCode(bytes[0]!, bytes[1]!);

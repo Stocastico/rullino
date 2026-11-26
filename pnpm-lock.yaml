@@ -106,6 +106,9 @@ importers:
 
   apps/playground:
     dependencies:
+      '@rullino/codecs':
+        specifier: workspace:*
+        version: link:../../packages/codecs
       '@rullino/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -139,6 +142,9 @@ importers:
 
   apps/tools:
     dependencies:
+      '@rullino/codecs':
+        specifier: workspace:*
+        version: link:../../packages/codecs
       '@rullino/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -207,6 +213,9 @@ importers:
 
   packages/node:
     dependencies:
+      '@rullino/codecs':
+        specifier: workspace:*
+        version: link:../codecs
       '@rullino/core':
         specifier: workspace:*
         version: link:../core
@@ -235,6 +244,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@rullino/codecs':
+        specifier: workspace:*
+        version: link:../codecs
       '@rullino/core':
         specifier: workspace:*
         version: link:../core

@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, extname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { detectFormat, readExif, readIptc, readMetadata, readXmpEdit } from '@rullino/codecs';
 import { parseEdit } from '@rullino/core';
 import { filters } from '@rullino/filters';
 import { lookEdit, looks, resolveLookLut } from '@rullino/presets';
@@ -17,6 +18,7 @@ const USAGE = `rullino: render an edit document onto photos (the server half of 
 usage:
   rullino render (--edit <edit.json> | --look <id>) <photo or folder>... [options]
   rullino looks                      list the built-in looks
+  rullino info <photo>               what a photo carries: camera, date, GPS, profiles, and the edit it was rendered with
 
 options:
   -o, --out <folder>     where the files go (default: ./rullino-out)
@@ -25,6 +27,9 @@ options:
       --long-side <px>   shrink so the long side is at most this (never enlarges)
       --backend <b>      auto (default), gpu or cpu
       --threads <n>      CPU worker threads: a number or "auto" (default 1)
+      --strip-metadata[=gps,personal]
+                         leave the photos' metadata out (all of it but the colour profile), or only
+                         GPS and / or personal fields (default: keep everything, as the document says)
   -h, --help
 
 Folders are read without descending into sub-folders; only .jpg .jpeg .png .webp .avif .tif .tiff files are used.
@@ -36,7 +41,8 @@ class UsageError extends Error {}
 
 const parse = (args: string[]) =>
   parseArgs({
-    args,
+    // parseArgs has no optional values: a bare --strip-metadata means all of it.
+    args: args.map((a) => (a === '--strip-metadata' ? '--strip-metadata=all' : a)),
     allowPositionals: true,
     options: {
       edit: { type: 'string' },
@@ -47,6 +53,7 @@ const parse = (args: string[]) =>
       'long-side': { type: 'string' },
       backend: { type: 'string' },
       threads: { type: 'string' },
+      'strip-metadata': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -64,6 +71,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       for (const look of looks) io.out(look.id);
       return 0;
     }
+    if (command === 'info') return await info(inputs, io);
     if (command !== 'render') throw new UsageError(`unknown command "${command}"`);
     return await render(values, inputs, io);
   } catch (e) {
@@ -103,6 +111,14 @@ async function render(values: ReturnType<typeof parse>['values'], inputs: string
     }
   }
   const quality = number('quality', values.quality, 0, 1);
+  const strip = values['strip-metadata'];
+  let metadata: 'strip' | { strip: ('gps' | 'personal')[] } | undefined;
+  if (strip === 'all') metadata = 'strip';
+  else if (strip !== undefined) {
+    const parts = strip.split(',').map((x) => x.trim());
+    if (!parts.every((x) => x === 'gps' || x === 'personal')) throw new UsageError(`--strip-metadata takes gps, personal or gps,personal (or nothing, to strip it all), got "${strip}"`);
+    metadata = { strip: [...new Set(parts)] as ('gps' | 'personal')[] };
+  }
   const longSide = number('long-side', values['long-side'], 1, 1e6);
   if (values.format !== undefined && !['png', 'jpeg', 'webp'].includes(values.format)) throw new UsageError(`--format must be png, jpeg or webp, got "${values.format}"`);
   edit = {
@@ -112,6 +128,7 @@ async function render(values: ReturnType<typeof parse>['values'], inputs: string
       ...(values.format !== undefined ? { format: values.format } : {}),
       ...(quality !== undefined ? { quality } : {}),
       ...(longSide !== undefined ? { longSide } : {}),
+      ...(metadata !== undefined ? { metadata } : {}),
     },
   };
   if (Object.keys(edit.output as object).length === 0) delete edit.output;
@@ -158,4 +175,53 @@ async function render(values: ReturnType<typeof parse>['values'], inputs: string
   } finally {
     renderer.destroy();
   }
+}
+
+/** `rullino info <photo>`: what a photo carries, and the edit document embedded in it (#180). */
+async function info(inputs: string[], io: CliIo): Promise<number> {
+  if (inputs.length !== 1) throw new UsageError('give one photo: rullino info <photo>');
+  const file = inputs[0]!;
+  const bytes = new Uint8Array(await readFile(file).catch((e: Error) => {
+    throw new Error(`cannot read ${file}: ${e.message}`);
+  }));
+  const meta = await readMetadata(bytes);
+  io.out(`${file}: ${detectFormat(bytes)}`);
+  if (meta.exif) {
+    try {
+      const exif = readExif(meta.exif);
+      const get = (ifd: string, tag: number) => exif.find((e) => e.ifd === ifd && e.tag === tag)?.value;
+      const camera = [get('ifd0', 0x010f), get('ifd0', 0x0110)].filter(Boolean).join(' ');
+      if (camera) io.out(`camera: ${camera}`);
+      const taken = get('exif', 0x9003) ?? get('ifd0', 0x0132);
+      if (taken) io.out(`taken: ${String(taken)}`);
+      const orientation = get('ifd0', 0x0112);
+      if (orientation !== undefined) io.out(`orientation ${String(orientation)}`);
+      io.out(`GPS: ${exif.some((e) => e.ifd === 'gps') ? 'yes' : 'no'}`);
+    } catch (e) {
+      io.out(`EXIF: unreadable (${(e as Error).message})`);
+    }
+  } else io.out('EXIF: none');
+  io.out(`XMP: ${meta.xmp !== undefined ? `${meta.xmp.length} characters` : 'none'}`);
+  let iptc = 'none';
+  if (meta.iptc) {
+    try {
+      iptc = `${readIptc(meta.iptc).length} datasets`;
+    } catch {
+      iptc = 'unreadable';
+    }
+  }
+  io.out(`IPTC: ${iptc}`);
+  io.out(`ICC profile: ${meta.icc ? `${meta.icc.length} bytes` : 'none'}`);
+  const edit = meta.xmp === undefined ? undefined : readXmpEdit(meta.xmp);
+  if (edit === undefined) io.out('edit document: none');
+  else {
+    let pretty = edit;
+    try {
+      pretty = JSON.stringify(JSON.parse(edit), null, 2);
+    } catch {
+      // printed as it is
+    }
+    io.out(`edit document:\n${pretty}`);
+  }
+  return 0;
 }

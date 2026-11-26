@@ -27,6 +27,8 @@ export async function exportPhoto(file: File, edit: unknown): Promise<Blob> {
 }
 ```
 
+**Metadata.** Rendering a file carries its metadata onto the export (EXIF, XMP, IPTC, ICC) as the document's `output.metadata` says: everything by default, GPS included; `"strip"` for none of it but the colour profile; `{ "strip": ["gps", "personal"] }` for all but those. What is kept is made true of the export (orientation 1, the export's size, no thumbnail of the unedited original), and the document itself is embedded as XMP (`rullino:edit`) unless `output.embedEdit` is `false`. The code for it (`@rullino/codecs`) is loaded only when `render` runs.
+
 `render` takes an image file the browser can decode or an `ImageData`; documents come from `serializeChain` in `@rullino/core`, the playground's share links or `lookEdit` in `@rullino/presets`. Every filter of `@rullino/filters` and every look (`look:<id>` LUTs) is available by default.
 
 - `createRenderer({ backend: 'gpu' })` fails with `WebGpuUnavailableError` instead of falling back; `'cpu'` never touches WebGPU.

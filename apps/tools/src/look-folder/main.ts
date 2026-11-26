@@ -3,7 +3,7 @@ import { encodeImage, type EditDocument } from '@rullino/core';
 import { looks } from '@rullino/presets';
 import { createRenderer, type Renderer } from '@rullino/web';
 import { outputName, type WebFormat } from '../names';
-import { decodeFile, downloadLink, kb, previewCanvas, whereItRan, type OutputFile } from '../page';
+import { decodeFile, downloadLink, kb, previewCanvas, recipeOf, whereItRan, type OutputFile } from '../page';
 import { isPhoto, lookFolderEdit, type LookFolderOptions } from './plan';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -180,6 +180,18 @@ async function run() {
   cancelButton.hidden = true;
 }
 
+// A photo exported with rullino carries its edit document (#180): it can be the recipe for the folder.
+$<HTMLInputElement>('from-photo').addEventListener('change', async (e) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const recipe = await recipeOf(file);
+  if (recipe === undefined) {
+    problem.textContent = `${file.name} carries no rullino edit document.`;
+    return;
+  }
+  pasted.value = recipe;
+  refresh();
+});
 folder.addEventListener('change', () => pick(folder.files));
 filesInput.addEventListener('change', () => pick(filesInput.files));
 for (const el of [lookSelect, intensity, pasted, longSide, format, quality]) el.addEventListener('input', refresh);

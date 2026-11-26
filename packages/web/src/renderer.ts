@@ -192,7 +192,14 @@ export async function createRenderer(options: RendererOptions = {}): Promise<Ren
       const { output } = parseEdit(edit, { filters, resolveLut });
       const pixels = input instanceof Blob ? await decodeFile(input) : input;
       const out = await apply(pixels, edit); // decoded where it renders: on the GPU, or in the worker
-      return encodeImage(out, output);
+      const blob = await encodeImage(out, output);
+      // The source file's metadata, as output.metadata says, and the document itself (#180).
+      const embed = output.embedEdit !== false;
+      if (!(input instanceof Blob) && !embed) return blob;
+      const { carryMetadata } = await import('@rullino/codecs'); // loaded only here: pages that never render a file do not pay for it
+      const source = input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : undefined;
+      const bytes = await carryMetadata(source, new Uint8Array(await blob.arrayBuffer()), { metadata: output.metadata ?? 'keep', width: out.width, height: out.height, ...(embed ? { edit: JSON.stringify(edit) } : {}) });
+      return new Blob([bytes as Uint8Array<ArrayBuffer>], { type: blob.type });
     },
     destroy() {
       destroyed = true;

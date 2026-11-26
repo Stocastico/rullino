@@ -85,6 +85,9 @@ const out = {};
   const back = await codecs.decode(jpeg);
   const tiff = await codecs.encodeTiff({ width: 2, height: 1, bitDepth: 16, data: Uint16Array.from([1, 2, 3, 65535, 40000, 5, 6, 65535]) });
   const t = await codecs.decode(tiff);
+  // Metadata from the tarball: a recipe embedded and read back.
+  const carried = await codecs.carryMetadata(undefined, jpeg, { width: 9, height: 7, edit: '{"version":3}' });
+  out.codecsMetadata = codecs.readXmpEdit((await codecs.readMetadata(carried)).xmp) === '{"version":3}';
   out.codecs = back.format === 'jpeg' && back.width === 9 && Math.abs(back.data[4] - rgba.data[4]) < 12 && t.format === 'tiff' && t.bitDepth === 16 && t.data[4] === 40000 && codecs.detectFormat(new Uint8Array(4)) === undefined;
 }
 out.core = typeof core.defineFilter === 'function' && !('passShader' in core) && typeof internal.passShader === 'function';
@@ -119,6 +122,8 @@ out.readmeJson = edit.startsWith('{"version":3,"inputs":{"main":{}},"nodes":[{"i
 const renderer = await createRenderer();
 const png = (await renderer.render({ data: new Uint8Array(8 * 6 * 4).fill(200), width: 8, height: 6 }, presets.lookEdit(presets.looks[0]))).bytes;
 out.nodeFallback = renderer.backend === 'cpu' && /webgpu/.test(renderer.reason ?? '') && png[1] === 0x50 && png[2] === 0x4e && png[3] === 0x47;
+// render() embeds the document (loading @rullino/codecs from the installed tarball through its dynamic import).
+out.nodeEmbedsEdit = JSON.parse(codecs.readXmpEdit((await codecs.readMetadata(png)).xmp) ?? 'null')?.version === 3;
 // Worker threads, from the installed package: its dist/worker.js, three threads, an image cut into
 // bands with the same result as the calling thread (bit for bit), a step that needs the whole image in the middle.
 const photo = core.createImage(120, 90, Float32Array.from({ length: 120 * 90 * 4 }, (_, i) => (i % 4 === 3 ? 1 : ((i * 7) % 251) / 251)));
@@ -365,7 +370,7 @@ window.__result = result;
     mkdirSync(filerobot);
     for (const f of ['index.html', 'main.js', 'photo.jpg']) copyFileSync(join(repo, 'examples/filerobot-looks', f), join(filerobot, f));
     const frPkg = JSON.parse(readFileSync(join(repo, 'examples/filerobot-looks/package.json'), 'utf8'));
-    for (const n of ['core', 'filters', 'presets', 'web', 'konva']) frPkg.dependencies[`@rullino/${n}`] = `file:../tarballs/rullino-${n}-${version}.tgz`;
+    for (const n of ['core', 'filters', 'presets', 'web', 'konva', 'codecs']) frPkg.dependencies[`@rullino/${n}`] = `file:../tarballs/rullino-${n}-${version}.tgz`;
     delete frPkg.devDependencies;
     writeFileSync(join(filerobot, 'package.json'), JSON.stringify(frPkg));
     run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], filerobot);

@@ -138,7 +138,7 @@
             "data": {
               "type": "string",
               "contentEncoding": "base64",
-              "description": "width × height bytes of coverage (0 to 255), row by row."
+              "description": "width \u00d7 height bytes of coverage (0 to 255), row by row."
             },
             "invert": {
               "type": "boolean"
@@ -257,6 +257,13 @@
           "type": "integer",
           "minimum": 1,
           "description": "Shrink so the long side is at most this many pixels; never enlarges."
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadataPolicy"
+        },
+        "embedEdit": {
+          "type": "boolean",
+          "description": "Embed the document in the exported file as XMP (rullino:edit). Default true."
         }
       },
       "if": {
@@ -322,6 +329,13 @@
           "type": "integer",
           "minimum": 1,
           "description": "Shrink so the long side is at most this many pixels; never enlarges."
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadataPolicy"
+        },
+        "embedEdit": {
+          "type": "boolean",
+          "description": "Embed the document in the exported file as XMP (rullino:edit). Default true."
         }
       },
       "if": {
@@ -405,7 +419,7 @@
           "$ref": "#/$defs/mask"
         }
       },
-      "description": "first + (second − first) · amount · mask, in premultiplied linear light."
+      "description": "first + (second \u2212 first) \u00b7 amount \u00b7 mask, in premultiplied linear light."
     },
     "resizeNode": {
       "type": "object",
@@ -529,6 +543,36 @@
           "$ref": "#/$defs/outputV3"
         }
       }
+    },
+    "metadataPolicy": {
+      "description": "What an export keeps of its source's metadata (EXIF, XMP, IPTC, ICC): everything (default), nothing but the colour profile, or all but GPS and / or personal fields.",
+      "oneOf": [
+        {
+          "enum": [
+            "keep",
+            "strip"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strip"
+          ],
+          "properties": {
+            "strip": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "gps",
+                  "personal"
+                ]
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
     }
   }
 }

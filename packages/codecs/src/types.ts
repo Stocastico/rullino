@@ -35,3 +35,10 @@ export interface DecodeOptions {
 }
 
 export const DEFAULT_MAX_PIXELS = 2 ** 28;
+
+/**
+ * `bytes` as a plain Uint8Array view of the same memory. Node's Buffer is a Uint8Array whose slice()
+ * returns a view instead of a copy: code that copies with slice() and then writes would write into the
+ * caller's data. Every entry point of the package passes its input through this first.
+ */
+export const plain = (bytes: Uint8Array): Uint8Array => (Object.getPrototypeOf(bytes) === Uint8Array.prototype ? bytes : new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength));

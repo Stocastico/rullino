@@ -60,3 +60,25 @@ export function previewCanvas(img: ImageData, maxSide = 360): HTMLCanvasElement 
   c.getContext('2d')!.drawImage(full, 0, 0, c.width, c.height);
   return c;
 }
+
+/**
+ * The edit document a photo exported by rullino carries in its XMP (rullino:edit, #180),
+ * pretty-printed; undefined for a photo without one or a file that is not an image.
+ * @rullino/codecs is loaded only when a page asks.
+ */
+export async function recipeOf(file: Blob): Promise<string | undefined> {
+  const { readMetadata, readXmpEdit } = await import('@rullino/codecs');
+  let xmp: string | undefined;
+  try {
+    xmp = (await readMetadata(new Uint8Array(await file.arrayBuffer()))).xmp;
+  } catch {
+    return undefined;
+  }
+  const edit = xmp === undefined ? undefined : readXmpEdit(xmp);
+  if (edit === undefined) return undefined;
+  try {
+    return JSON.stringify(JSON.parse(edit), null, 2);
+  } catch {
+    return edit;
+  }
+}

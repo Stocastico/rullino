@@ -10,6 +10,7 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
+    "@rullino/codecs": "workspace:*",
     "@rullino/core": "workspace:*",
     "@rullino/filters": "workspace:*",
     "@rullino/presets": "workspace:*",
