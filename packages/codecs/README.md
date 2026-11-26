@@ -77,6 +77,10 @@ Both give `bitDepth: 32` float RGBA with `linear: true`: scene-referred light, n
 
 Tested on files written by OpenCV (Radiance) and OpenEXR (through imagecodecs: every lossless compression, half and float, RGBA / RGB / grey, odd sizes, a ramp over the whole half range that reaches PIZ's 16-bit wavelet path and Huffman codes longer than 14 bits): the decoded pixels must be the written ones bit for bit. Fuzzed like the other decoders.
 
+## Ultra HDR (gain maps)
+
+`readUltraHdr(bytes)` takes an Ultra HDR JPEG apart (an SDR JPEG with a second JPEG, the gain map, appended after it and indexed by an MPF segment) into `{ primary, gainMap, metadata }`, two complete JPEG files you decode with `decodeJpeg` and the map's parameters (`gainMapMin`, `gainMapMax`, `gamma`, offsets, headrooms, per channel, log2) from its ISO 21496-1 block or its Adobe `hdrgm` XMP; it returns `undefined` for a file that is no Ultra HDR file. `writeUltraHdr({ primary, gainMap, metadata })` makes one from an SDR JPEG (its EXIF, ICC profile and XMP kept, the Container directory joining its XMP packet) and a gain map JPEG: `encodeJpeg(…, { grey: true })` makes a one-channel map. The layouts follow Google's libultrahdr, which Android and Chrome read; the index was checked with Pillow and exiftool. The maths that turns the pair into HDR light and back is `applyGainMap` / `makeGainMap` in `@rullino/core`.
+
 ## TIFF encoding
 
 ```ts
