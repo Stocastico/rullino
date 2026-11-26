@@ -11,8 +11,8 @@ describe('@rullino/core public API', () => {
     'createRasterMask', 'decodeSrgb8', 'defaultParams', 'defineFilter', 'downscale', 'downscaleCpu',
     'encodeImage', 'encodePng', 'encodeSrgb16', 'encodeSrgb8', 'exportImage', 'fillShape', 'fitWithin', 'flipGeometry',
     'formatCube', 'fromFloat16Array', 'geometryFrame', 'histogramSrgb8', 'identityLut', 'importImage',
-    'isIdentityGeometry', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
-    'maskImage', 'maskValue', 'migrateChain', 'migrateEdit', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseEdit', 'parseHald',
+    'isIdentityGeometry', 'isSrgbProfile', 'linearToOklab', 'linearToSrgb', 'luminance', 'lutFromFunction', 'magicWand',
+    'maskImage', 'maskValue', 'migrateChain', 'migrateEdit', 'oklabToLinear', 'paintStroke', 'parseChain', 'parseCube', 'parseEdit', 'parseHald', 'parseIcc', 'profileImage',
     'readImage', 'readSrgb8', 'refineMask', 'releaseTexture', 'resampleRaster', 'resolveParams',
     'runChainCpu', 'runFilter', 'sampleCurve', 'sampleImage', 'serializeChain', 'srgbToLinear',
     'toFloat16Array', 'turnGeometry', 'uploadImage', 'uploadSrgb8', 'validateGeometry', 'validateMask',
@@ -22,11 +22,11 @@ describe('@rullino/core public API', () => {
   it('keeps the plumbing under the unstable "./internal" subpath', async () => {
     const internal = await import('./internal');
     expect(Object.keys(internal).sort()).toEqual([
-    'CURVE_SAMPLES', 'WORKING_FORMAT', 'applyEditPixels', 'bandReach', 'bindSources', 'blendMask', 'chainDocument', 'checkMixSizes', 'colorWgsl', 'createWorkingTexture', 'curveLut',
-    'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'exportSamples',
-    'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture',
-    'lutSamplerWgsl', 'lutTexture', 'mixMask', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
-    'passShader', 'planBands', 'planSegments', 'planTiles', 'poolStats', 'readTextureBytes', 'renderMask', 'reportGpuError', 'resizeSize', 'runChainBand', 'runChainBandRows', 'runChainBands', 'runChainTiled', 'runFused',
+    'CURVE_SAMPLES', 'SRGB_PRIMARIES', 'WORKING_FORMAT', 'XYZ_D50_TO_LINEAR_SRGB', 'applyEditPixels', 'bandReach', 'bindSources', 'blendMask', 'chainDocument', 'checkMixSizes', 'colorWgsl', 'createWorkingTexture', 'curveLut',
+    'curveSamplerWgsl', 'curveSamplersWgsl', 'effectiveParams', 'encodeSamples', 'encodeToTexture', 'evalCurve', 'exportSamples',
+    'float16ToFloat32', 'float32ToFloat16', 'fusedShader', 'imageSamplerWgsl', 'imageTexture', 'inv3',
+    'lutSamplerWgsl', 'lutTexture', 'mixMask', 'mul3', 'namespaceWgsl', 'packParams', 'paramsLayout', 'paramsStructWgsl',
+    'passShader', 'planBands', 'planSegments', 'planTiles', 'poolStats', 'profileToXyz', 'readTextureBytes', 'renderMask', 'reportGpuError', 'resizeSize', 'rgbToXyzD50', 'runChainBand', 'runChainBandRows', 'runChainBands', 'runChainTiled', 'runFused',
     'runGraphCpu', 'runGraphGpu', 'runMultipass', 'runPointwise', 'runStepCpu', 'sampleCurveLut', 'scaleParams', 'setPoolLimit', 'stepReach', 'sumStats', 'toGpuError', 'twoPhaseStat', 'uploadHalves', 'uploadSrgb8Rect', 'validateSchema', 'walkGraph', 'wholeFrame',
     ]);
     const publicNames = new Set(Object.keys(api));
