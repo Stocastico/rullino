@@ -37,7 +37,7 @@ For scale: one 8-bit step of sRGB output is about 0.0003 in linear light near bl
 
 | Filter | Kind | abs | rel | At 1.0 | Outliers |
 |---|---|---|---|---|---|
-| LUT (`applyLut`) | multipass | 0.0002 | 0.002 | 0.0022 | 0 |
+| LUT (`applyLut`) | multipass | 0.0002 | 0.002 | 0.0022 | 0.1% |
 | Vignette (`vignette`) | multipass | 0.0001 | 0.00195 | 0.00205 | 0 |
 | Grain (`grain`) | multipass | 0.0002 | 0.002 | 0.0022 | 0 |
 | Gradient map (`gradientMap`) | pointwise | 0.0005 | 0.001 | 0.0015 | 0 |

@@ -1,4 +1,5 @@
-import { createImage, identityLut, linearToSrgb, lutFromFunction, srgbToLinear } from '@rullino/core';
+import { createImage, identityLut, linearToOklab, linearToSrgb, lutFromFunction, srgbToLinear } from '@rullino/core';
+import { gamutMapOklab } from '@rullino/core/internal';
 import { describe, expect, it } from 'vitest';
 import { grey } from '../test-utils';
 import { applyLut } from './index';
@@ -33,6 +34,24 @@ describe('applyLut', () => {
   it('clamps out-of-gamut input to the LUT edge, but keeps it at intensity 0', () => {
     expect(run(grey(4), { look: invertLut })[0]).toBeCloseTo(0, 6);
     expect(run(grey(4), { look: invertLut, intensity: 0 })[0]).toBeCloseTo(4, 5);
+  });
+
+  it('maps a colour outside sRGB into sRGB (OKLCh) before the lookup (#181), not channel by channel', () => {
+    // A saturated Display P3 green in linear sRGB: negative red and blue.
+    const wide = [-0.4, 1.05, -0.15];
+    const mapped = gamutMapOklab('srgb', linearToOklab(wide[0]!, wide[1]!, wide[2]!)).map(linearToSrgb);
+    const clipped = wide.map((v) => Math.min(1, Math.max(0, linearToSrgb(v))));
+    expect(mapped).not.toEqual(clipped);
+    // The identity LUT shows the colour that reached the lookup (intensity 1: the LUT's output).
+    const out = run([...wide, 1], { look: identityLut(2) });
+    mapped.forEach((v, i) => expect(linearToSrgb(out[i]!), `channel ${i}`).toBeCloseTo(v, 5));
+    // Intensity 0 stays an exact no-op, negative values included.
+    expect(run([...wide, 1], { look: invertLut, intensity: 0 })).toEqual(wide.concat(1).map((v) => Math.fround(v)));
+  });
+
+  it('only changes what has a negative channel: colours above 1 clamp as they always did', () => {
+    const hot = run([3, 0.5, 0.2, 1], { look: identityLut(2) });
+    expect([hot[0], hot[1], hot[2]].map((v) => linearToSrgb(v!))).toEqual([1, linearToSrgb(0.5), linearToSrgb(0.2)].map((v) => expect.closeTo(v, 5)));
   });
 
   it('does not mutate its input', () => {
