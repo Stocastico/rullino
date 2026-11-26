@@ -2,7 +2,7 @@
 // a Photoshop image resource block (8BIM 0x0404: JPEG's APP13, PNG's "Raw profile type iptc") or bare
 // (TIFF's tag 33723). `ImageMetadata.iptc` holds the bare datasets.
 
-import { CodecError } from './types';
+import { CodecError, plain } from './types';
 
 const fail = (message: string): never => {
   throw new CodecError('iptc', message);
@@ -15,7 +15,8 @@ export interface IptcDataset {
 }
 
 /** The datasets of bare IIM data. */
-export function readIptc(iptc: Uint8Array): IptcDataset[] {
+export function readIptc(input: Uint8Array): IptcDataset[] {
+  const iptc = plain(input);
   const out: IptcDataset[] = [];
   for (let i = 0; i < iptc.length; ) {
     if (iptc[i] !== 0x1c) {
@@ -56,7 +57,8 @@ export function writeIptc(datasets: readonly IptcDataset[]): Uint8Array {
 }
 
 /** The IIM data inside a Photoshop image resource block (resource 0x0404), if there is one. */
-export function iptcFromIrb(irb: Uint8Array): Uint8Array | undefined {
+export function iptcFromIrb(input: Uint8Array): Uint8Array | undefined {
+  const irb = plain(input);
   for (let i = 0; i + 12 <= irb.length; ) {
     if (String.fromCharCode(irb[i]!, irb[i + 1]!, irb[i + 2]!, irb[i + 3]!) !== '8BIM') return undefined;
     const id = (irb[i + 4]! << 8) | irb[i + 5]!;

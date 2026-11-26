@@ -6,7 +6,7 @@ import { detectFormat } from './decode';
 import { walkExif } from './exif';
 import { iptcFromIrb, irbFromIptc } from './iptc';
 import { crc32 } from './png';
-import { CodecError } from './types';
+import { CodecError, plain } from './types';
 import { deflate, inflate } from './zlib';
 
 export interface ImageMetadata {
@@ -172,7 +172,8 @@ function readTiff(b: Uint8Array): ImageMetadata {
  * that is broken is left out (the image is still usable); an unknown format is a `CodecError`.
  * TIFF's own EXIF (in its image directory) is not read yet.
  */
-export async function readMetadata(bytes: Uint8Array): Promise<ImageMetadata> {
+export async function readMetadata(input: Uint8Array): Promise<ImageMetadata> {
+  const bytes = plain(input);
   const format = detectFormat(bytes);
   if (format === 'jpeg') return readJpeg(bytes);
   if (format === 'png') return readPng(bytes);
@@ -331,7 +332,8 @@ function writeWebp(b: Uint8Array, meta: ImageMetadata): Uint8Array {
  * that does not fit its container (EXIF or XMP over 64 KB in JPEG) is left out and named in `dropped`,
  * never truncated. WebP has no place for IPTC or text; PNG's text chunks are only written to PNG.
  */
-export async function writeMetadata(bytes: Uint8Array, meta: ImageMetadata): Promise<{ bytes: Uint8Array; dropped: MetadataBlock[] }> {
+export async function writeMetadata(input: Uint8Array, meta: ImageMetadata): Promise<{ bytes: Uint8Array; dropped: MetadataBlock[] }> {
+  const bytes = plain(input);
   const format = detectFormat(bytes);
   const dropped: MetadataBlock[] = [];
   if (format === 'jpeg') return { bytes: writeJpeg(bytes, meta, dropped), dropped };

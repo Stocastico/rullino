@@ -6,7 +6,7 @@
 import { decodeJpeg } from './jpeg';
 import { decodePng } from './png';
 import { decodeTiff } from './tiff';
-import { CodecError, DEFAULT_MAX_PIXELS, type DecodedImage, type DecodeOptions } from './types';
+import { CodecError, DEFAULT_MAX_PIXELS, plain, type DecodedImage, type DecodeOptions } from './types';
 
 export type ImageFormat = 'png' | 'jpeg' | 'tiff' | 'webp' | 'avif' | 'heic' | 'jxl' | 'gif' | 'bmp';
 
@@ -67,7 +67,8 @@ function check(img: DecodedImage, format: ImageFormat, maxPixels: number): Decod
  * through `decoders` (`{ avif: myAvifDecoder }`). Rejects with a `CodecError` for an unknown format,
  * a format without a decoder, or what the decoder refuses or returns wrongly.
  */
-export async function decode(bytes: Uint8Array, options: DecodeAnyOptions = {}): Promise<DecodedImage & { readonly format: ImageFormat }> {
+export async function decode(input: Uint8Array, options: DecodeAnyOptions = {}): Promise<DecodedImage & { readonly format: ImageFormat }> {
+  const bytes = plain(input);
   const format = detectFormat(bytes);
   if (!format) throw new CodecError('image', 'unknown format (not PNG, JPEG, TIFF, WebP, AVIF, HEIC, JPEG XL, GIF or BMP)');
   const decoder = options.decoders?.[format] ?? BUILT_IN[format];

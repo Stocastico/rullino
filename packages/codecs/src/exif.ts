@@ -4,7 +4,7 @@
 // their IFD with fewer entries and zeroing what they pointed to, values are patched where they lie.
 // Nothing moves, so offsets elsewhere (a MakerNote's, often relative to the TIFF header) stay valid.
 
-import { CodecError } from './types';
+import { CodecError, plain } from './types';
 
 const fail = (message: string): never => {
   throw new CodecError('exif', message);
@@ -47,7 +47,8 @@ export interface Ifd {
 }
 
 /** The blob's IFDs and their entries, bounds-checked. */
-export function walkExif(exif: Uint8Array): { little: boolean; view: DataView; ifds: Ifd[] } {
+export function walkExif(input: Uint8Array): { little: boolean; view: DataView; ifds: Ifd[] } {
+  const exif = plain(input);
   if (exif.length < 8) fail('too short');
   const order = String.fromCharCode(exif[0]!, exif[1]!);
   if (order !== 'II' && order !== 'MM') fail('bad byte order');
@@ -145,7 +146,7 @@ export interface ExifEdits {
  * `CodecError` when the structure is broken.
  */
 export function editExif(exif: Uint8Array, edits: ExifEdits): Uint8Array {
-  const out = exif.slice();
+  const out = plain(exif).slice();
   const { little, ifds } = walkExif(out);
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
   const zero = (at: number, size: number) => out.fill(0, Math.max(0, at), Math.min(out.length, at + size));
