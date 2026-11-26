@@ -1,6 +1,6 @@
 # @rullino/web
 
-[![npm](https://img.shields.io/npm/v/@rullino/web.svg)](https://www.npmjs.com/package/@rullino/web) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@rullino/web.svg)](https://www.npmjs.com/package/@rullino/web) [![npm downloads](https://img.shields.io/npm/dm/@rullino/web.svg)](https://www.npmjs.com/package/@rullino/web) [![types: TypeScript](https://img.shields.io/badge/types-TypeScript-3178c6.svg)](https://www.typescriptlang.org/) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
 
 Render [rullino](https://github.com/Stocastico/rullino) edit documents in the browser with one call: on **WebGPU** when the browser has it, otherwise on the CPU in a **Web Worker**, so the page never freezes. Both give the same result within the [published per-filter tolerance](https://github.com/Stocastico/rullino/blob/main/docs/parity.md), and the same as [`@rullino/node`](https://www.npmjs.com/package/@rullino/node) on the server.
 
