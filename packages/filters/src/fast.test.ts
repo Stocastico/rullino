@@ -1,7 +1,7 @@
 import { compareImages, defaultParams, maskImage, type Filter } from '@rullino/core';
 import { describe, expect, it } from 'vitest';
 import { filters } from './index';
-import { parityCases, parityImages, parityMask, specialImage } from './test-utils';
+import { parityCases, parityImages, parityMask, specialImage, wideImage } from './test-utils';
 
 // Every filter's fast CPU path is checked against its reference on the GPU parity cases, within
 // the same tolerance: the fast path may compute differently, but never further from the reference
@@ -9,7 +9,7 @@ import { parityCases, parityImages, parityMask, specialImage } from './test-util
 
 const fast = filters.filter((f) => f.fast);
 
-const images = { ...parityImages, special: specialImage() };
+const images = { ...parityImages, special: specialImage(), wide: wideImage() };
 
 it('some filters have a fast path', () => {
   expect(fast.map((f) => f.id)).not.toEqual([]);

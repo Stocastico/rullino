@@ -1,7 +1,10 @@
 import { compareImages, createGpuContext, defaultParams, maskImage, readImage, runFilter, uploadImage, type Filter } from '@rullino/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { filters } from './index';
-import { parityCases as cases, parityImages as images, parityMask } from './test-utils';
+import { parityCases as cases, parityImages, parityMask, wideImage } from './test-utils';
+
+// Colours outside sRGB (negative channels, RFC #181) too: rullino's working space is extended linear sRGB.
+const images = { ...parityImages, wide: wideImage() };
 
 // Every registered filter is checked GPU <-> CPU at its defaults and at the extremes of each
 // parameter (every option for enums, both values for bools, an asymmetric kernel). New filters get
