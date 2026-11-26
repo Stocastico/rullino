@@ -63,4 +63,33 @@ describe('HDR decoder fuzzing', SLOW, () => {
         { numRuns: RUNS },
       );
     });
+
+  it('every byte of small files, set to 0, 255 or one more: an image or a CodecError (exhaustive, deterministic)', async () => {
+    const small = load(['one-none-half.exr', 'grey-none-half.exr', 'grey-zip-half.exr', 'grey-piz-half.exr', 'flat-5x7.hdr', 'rle-8x4.hdr', 'cv-9x5.hdr']);
+    for (const seed of small)
+      for (let i = 0; i < Math.min(seed.length, 900); i++)
+        for (const v of [0, 255, (seed[i]! + 1) & 255, (seed[i]! + 128) & 255]) {
+          const b = seed.slice();
+          b[i] = v;
+          await decodesOrRefuses(b);
+        }
+  });
+
+  it('every byte of the start of a compressed PIZ block (its bitmap, Huffman table and first codes), set to other values', async () => {
+    const seed = load(['wide-piz-half.exr'])[0]!;
+    for (let i = 368; i < 368 + 700; i++)
+      for (const v of [0, 255, (seed[i]! + 1) & 255, (seed[i]! ^ 0x80) & 255, (seed[i]! ^ 0x10) & 255]) {
+        const b = seed.slice();
+        b[i] = v;
+        await decodesOrRefuses(b);
+      }
+  });
+
+  it('files of the right shape but wrong sizes inside: PIZ and RLE blocks of every length', async () => {
+    const piz = load(['grey-piz-half.exr'])[0]!;
+    const start = piz.length - 200;
+    for (let cut = start; cut < piz.length; cut += 3) await decodesOrRefuses(piz.subarray(0, cut));
+    const rle = load(['rgba-rle-float16.exr'])[0]!;
+    for (let cut = rle.length - 300; cut < rle.length; cut += 7) await decodesOrRefuses(rle.subarray(0, cut));
+  });
 });

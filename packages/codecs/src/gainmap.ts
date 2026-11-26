@@ -199,7 +199,7 @@ function hdrgmNumbers(xmp: string, local: string): number[] | undefined {
   return undefined;
 }
 
-function parseXmpGainMap(xmp: string): GainMapMetadata | undefined {
+export function parseXmpGainMap(xmp: string): GainMapMetadata | undefined {
   const get = (name: string) => hdrgmNumbers(xmp, name);
   const min = get('GainMapMin') ?? [0];
   const max = get('GainMapMax');
@@ -428,11 +428,10 @@ export function writeUltraHdr(parts: UltraHdr): Uint8Array {
   if (!merged) head.push(segment(0xe1, concat([ascii(XMP_NS), new TextEncoder().encode(addXmpDescription(undefined, description))])));
   head.push(segment(0xe2, concat([ascii(ISO_NS), [0, 0, 0, 0]])));
   const before = 2 + head.reduce((n, p) => n + p.length, 0);
-  const mpfSize = 90; // marker + length + "MPF\0" + 82 bytes of header, index and two entries
+  const mpfSize = mpfSegment(0, 0, 0).length; // the index has a fixed size
   const rest = primary.subarray(restStart);
   const primarySize = before + mpfSize + rest.length;
   // The gain map starts right after the primary image; offsets in the index count from the byte order marker (8 bytes into the segment).
   const mpf = mpfSegment(primarySize, primarySize - (before + 8), gainMap.length);
-  if (mpf.length !== mpfSize) fail('internal error: the MPF segment has an unexpected size');
   return concat([[0xff, 0xd8], ...head, mpf, rest, gainMap]);
 }

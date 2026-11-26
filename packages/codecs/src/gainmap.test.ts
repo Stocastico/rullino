@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CodecError, decodeJpeg, encodeJpeg, readMetadata, readUltraHdr, writeMetadata, writeUltraHdr, type GainMapMetadata } from './index';
-import { encodeIsoGainMap, parseIsoGainMap } from './gainmap';
+import { encodeIsoGainMap, parseIsoGainMap, parseXmpGainMap } from './gainmap';
 
 // Ultra HDR / ISO 21496-1 (#182): an SDR JPEG as the primary image, a gain map JPEG appended and
 // pointed at by an MPF index, the gain map's parameters in XMP (hdrgm) and in the ISO 21496-1 binary
@@ -120,5 +120,186 @@ describe('writeUltraHdr and readUltraHdr', () => {
   it('refuses inputs that are not JPEGs', () => {
     expect(() => writeUltraHdr({ primary: new Uint8Array(10), gainMap: map(), metadata: meta })).toThrow(CodecError);
     expect(() => writeUltraHdr({ primary: primary(), gainMap: new Uint8Array(10), metadata: meta })).toThrow(CodecError);
+  });
+});
+
+describe('the metadata in the XMP, when there is no ISO block', () => {
+  const header = '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">';
+  const footer = '</rdf:RDF></x:xmpmeta>';
+  const NS = 'xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"';
+
+  it('reads the attributes, with the specification\'s defaults for what is missing', () => {
+    const m = parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:Version="1.0" hdrgm:GainMapMax="3" hdrgm:HDRCapacityMax="3"/>${footer}`)!;
+    expect(m.gainMapMax).toEqual([3, 3, 3]);
+    expect(m.gainMapMin).toEqual([0, 0, 0]);
+    expect(m.gamma).toEqual([1, 1, 1]);
+    expect(m.baseOffset).toEqual([1 / 64, 1 / 64, 1 / 64]);
+    expect(m.alternateHdrHeadroom).toBe(3);
+    expect(parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:GainMapMax="2.5"/>${footer}`)!.alternateHdrHeadroom).toBe(2.5); // defaults to the largest gain
+  });
+
+  it('reads sequences of three numbers, per channel', () => {
+    const seq = (name: string, v: number[]) => `<hdrgm:${name}><rdf:Seq>${v.map((x) => `<rdf:li>${x}</rdf:li>`).join('')}</rdf:Seq></hdrgm:${name}>`;
+    const m = parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:Version="1.0">${seq('GainMapMin', [0, -1, 0.5])}${seq('GainMapMax', [1, 2, 3])}${seq('Gamma', [1, 1.5, 2])}</rdf:Description>${footer}`)!;
+    expect(m.gainMapMin).toEqual([0, -1, 0.5]);
+    expect(m.gainMapMax).toEqual([1, 2, 3]);
+    expect(m.gamma).toEqual([1, 1.5, 2]);
+  });
+
+  it('is not a gain map without a maximum, and refuses nonsense and an HDR base image', () => {
+    expect(parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:Version="1.0"/>${footer}`)).toBeUndefined();
+    expect(parseXmpGainMap('not xml at all')).toBeUndefined();
+    expect(() => parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:GainMapMax="abc"/>${footer}`)).toThrow(CodecError);
+    expect(() => parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:GainMapMin="2" hdrgm:GainMapMax="1"/>${footer}`)).toThrow(/invalid/);
+    expect(() => parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:GainMapMax="1" hdrgm:Gamma="0"/>${footer}`)).toThrow(/invalid/);
+    expect(() => parseXmpGainMap(`${header}<rdf:Description ${NS} hdrgm:GainMapMax="1" hdrgm:BaseRenditionIsHDR="True"/>${footer}`)).toThrow(/direction/);
+  });
+});
+
+describe('where the gain map is found', () => {
+  /** The file with segments removed from its primary image (`pick` says which). */
+  const without = (bytes: Uint8Array, pick: (marker: number, body: string) => boolean) => {
+    const out: number[] = [0xff, 0xd8];
+    let i = 2;
+    for (; bytes[i] === 0xff && bytes[i + 1] !== 0xda; ) {
+      const end = i + 2 + ((bytes[i + 2]! << 8) | bytes[i + 3]!);
+      const body = new TextDecoder('latin1').decode(bytes.subarray(i + 4, i + 20));
+      if (!pick(bytes[i + 1]!, body)) out.push(...bytes.subarray(i, end));
+      i = end;
+    }
+    return Uint8Array.from([...out, ...bytes.subarray(i)]);
+  };
+  const file = () => writeUltraHdr({ primary: primary(), gainMap: map(), metadata: meta });
+
+  it('by the Container directory\'s length when the file has no MPF index (the offsets were never needed)', () => {
+    const noMpf = without(file(), (m, b) => m === 0xe2 && b.startsWith('MPF'));
+    const got = readUltraHdr(noMpf)!;
+    expect(got.metadata).toEqual(meta);
+    expect(got.gainMap.length).toBe(readUltraHdr(file())!.gainMap.length);
+  });
+
+  /** `bytes` with the first occurrence of `from` (after `after`) overwritten by `to` (same length). */
+  const patched = (bytes: Uint8Array, from: string, to: string, after = 0) => {
+    const at = new TextDecoder('latin1').decode(bytes).indexOf(from, after);
+    expect(at).toBeGreaterThan(-1);
+    const out = bytes.slice();
+    out.set(Array.from(to, (c) => c.charCodeAt(0)), at);
+    return out;
+  };
+
+  it('from the gain map\'s XMP when its ISO block is not there', () => {
+    const f = file();
+    const second = new TextDecoder('latin1').decode(f).lastIndexOf('\xff\xd8\xff');
+    const noIso = patched(f, 'urn:iso:std', 'urn:xxx:std', second);
+    const got = readUltraHdr(noIso)!;
+    expect(got.metadata.gainMapMax[0]).toBeCloseTo(2.5, 5);
+    expect(got.metadata.alternateHdrHeadroom).toBeCloseTo(2.5, 5);
+  });
+
+  it('is not Ultra HDR when the second picture carries no gain map metadata', () => {
+    const f = file();
+    const second = new TextDecoder('latin1').decode(f).lastIndexOf('\xff\xd8\xff');
+    const none = patched(patched(f, 'urn:iso:std', 'urn:xxx:std', second), 'hdrgm:GainMapMax', 'hdrgm:GainMapMxx', second);
+    expect(readUltraHdr(none)).toBeUndefined();
+  });
+
+  it('refuses an index that points outside the file', () => {
+    const f = file();
+    const bad = f.slice();
+    const at = new TextDecoder('latin1').decode(bad).indexOf('MPF\0') + 4;
+    new DataView(bad.buffer).setUint32(at + 8 + 2 + 3 * 12 + 4 + 16 + 8, 0x7fffffff);
+    expect(() => readUltraHdr(bad)).toThrow(CodecError);
+  });
+
+  it('reads an MPF index written little endian as well', () => {
+    const f = file();
+    const text = new TextDecoder('latin1').decode(f);
+    const at = text.indexOf('MPF\0') + 4;
+    // Rewrite the index in little endian: the same entries, bytes reversed in every field.
+    const le = f.slice();
+    const be = new DataView(f.buffer, f.byteOffset);
+    const w = new DataView(le.buffer);
+    le.set([0x49, 0x49, 0x2a, 0x00], at);
+    w.setUint32(at + 4, be.getUint32(at + 4), true);
+    w.setUint16(at + 8, be.getUint16(at + 8), true);
+    for (let k = 0; k < 3; k++) {
+      const e = at + 10 + 12 * k;
+      w.setUint16(e, be.getUint16(e), true);
+      w.setUint16(e + 2, be.getUint16(e + 2), true);
+      w.setUint32(e + 4, be.getUint32(e + 4), true);
+      if (k !== 0) w.setUint32(e + 8, be.getUint32(e + 8), true);
+    }
+    const entries = at + 8 + 2 + 3 * 12 + 4;
+    for (let k = 0; k < 2; k++) for (const o of [0, 4, 8]) w.setUint32(entries + 16 * k + o, be.getUint32(entries + 16 * k + o), true);
+    expect(readUltraHdr(le)!.metadata).toEqual(meta);
+  });
+});
+
+describe('readUltraHdr on damaged files', () => {
+  it('every byte of the container, set to 0, 255 or one more, gives a gain map, no gain map or a CodecError: never another error', () => {
+    const f = writeUltraHdr({ primary: primary(), gainMap: map(), metadata: meta });
+    const head = new TextDecoder('latin1').decode(f).indexOf('MPF\0') + 120;
+    for (let i = 0; i < Math.min(f.length, head + 200); i++)
+      for (const v of [0, 255, (f[i]! + 1) & 255]) {
+        const g = f.slice();
+        g[i] = v;
+        try {
+          readUltraHdr(g);
+        } catch (e) {
+          expect(e, `byte ${i} = ${v}`).toBeInstanceOf(CodecError);
+        }
+      }
+  });
+
+  it('a file of any other kind is no Ultra HDR file', () => {
+    expect(readUltraHdr(new Uint8Array(0))).toBeUndefined();
+    expect(readUltraHdr(Uint8Array.of(0xff, 0xd8, 0xff))).toBeUndefined();
+    expect(readUltraHdr(Uint8Array.of(0xff, 0xd8, 0x12, 0x34, 0x56, 0x78))).toBeUndefined();
+  });
+});
+
+describe('the ISO block, the remaining cases', () => {
+  it('reads a common denominator, and refuses a zero one', () => {
+    const be = (v: number) => [v >>> 24, (v >> 16) & 255, (v >> 8) & 255, v & 255];
+    // version 0 / 0, flags: common denominator (8), denominator 4, then headrooms and one channel as numerators
+    const block = Uint8Array.from([0, 0, 0, 0, 0x08, ...be(4), ...be(0), ...be(10), ...be(0), ...be(8), ...be(4), ...be(0), ...be(0)]);
+    // layout after the denominator: base, alternate, then min, max, gamma, base offset, alternate offset
+    const m = parseIsoGainMap(Uint8Array.from([0, 0, 0, 0, 0x08, ...be(4), ...be(0), ...be(10), ...be(0), ...be(8), ...be(4), ...be(0), ...be(0)]));
+    expect(m.alternateHdrHeadroom).toBe(2.5);
+    expect(m.gainMapMax[0]).toBe(2);
+    expect(m.gamma[0]).toBe(1);
+    expect(() => parseIsoGainMap(Uint8Array.from([0, 0, 0, 0, 0x08, ...be(0), ...block.subarray(9)]))).toThrow(/common denominator/);
+    expect(() => parseIsoGainMap(Uint8Array.from([0, 0, 0, 0, 0x08]))).toThrow(CodecError);
+  });
+
+  it('refuses a gamma that is zero, and a field too large to write', () => {
+    const good = encodeIsoGainMap(meta);
+    // gamma's numerator (one channel: after the two headroom pairs, min and max) is at 5 + 16 + 16
+    const zeroGamma = good.slice();
+    new DataView(zeroGamma.buffer).setUint32(5 + 16 + 16, 0);
+    expect(() => parseIsoGainMap(zeroGamma)).toThrow(/gamma/);
+    expect(() => encodeIsoGainMap({ ...meta, gainMapMax: [5000, 5000, 5000] })).toThrow(/does not fit/);
+    expect(() => encodeIsoGainMap({ ...meta, alternateHdrHeadroom: -1 })).toThrow(/does not fit/);
+  });
+});
+
+describe('writeUltraHdr, the remaining cases', () => {
+  it('takes a primary that is only a header, and refuses a metadata block that does not fit a JPEG segment', async () => {
+    const bare = Uint8Array.of(0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0);
+    expect(writeUltraHdr({ primary: bare, gainMap: map(), metadata: meta }).length).toBeGreaterThan(bare.length);
+    // An XMP packet nearly as large as a segment can be: adding the container directory no longer fits.
+    const pad = ' '.repeat(64000);
+    const xmp = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">${pad}</rdf:RDF></x:xmpmeta><?xpacket end="w"?>`;
+    const big = (await writeMetadata(primary(), { xmp: xmp + ' '.repeat(65500 - 29 - xmp.length - 500) })).bytes;
+    expect(() => writeUltraHdr({ primary: big, gainMap: map(), metadata: meta })).toThrow(/too large/);
+  });
+
+  it('reads a file whose MPF lists one picture only by the Container directory, and takes a cut index for no Ultra HDR file', () => {
+    const f = writeUltraHdr({ primary: primary(), gainMap: map(), metadata: meta });
+    const at = new TextDecoder('latin1').decode(f).indexOf('MPF\0') + 4;
+    const one = f.slice();
+    new DataView(one.buffer).setUint32(at + 38, 16); // the MPEntry table: 16 bytes, one entry
+    expect(readUltraHdr(one)?.metadata).toEqual(meta);
+    expect(readUltraHdr(f.slice(0, at + 6))).toBeUndefined();
   });
 });

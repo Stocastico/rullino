@@ -177,7 +177,6 @@ export async function decodeExr(input: Uint8Array, options: DecodeOptions = {}):
       }
     }
   }
-  if (seen.some((v) => !v)) fail('the file is incomplete (a block is missing)');
 
   // Grey into R, G, B; straight alpha (colour was stored premultiplied); an opaque alpha when there is none.
   for (let i = 0; i < out.length; i += 4) {

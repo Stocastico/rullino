@@ -68,4 +68,13 @@ describe('decodeHdr', () => {
     bad[at + 4] = 255; // a run of 127 where 40 pixels are left
     expect(() => decodeHdr(bad)).toThrow(CodecError);
   });
+
+  it('refuses a header line that never ends, a header without a blank line, and a repeat code with nothing to repeat', () => {
+    const text = (s: string) => new TextEncoder().encode(s);
+    expect(() => decodeHdr(text('#?RADIANCE\n' + 'A'.repeat(70000)))).toThrow(/too long/);
+    expect(() => decodeHdr(text('#?RADIANCE\n' + 'X=1\n'.repeat(1200)))).toThrow(/no end/);
+    const body = Uint8Array.of(1, 1, 1, 5, 0, 0, 0, 0); // an old-style repeat as the first pixel
+    const head = text('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 4\n');
+    expect(() => decodeHdr(Uint8Array.from([...head, ...body]))).toThrow(/nothing to repeat/);
+  });
 });
