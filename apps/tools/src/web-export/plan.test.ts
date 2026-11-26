@@ -13,14 +13,14 @@ describe('webExportEdit', () => {
     if (sharp.kind !== 'chain') throw new Error('not a chain');
     expect(sharp.steps.map((s) => s.filter.id)).toEqual(['unsharpMask']);
     expect(sharp.steps[0]!.params).toMatchObject({ amount: 0.5, sigma: 0.6 });
-    expect(g.output).toEqual({ node: 'sharp', format: 'webp', quality: 0.8 });
+    expect(g.output).toEqual({ node: 'sharp', format: 'webp', quality: 0.8, metadata: 'strip' }); // the page promises no metadata, also through render()
   });
 
   it('leaves out the resize without a long side and the sharpening at 0', () => {
     const g = parseEdit(webExportEdit({ sharpen: 0, format: 'png' }), { filters });
     expect(g.nodes.map((n) => [n.id, n.kind])).toEqual([['sharp', 'chain']]);
     expect((g.nodes[0] as unknown as { steps: unknown[] }).steps).toHaveLength(0);
-    expect(g.output).toEqual({ node: 'sharp', format: 'png' });
+    expect(g.output).toEqual({ node: 'sharp', format: 'png', metadata: 'strip' });
   });
 
   it('rejects a long side that is not a positive whole number', () => {

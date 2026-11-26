@@ -35,6 +35,6 @@ export function webExportEdit(o: WebExportOptions) {
         steps: o.sharpen > 0 ? [{ filter: 'unsharpMask', params: { amount: o.sharpen, sigma: SHARPEN_SIGMA } }] : [],
       },
     ],
-    output: { node: 'sharp', format: o.format, ...(o.format !== 'png' && o.quality !== undefined && { quality: o.quality }) },
+    output: { node: 'sharp', format: o.format, ...(o.format !== 'png' && o.quality !== undefined && { quality: o.quality }), metadata: 'strip' },
   };
 }

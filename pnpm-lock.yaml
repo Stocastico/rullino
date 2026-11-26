@@ -139,6 +139,9 @@ importers:
 
   apps/tools:
     dependencies:
+      '@rullino/codecs':
+        specifier: workspace:*
+        version: link:../../packages/codecs
       '@rullino/core':
         specifier: workspace:*
         version: link:../../packages/core
