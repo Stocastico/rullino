@@ -232,6 +232,19 @@ export function editXmp(xmp: string | undefined, edits: XmpEdits): string {
   return out;
 }
 
+/**
+ * `xmp` with an `rdf:Description` element (given as XML text, using the packet's `rdf` prefix or none
+ * at all) added to its `rdf:RDF`: a packet with several descriptions is one XMP document. A new packet
+ * when `xmp` is undefined. What was there stays byte for byte. Throws a `CodecError` for a packet
+ * without `rdf:RDF`.
+ */
+export function addXmpDescription(xmp: string | undefined, description: string): string {
+  const packet = xmp ?? PACKET('');
+  const rdf = [...walk(parseXmp(packet))].find((e) => e.ns === NS.rdf && e.local === 'RDF');
+  if (!rdf || (rdf.contentEnd === rdf.contentStart && rdf.end === rdf.contentEnd)) fail('the packet has no rdf:RDF element');
+  return packet.slice(0, rdf!.contentEnd) + description + packet.slice(rdf!.contentEnd);
+}
+
 /** The edit document (JSON text) embedded as rullino:edit, or undefined (none, or XML it cannot read). */
 export function readXmpEdit(xmp: string): string | undefined {
   let roots: XmlElement[];
