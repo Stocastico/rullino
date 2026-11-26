@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { readExif, readMetadata, readXmpEdit } from '@rullino/codecs';
+import { editXmp, encodeJpeg, readExif, readMetadata, readXmpEdit, writeMetadata } from '@rullino/codecs';
 import { fileURLToPath } from 'node:url';
 import { runCli } from './cli';
 
@@ -113,6 +113,26 @@ describe('rullino CLI', { timeout: 60_000 }, () => {
     expect((await run(['info'])).code).toBe(2);
     const missing = await run(['info', join(dir, 'nope.jpg')]);
     expect([missing.code, missing.err]).toEqual([1, expect.stringContaining('nope.jpg')]);
+  });
+
+  it('info on photos without EXIF, with blocks it cannot read, and with an edit that is not JSON', async () => {
+    const dir = await workspace();
+    const none = await run(['info', join(dir, 'in', 'a.png')]);
+    expect(none.out).toContain('EXIF: none');
+    expect(none.out).toContain('XMP: none');
+    expect(none.out).toContain('IPTC: none');
+    const jpeg = encodeJpeg({ width: 2, height: 2, data: new Uint8Array(16) });
+    const odd = (await writeMetadata(jpeg, { exif: Uint8Array.from([0x49, 0x49, 42, 0, 99, 0, 0, 0]), iptc: Uint8Array.of(7, 7, 7), xmp: editXmp(undefined, { edit: 'not json {' }) })).bytes;
+    await writeFile(join(dir, 'odd.jpg'), odd);
+    const r = await run(['info', join(dir, 'odd.jpg')]);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/EXIF: unreadable/);
+    expect(r.out).toContain('IPTC: unreadable');
+    expect(r.out).toContain('edit document:\nnot json {');
+    // No DateTimeOriginal: the date comes from IFD0's DateTime.
+    const date = Uint8Array.from([0x49, 0x49, 42, 0, 8, 0, 0, 0, 1, 0, 0x32, 0x01, 2, 0, 20, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, ...new TextEncoder().encode('2020:01:02 03:04:05\0')]);
+    await writeFile(join(dir, 'date.jpg'), (await writeMetadata(jpeg, { exif: date })).bytes);
+    expect((await run(['info', join(dir, 'date.jpg')])).out).toContain('taken: 2020:01:02 03:04:05');
   });
 
   it('lists the looks', async () => {
