@@ -43,9 +43,18 @@ export function float16ToFloat32(h: number): number {
   return s * (1 + m / 1024) * 2 ** (e - 15);
 }
 
-export function toFloat16Array(src: Float32Array): Uint16Array {
+/**
+ * Float32 to half bits. Values beyond the largest half (65504) become infinity, as IEEE says; with
+ * `saturate` a *finite* value that large stays finite (±65504), which is what HDR light needs: an
+ * infinity turns into NaN at the first multiplication by zero or division of the next filter. Inf and
+ * NaN are kept either way.
+ */
+export function toFloat16Array(src: Float32Array, saturate = false): Uint16Array {
   const out = new Uint16Array(src.length);
-  for (let i = 0; i < src.length; i++) out[i] = float32ToFloat16(src[i]!);
+  for (let i = 0; i < src.length; i++) {
+    const h = float32ToFloat16(src[i]!);
+    out[i] = saturate && (h & 0x7fff) === 0x7c00 && Number.isFinite(src[i]!) ? (h & 0x8000) | 0x7bff : h;
+  }
   return out;
 }
 

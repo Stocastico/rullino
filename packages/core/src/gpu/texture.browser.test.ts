@@ -22,4 +22,10 @@ describe('texture upload / readback', () => {
     expect(out.height).toBe(h);
     expect(Array.from(out.data)).toEqual(Array.from(fromFloat16Array(toFloat16Array(data))));
   });
+
+  it('keeps HDR light up to the largest half (65504) and saturates beyond it instead of becoming infinity', async () => {
+    const src = createImage(2, 1, Float32Array.of(40000, 65504, 1e6, 1, -5e5, 0.5, 2, 1));
+    const out = await readImage(ctx, uploadImage(ctx, src));
+    expect(Array.from(out.data)).toEqual([40000, 65504, 65504, 1, -65504, 0.5, 2, 1]);
+  });
 });

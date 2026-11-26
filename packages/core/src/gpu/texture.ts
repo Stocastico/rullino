@@ -27,7 +27,7 @@ export function uploadImage(ctx: GpuContext, img: LinearImage): GPUTexture {
   const tex = createWorkingTexture(ctx, img.width, img.height);
   ctx.device.queue.writeTexture(
     { texture: tex },
-    toFloat16Array(img.data),
+    toFloat16Array(img.data, true),
     { bytesPerRow: img.width * BYTES_PER_PIXEL, rowsPerImage: img.height },
     { width: img.width, height: img.height },
   );

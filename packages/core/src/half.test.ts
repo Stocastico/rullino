@@ -27,6 +27,16 @@ describe('float16 conversion', () => {
     expect(Number.isNaN(float16ToFloat32(float32ToFloat16(NaN)))).toBe(true);
   });
 
+  it('toFloat16Array saturates finite overflow at the largest half when asked (HDR light must not become infinity), and keeps Inf and NaN', () => {
+    const src = Float32Array.of(1e6, -1e6, 65504, 65519, 65520, Infinity, -Infinity, NaN, 0.5);
+    const plain = Array.from(toFloat16Array(src));
+    expect(plain.slice(0, 2)).toEqual([0x7c00, 0xfc00]);
+    const sat = Array.from(toFloat16Array(src, true));
+    expect(sat).toEqual([0x7bff, 0xfbff, 0x7bff, 0x7bff, 0x7bff, 0x7c00, 0xfc00, sat[7], 0x3800]);
+    expect(Number.isNaN(float16ToFloat32(sat[7]!))).toBe(true);
+    expect(Array.from(fromFloat16Array(toFloat16Array(Float32Array.of(1e9), true)))).toEqual([65504]);
+  });
+
   it('keeps relative error within half precision', () => {
     for (let v = 1e-3; v < 6e4; v *= 1.37) {
       const back = float16ToFloat32(float32ToFloat16(v));

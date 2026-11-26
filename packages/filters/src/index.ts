@@ -46,6 +46,7 @@ import { shadowsHighlights } from './shadowsHighlights';
 import { sharpen } from './sharpen';
 import { sketch } from './sketch';
 import { threshold } from './threshold';
+import { toneMap } from './toneMap';
 import { transparency } from './transparency';
 import { unsharpMask } from './unsharpMask';
 import { vibrance } from './vibrance';
@@ -99,6 +100,7 @@ export {
   sharpen,
   sketch,
   threshold,
+  toneMap,
   transparency,
   unsharpMask,
   vibrance,
@@ -118,6 +120,7 @@ export const filters: readonly Filter<any>[] = [
   equalize,
   clahe,
   gamma,
+  toneMap,
   saturation,
   vibrance,
   hue,
