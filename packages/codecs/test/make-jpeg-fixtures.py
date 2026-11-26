@@ -79,3 +79,6 @@ for name, img in inputs.items():
     for q in [1, 50, 75, 100]:
         for sub, label in [(0, '444'), (1, '422'), (2, '420')]:
             img.save(os.path.join(enc, f'{name}-q{q}-{label}.jpg'), 'JPEG', quality=q, subsampling=sub)
+    # One component (grey): what Pillow writes for an 'L' image; the encoder's `grey` option.
+    for q in [1, 50, 75, 100]:
+        img.convert('L').save(os.path.join(enc, f'{name}-q{q}-grey.jpg'), 'JPEG', quality=q)

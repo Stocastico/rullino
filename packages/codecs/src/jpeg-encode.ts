@@ -15,6 +15,8 @@ export interface JpegEncodeOptions {
   readonly quality?: number;
   /** Chroma subsampling. Default '4:2:0' (what libjpeg, Pillow and browsers write). */
   readonly subsampling?: '4:4:4' | '4:2:2' | '4:2:0';
+  /** One component (the luma of the RGB, 8-bit grey), as Pillow writes an 'L' image: a third of the work and no chroma. Default false. */
+  readonly grey?: boolean;
   /** An ICC profile to embed (APP2 segments). */
   readonly icc?: Uint8Array;
 }
@@ -237,7 +239,8 @@ export function encodeJpeg(image: Rgba8, options: JpegEncodeOptions = {}): Uint8
   const q = options.quality ?? 0.9;
   if (!(q >= 0 && q <= 1)) fail('quality must be in [0, 1]');
   const quality = Math.min(100, Math.max(1, Math.round(q * 100)));
-  const sub = options.subsampling ?? '4:2:0';
+  const grey = options.grey === true;
+  const sub = grey ? '4:4:4' : (options.subsampling ?? '4:2:0');
   if (sub !== '4:4:4' && sub !== '4:2:2' && sub !== '4:2:0') fail(`unknown subsampling ${String(sub)}`);
   const hmax = sub === '4:4:4' ? 1 : 2;
   const vmax = sub === '4:2:0' ? 2 : 1;
@@ -283,7 +286,7 @@ export function encodeJpeg(image: Rgba8, options: JpegEncodeOptions = {}): Uint8
   const acL = codes(STANDARD_HUFFMAN.acLuminance);
   const dcC = codes(STANDARD_HUFFMAN.dcChrominance);
   const acC = codes(STANDARD_HUFFMAN.acChrominance);
-  const comps: Comp[] = [0, 1, 2].map((ci) => {
+  const comps: Comp[] = (grey ? [0] : [0, 1, 2]).map((ci) => {
     const h = ci === 0 ? hmax : 1;
     const v = ci === 0 ? vmax : 1;
     const cw = Math.ceil((width * h) / hmax);
@@ -334,16 +337,16 @@ export function encodeJpeg(image: Rgba8, options: JpegEncodeOptions = {}): Uint8
     [0, lumQ],
     [1, chromQ],
   ] as const)
-    w.segment(0xdb, [id, ...Array.from({ length: 64 }, (_, k) => t[ZIGZAG[k]!]!)]);
-  w.segment(0xc0, [8, height >> 8, height & 255, width >> 8, width & 255, 3, 1, (hmax << 4) | vmax, 0, 2, 0x11, 1, 3, 0x11, 1]);
+    if (!grey || id === 0) w.segment(0xdb, [id, ...Array.from({ length: 64 }, (_, k) => t[ZIGZAG[k]!]!)]);
+  w.segment(0xc0, grey ? [8, height >> 8, height & 255, width >> 8, width & 255, 1, 1, 0x11, 0] : [8, height >> 8, height & 255, width >> 8, width & 255, 3, 1, (hmax << 4) | vmax, 0, 2, 0x11, 1, 3, 0x11, 1]);
   for (const [tc, th, t] of [
     [0, 0, STANDARD_HUFFMAN.dcLuminance],
     [1, 0, STANDARD_HUFFMAN.acLuminance],
     [0, 1, STANDARD_HUFFMAN.dcChrominance],
     [1, 1, STANDARD_HUFFMAN.acChrominance],
   ] as const)
-    w.segment(0xc4, [(tc << 4) | th, ...t.counts, ...t.symbols]);
-  w.segment(0xda, [3, 1, 0x00, 2, 0x11, 3, 0x11, 0, 63, 0]);
+    if (!grey || th === 0) w.segment(0xc4, [(tc << 4) | th, ...t.counts, ...t.symbols]);
+  w.segment(0xda, grey ? [1, 1, 0x00, 0, 63, 0] : [3, 1, 0x00, 2, 0x11, 3, 0x11, 0, 63, 0]);
 
   // Blocks in MCU order; those past a component's own blocks are libjpeg's dummy blocks (jccoefct.c):
   // all zero but the DC, copied from the block before in the same component, which is the DC its
