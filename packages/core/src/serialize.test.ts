@@ -131,6 +131,14 @@ describe('edit document v2', () => {
     }
   });
 
+  it('carries colorSpace and gamut (#181), and round-trips them', () => {
+    for (const colorSpace of ['srgb', 'display-p3', 'adobe-rgb', 'rec2020'] as const)
+      for (const gamut of ['map', 'clip'] as const) {
+        const output: OutputSettings = { format: 'png', colorSpace, gamut };
+        expect(parseChain(viaJson(serializeChain([], { output })), { filters }).output).toEqual(output);
+      }
+  });
+
   it('rejects invalid output settings with a useful message', () => {
     const bad: [unknown, RegExp][] = [
       [{ format: 'gif' }, /format/],
@@ -146,6 +154,8 @@ describe('edit document v2', () => {
       [{ metadata: { strip: 'gps' } }, /metadata/],
       [{ metadata: { strip: ['gps'], also: 1 } }, /metadata/],
       [{ embedEdit: 'yes' }, /embedEdit/],
+      [{ colorSpace: 'prophoto' }, /colorSpace/],
+      [{ gamut: 'soft' }, /gamut/],
     ];
     for (const [output, message] of bad) {
       expect(() => parseChain({ version: 2, steps: [], output }, { filters }), JSON.stringify(output)).toThrow(message);

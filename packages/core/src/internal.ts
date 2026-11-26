@@ -32,3 +32,5 @@ export { bindSources, checkMixSizes, mixMask, resizeSize, runGraphCpu, walkGraph
 export { runGraphGpu, type GraphGpuResult } from './graph-gpu';
 export { chainDocument } from './graph';
 export { evalCurve, inv3, mul3, profileToXyz, rgbToXyzD50, SRGB_PRIMARIES, XYZ_D50_TO_LINEAR_SRGB } from './icc';
+export { decodeTransfer, encodeColour, encodeTransfer, fromLinearSrgb, gamutMapOklab, inGamut, linearSrgbTo, PRIMARIES, toLinearSrgb } from './colour-space';
+export { writeIcc } from './icc';

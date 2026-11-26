@@ -64,3 +64,4 @@ export { ParseError } from './parse-error';
 export { CHAIN_VERSION, migrateChain, parseChain, serializeChain, type ChainDocument, type MaskDocument, type MetadataPolicy, type OutputSettings, type ParseOptions, type SerializeOptions, type Json, type StepDocument } from './serialize';
 export { applyEdit, type ApplyEditOptions, type EditSources } from './edit';
 export { isSrgbProfile, parseIcc, profileImage, type IccCurve, type IccProfile, type Primaries, type ProfiledSamples } from './icc';
+export { COLOR_SPACES, outputProfile, type ColorSpace, type GamutMapping } from './colour-space';
