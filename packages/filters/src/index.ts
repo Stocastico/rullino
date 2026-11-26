@@ -36,6 +36,7 @@ import { invert } from './invert';
 import { kuwahara } from './kuwahara';
 import { lensBlur } from './lensBlur';
 import { levels } from './levels';
+import { localToneMap } from './localToneMap';
 import { median } from './median';
 import { morphology } from './morphology';
 import { otsu } from './otsu';
@@ -90,6 +91,7 @@ export {
   kuwahara,
   lensBlur,
   levels,
+  localToneMap,
   median,
   morphology,
   otsu,
@@ -121,6 +123,7 @@ export const filters: readonly Filter<any>[] = [
   clahe,
   gamma,
   toneMap,
+  localToneMap,
   saturation,
   vibrance,
   hue,

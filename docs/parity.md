@@ -1,6 +1,6 @@
 # GPU ↔ CPU parity
 
-52 filters. Generated from the filters' tolerances (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it.
+53 filters. Generated from the filters' tolerances (`packages/filters`): do not edit by hand; `npx vitest run packages/filters -u` rewrites it.
 
 Every filter has two implementations: a WGSL compute shader (GPU) and a plain TypeScript reference (CPU), which is the specification. They do not produce identical numbers (the GPU keeps intermediate images in float16 and its maths functions differ slightly), so each filter declares how far apart they may be, and CI checks it on every change. This table is that declaration.
 
@@ -10,7 +10,7 @@ Every filter has two implementations: a WGSL compute shader (GPU) and a plain Ty
 
 For scale: one 8-bit step of sRGB output is about 0.0003 in linear light near black and 0.009 near white.
 
-## Adjust (19)
+## Adjust (20)
 
 | Filter | Kind | abs | rel | At 1.0 | Outliers |
 |---|---|---|---|---|---|
@@ -25,6 +25,7 @@ For scale: one 8-bit step of sRGB output is about 0.0003 in linear light near bl
 | CLAHE (local contrast) (`clahe`) | multipass | 0.0002 | 0.002 | 0.0022 | 0 |
 | Gamma (`gamma`) | pointwise | 0.0001 | 0.002 | 0.0021 | 0 |
 | Tone map (`toneMap`) | pointwise | 0.0002 | 0.002 | 0.0022 | 0 |
+| Local tone map (`localToneMap`) | multipass | 0.001 | 0.006 | 0.007 | 0 |
 | Saturation (`saturation`) | pointwise | 0.0002 | 0.002 | 0.0022 | 0 |
 | Vibrance (`vibrance`) | pointwise | 0.0002 | 0.002 | 0.0022 | 0 |
 | Hue (`hue`) | pointwise | 0.0002 | 0.002 | 0.0022 | 0 |
