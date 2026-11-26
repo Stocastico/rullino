@@ -10,3 +10,4 @@ export { readIptc, writeIptc, type IptcDataset } from './iptc';
 export { readMetadata, writeMetadata, type ImageMetadata, type MetadataBlock } from './metadata';
 export { editXmp, readXmpEdit, RULLINO_NS, type XmpEdits } from './xmp';
 export { carryMetadata, exportMetadata, type ExportMetadataOptions, type MetadataPolicy } from './policy';
+export { decodeOriented, exifOrientation, orient } from './orient';
