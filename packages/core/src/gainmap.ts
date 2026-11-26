@@ -3,6 +3,8 @@
 // the JPEG container and the metadata block are in `@rullino/codecs`. Colour is in rullino's
 // working space: linear, premultiplied, sRGB primaries (1 = SDR white).
 
+import { decodeSrgb8 } from './color';
+import { manageSource, type ManagedSource, type ProfiledImage } from './icc';
 import { createImage, type LinearImage } from './image';
 
 /** The gain map's parameters, per channel (R, G, B). Gains and headrooms are log2; the layout is `@rullino/codecs`' `GainMapMetadata`. */
@@ -175,4 +177,21 @@ export function makeGainMap(
       alternateHdrHeadroom: Math.max(0, ...max),
     },
   };
+}
+
+/**
+ * The HDR picture of an Ultra HDR file from its two decoded JPEGs: the SDR picture (8-bit RGBA with
+ * the ICC profile it carries, through `manageSource`) turned into linear light, then the gain applied
+ * with `weight` (1 = the full HDR picture). `wide` and `converted` say what the SDR picture's profile
+ * made of it, as in `manageSource`. The gain map is RGBA from a JPEG decoder (a grey map has R = G = B).
+ */
+export function reconstructHdr(
+  sdr: ProfiledImage & { readonly bitDepth: 8; readonly data: Uint8Array | Uint8ClampedArray },
+  gainMap: { readonly data: ArrayLike<number>; readonly width: number; readonly height: number },
+  meta: GainMapMetadata,
+  weight = 1,
+): ManagedSource & { readonly image: LinearImage } {
+  const managed = manageSource(sdr);
+  const base = managed.image.data instanceof Float32Array ? (managed.image as LinearImage) : decodeSrgb8(managed.image.data as Uint8ClampedArray, managed.image.width, managed.image.height);
+  return { ...managed, image: applyGainMap(base, { ...gainMap, channels: 4 }, meta, weight) };
 }

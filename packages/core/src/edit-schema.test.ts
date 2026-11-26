@@ -43,6 +43,8 @@ describe('edit.schema.json', () => {
       { version: 2, steps: [], output: { metadata: { strip: ['faces'] } } },
       { version: 2, steps: [], output: { embedEdit: 'yes' } },
       { version: 2, steps: [], output: { colorSpace: 'prophoto' } },
+      { version: 2, steps: [], output: { format: 'jpeg', hdr: 'pq' } },
+      { version: 2, steps: [], output: { format: 'png', hdr: 'gain-map' } },
       { version: 2, steps: [], output: { gamut: 'soft' } },
       { version: 2, steps: [], extra: true },
       { version: 2, steps: [{ filter: 'gain', params: {}, mask: { kind: 'blob' } }] },

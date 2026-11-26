@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { applyGainMap, gainMapWeight, makeGainMap, sdrFromHdr, type GainMapMetadata } from './gainmap';
+import { applyGainMap, gainMapWeight, makeGainMap, reconstructHdr, sdrFromHdr, type GainMapMetadata } from './gainmap';
 import { createImage } from './image';
 
 const meta = (over: Partial<GainMapMetadata> = {}): GainMapMetadata => ({
@@ -183,5 +184,27 @@ describe('makeGainMap and applyGainMap together', () => {
 
   it('refuses pictures of different sizes', () => {
     expect(() => makeGainMap(createImage(2, 2), createImage(3, 2))).toThrow(/size/);
+  });
+});
+
+describe('reconstructHdr', () => {
+  const rgba = (px: number[][]) => Uint8Array.from(px.flatMap((p) => [...p, 255]));
+
+  it('is what a renderer does with the two decoded JPEGs: the SDR pixels to linear light, then the gain', () => {
+    const sdr = { data: rgba([[188, 188, 188], [255, 255, 255]]), width: 2, height: 1, bitDepth: 8 as const };
+    const gain = { data: rgba([[255, 255, 255]]), width: 1, height: 1 };
+    const out = reconstructHdr(sdr, gain, meta());
+    // sRGB 188 is 0.5029 linear; the gain is 4×
+    expect(out.image.data[0]).toBeCloseTo(0.502886 * 4, 3);
+    expect(out.image.data[4]).toBeCloseTo(4, 4);
+    expect(out.wide).toBe(false);
+    expect(out.image.data).toBeInstanceOf(Float32Array);
+  });
+
+  it('converts the SDR picture\'s colour profile first (a wide-gamut base stays wide)', () => {
+    const sdr = { data: rgba([[255, 0, 0]]), width: 1, height: 1, bitDepth: 8 as const, icc: new Uint8Array(readFileSync(new URL('../test/icc/display-p3-v4.icc', import.meta.url))) };
+    const out = reconstructHdr(sdr, { data: rgba([[0, 0, 0]]), width: 1, height: 1 }, meta());
+    expect(out.wide).toBe(true);
+    expect(out.image.data[1]).toBeLessThan(0); // P3 red has a negative green in sRGB
   });
 });

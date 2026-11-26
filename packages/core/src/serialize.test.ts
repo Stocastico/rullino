@@ -139,6 +139,11 @@ describe('edit document v2', () => {
       }
   });
 
+  it('carries hdr: "gain-map" (#182) for JPEG, and round-trips it', () => {
+    const output: OutputSettings = { format: 'jpeg', hdr: 'gain-map' };
+    expect(parseChain(viaJson(serializeChain([], { output })), { filters }).output).toEqual(output);
+  });
+
   it('rejects invalid output settings with a useful message', () => {
     const bad: [unknown, RegExp][] = [
       [{ format: 'gif' }, /format/],
@@ -155,6 +160,9 @@ describe('edit document v2', () => {
       [{ metadata: { strip: ['gps'], also: 1 } }, /metadata/],
       [{ embedEdit: 'yes' }, /embedEdit/],
       [{ colorSpace: 'prophoto' }, /colorSpace/],
+      [{ hdr: 'pq' }, /hdr/],
+      [{ format: 'png', hdr: 'gain-map' }, /hdr.*jpeg/],
+      [{ hdr: 'gain-map' }, /hdr.*jpeg/], // PNG is the default format
       [{ gamut: 'soft' }, /gamut/],
     ];
     for (const [output, message] of bad) {

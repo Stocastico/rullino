@@ -280,25 +280,52 @@
             "clip"
           ],
           "description": "Colours the output space cannot hold: map (CSS Color 4, OKLCh) or clip. Default map for a space other than srgb or a source with a wide profile, else clip."
+        },
+        "hdr": {
+          "enum": [
+            "gain-map"
+          ],
+          "description": "JPEG only. Write an Ultra HDR file (an SDR picture and a gain map, ISO 21496-1) and, for an Ultra HDR input, start from its HDR rendition."
         }
       },
-      "if": {
-        "properties": {
-          "bitDepth": {
-            "const": 16
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "bitDepth": {
+                "const": 16
+              }
+            },
+            "required": [
+              "bitDepth"
+            ]
+          },
+          "then": {
+            "properties": {
+              "format": {
+                "const": "png"
+              }
+            }
           }
         },
-        "required": [
-          "bitDepth"
-        ]
-      },
-      "then": {
-        "properties": {
-          "format": {
-            "const": "png"
+        {
+          "if": {
+            "required": [
+              "hdr"
+            ]
+          },
+          "then": {
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "const": "jpeg"
+              }
+            }
           }
         }
-      }
+      ]
     },
     "name": {
       "type": "string",
@@ -368,25 +395,52 @@
             "clip"
           ],
           "description": "Colours the output space cannot hold: map (CSS Color 4, OKLCh) or clip. Default map for a space other than srgb or a source with a wide profile, else clip."
+        },
+        "hdr": {
+          "enum": [
+            "gain-map"
+          ],
+          "description": "JPEG only. Write an Ultra HDR file (an SDR picture and a gain map, ISO 21496-1) and, for an Ultra HDR input, start from its HDR rendition."
         }
       },
-      "if": {
-        "properties": {
-          "bitDepth": {
-            "const": 16
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "bitDepth": {
+                "const": 16
+              }
+            },
+            "required": [
+              "bitDepth"
+            ]
+          },
+          "then": {
+            "properties": {
+              "format": {
+                "const": "png"
+              }
+            }
           }
         },
-        "required": [
-          "bitDepth"
-        ]
-      },
-      "then": {
-        "properties": {
-          "format": {
-            "const": "png"
+        {
+          "if": {
+            "required": [
+              "hdr"
+            ]
+          },
+          "then": {
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "const": "jpeg"
+              }
+            }
           }
         }
-      }
+      ]
     },
     "chainNode": {
       "type": "object",

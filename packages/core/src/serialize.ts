@@ -37,6 +37,8 @@ export type MetadataPolicy = 'keep' | 'strip' | { readonly strip: readonly ('gps
 
 /** How to export the result: the encoding options plus an optional size. */
 export interface OutputSettings extends ExportOptions {
+  /** JPEG only: write an Ultra HDR file (SDR picture + gain map) and start from an Ultra HDR input's HDR rendition (#182). */
+  readonly hdr?: 'gain-map';
   /** Shrink (in linear light, after the chain) so the long side is at most this many pixels. Never enlarges. */
   readonly longSide?: number;
   /** The source file's metadata (EXIF, XMP, IPTC, ICC) on export: default 'keep'. Renderers apply it when they render from a file. */
@@ -172,13 +174,13 @@ export function parseSteps(raw: readonly unknown[], options: ParseOptions, where
   });
 }
 
-const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide', 'metadata', 'embedEdit', 'colorSpace', 'gamut']);
+const OUTPUT_KEYS = new Set(['format', 'quality', 'bitDepth', 'background', 'longSide', 'metadata', 'embedEdit', 'colorSpace', 'gamut', 'hdr']);
 
 /** Validates output settings and rebuilds them from known fields; `extra` keys are left to the caller (v3's `node`). */
 export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSettings {
   if (!isObject(o)) throw new ParseError('output: not an object');
   for (const key of Object.keys(o)) if (!OUTPUT_KEYS.has(key) && !extra.includes(key)) throw new ParseError(`output: unknown setting "${key}"`);
-  const { format, quality, bitDepth, background, longSide, metadata, embedEdit, colorSpace, gamut } = o;
+  const { format, quality, bitDepth, background, longSide, metadata, embedEdit, colorSpace, gamut, hdr } = o;
   if (format !== undefined && format !== 'png' && format !== 'jpeg' && format !== 'webp') throw new ParseError(`output: format must be png, jpeg or webp, got ${JSON.stringify(format)}`);
   if (quality !== undefined && !(typeof quality === 'number' && quality >= 0 && quality <= 1)) throw new ParseError('output: quality must be a number in [0, 1]');
   if (bitDepth !== undefined && bitDepth !== 8 && bitDepth !== 16) throw new ParseError('output: bitDepth must be 8 or 16');
@@ -193,6 +195,8 @@ export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSe
   }
   if (colorSpace !== undefined && !(COLOR_SPACES as readonly unknown[]).includes(colorSpace)) throw new ParseError(`output: colorSpace must be ${COLOR_SPACES.map((c) => `'${c}'`).join(', ')}, got ${JSON.stringify(colorSpace)}`);
   if (gamut !== undefined && gamut !== 'map' && gamut !== 'clip') throw new ParseError(`output: gamut must be 'map' or 'clip', got ${JSON.stringify(gamut)}`);
+  if (hdr !== undefined && hdr !== 'gain-map') throw new ParseError(`output: hdr must be 'gain-map', got ${JSON.stringify(hdr)}`);
+  if (hdr !== undefined && format !== 'jpeg') throw new ParseError("output: hdr 'gain-map' needs format jpeg");
   if (embedEdit !== undefined && typeof embedEdit !== 'boolean') throw new ParseError('output: embedEdit must be true or false');
   return {
     ...(format !== undefined ? { format } : {}),
@@ -204,6 +208,7 @@ export function parseOutput(o: unknown, extra: readonly string[] = []): OutputSe
     ...(embedEdit !== undefined ? { embedEdit } : {}),
     ...(colorSpace !== undefined ? { colorSpace: colorSpace as ColorSpace } : {}),
     ...(gamut !== undefined ? { gamut } : {}),
+    ...(hdr !== undefined ? { hdr } : {}),
   } as OutputSettings;
 }
 
