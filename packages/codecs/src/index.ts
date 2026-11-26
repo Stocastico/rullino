@@ -8,3 +8,5 @@ export { encodeJpeg, type JpegEncodeOptions, type Rgba8 } from './jpeg-encode';
 export { editExif, PERSONAL_EXIF, readExif, type ExifEdits, type ExifEntry, type ExifIfd } from './exif';
 export { readIptc, writeIptc, type IptcDataset } from './iptc';
 export { readMetadata, type ImageMetadata } from './metadata';
+export { editXmp, readXmpEdit, RULLINO_NS, type XmpEdits } from './xmp';
+export { exportMetadata, type ExportMetadataOptions, type MetadataPolicy } from './policy';
