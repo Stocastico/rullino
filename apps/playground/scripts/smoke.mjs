@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 import { launchOptions } from '../../../scripts/browser-launch.mjs';
+import { editXmp, encodeJpeg, writeMetadata } from '../../../packages/codecs/dist/index.js';
 
 const server = await preview({ root: fileURLToPath(new URL('..', import.meta.url)), preview: { port: 0, strictPort: false } });
 const url = server.resolvedUrls.local[0];
@@ -124,6 +125,32 @@ try {
   await opensShared(await page.evaluate(() => location.href), 'long');
   await page.unroute(LINKS);
   linksDown = false;
+
+  // A photo exported with rullino carries its edit (#180): opening it offers to load that edit; a
+  // photo without one does not. In a page of its own, as it changes the image.
+  {
+    const recipe = { version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps: [{ filter: 'exposure', params: { ev: 1.5 } }] }] };
+    const plain = encodeJpeg({ width: 48, height: 32, data: new Uint8Array(48 * 32 * 4).fill(140) });
+    const carrying = (await writeMetadata(plain, { xmp: editXmp(undefined, { edit: JSON.stringify(recipe) }) })).bytes;
+    const other = await browser.newPage();
+    other.on('pageerror', (e) => failures.push(`page error (recipe): ${e.message}`));
+    await other.goto(`${url}?sample=ramps`);
+    await other.waitForFunction(() => Number(document.getElementById('status').dataset.frame ?? 0) > 0, null, { timeout: 30000 });
+    await other.setInputFiles('#file', { name: 'plain.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(plain) });
+    await other.waitForTimeout(1500);
+    check(await other.$eval('#load-recipe', (b) => b.hidden), 'a photo without a rullino edit should not offer one');
+    await other.setInputFiles('#file', { name: 'exported.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(carrying) });
+    const offered = await other.waitForFunction(() => !document.getElementById('load-recipe').hidden, null, { timeout: 15000 }).then(() => true, () => false);
+    check(offered, 'opening a photo exported with rullino should offer its edit');
+    if (offered) {
+      await other.click('#load-recipe');
+      await other.waitForFunction(() => document.querySelector('#chain [name=ev]')?.value === '1.5', null, { timeout: 10000 }).catch(() => {});
+      check((await other.$eval('#chain [name=ev]', (el) => el.value).catch(() => 'none')) === '1.5', "loading the photo's edit should set +1.5 EV");
+      check(await other.$eval('#load-recipe', (b) => b.hidden), 'the offer should go once taken');
+      check(!(await other.$eval('#undo', (b) => b.disabled)), 'loading an edit should be undoable');
+    }
+    await other.close();
+  }
 
   // Copy as code: the dialog shows the current chain (+1.5 EV) as a document and as @rullino/web code.
   await page.click('#code');

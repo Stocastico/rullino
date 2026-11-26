@@ -51,6 +51,7 @@ import { samples } from './samples';
 import { History } from './history';
 import { decodeState, encodeState } from './share';
 import { expand, shorten } from './short-links';
+import { recipeOf } from './recipe';
 import { attachZoom, FIT, updateHandleScale } from './zoom';
 import { createDepthMapper } from './depth-estimate';
 import { statusText } from './status-text';
@@ -72,6 +73,7 @@ const ui = {
   announce: $<HTMLParagraphElement>('announce'),
   sample: $<HTMLSelectElement>('sample'),
   file: $<HTMLInputElement>('file'),
+  loadRecipe: $<HTMLButtonElement>('load-recipe'),
   chain: $<HTMLDivElement>('chain'),
   compare: $<HTMLInputElement>('compare'),
   split: $<HTMLInputElement>('split'),
@@ -918,11 +920,34 @@ for (const group of new Set(samples.map((s) => s.group))) {
 ui.sample.addEventListener('change', () => {
   const s = samples.find((s) => s.id === ui.sample.value)!;
   void loadImage(s.make(), s.label, s.id);
+  void offerRecipe(undefined);
 });
 
+// A photo exported with rullino carries the edit it was made with (#180): offer to load it.
+let recipe: unknown;
+async function offerRecipe(file: Blob | undefined): Promise<void> {
+  recipe = undefined;
+  ui.loadRecipe.hidden = true;
+  if (!file) return;
+  const found = await recipeOf(file);
+  if (found === undefined) return;
+  recipe = found;
+  ui.loadRecipe.hidden = false;
+}
+ui.loadRecipe.addEventListener('click', () => {
+  try {
+    applySnapshot(snapshotOf(recipe));
+    recordHistory();
+    announce('Loaded the edit this photo was made with. The photo already shows it: open the original to apply it.');
+  } catch (e) {
+    announce(`This photo's edit cannot be loaded: ${(e as Error).message}`);
+  }
+  void offerRecipe(undefined);
+});
 ui.file.addEventListener('change', () => {
   const file = ui.file.files?.[0];
   if (file) void loadImage(file, file.name);
+  void offerRecipe(file);
 });
 document.addEventListener('dragover', (e) => {
   e.preventDefault();
@@ -933,7 +958,10 @@ document.addEventListener('drop', (e) => {
   e.preventDefault();
   document.body.classList.remove('dragging');
   const file = e.dataTransfer?.files[0];
-  if (file?.type.startsWith('image/')) void loadImage(file, file.name);
+  if (file?.type.startsWith('image/')) {
+    void loadImage(file, file.name);
+    void offerRecipe(file);
+  }
 });
 
 // Before / after split: drag on the image, or use the slider.
@@ -1191,6 +1219,19 @@ const loadCodeDialog = () => import('./code-dialog').then(({ createCodeDialog })
 ui.code.addEventListener('click', () => void (codeDialog ??= loadCodeDialog()).then((d) => d.open()));
 
 /** The edits and sample image in the URL fragment, if any. */
+/** The playground's state for an edit document (a share link's, or the one a photo carries). Throws for a bad document. */
+function snapshotOf(doc: unknown): Snapshot {
+  const { steps, geometry: g } = parseChain(doc, { filters, resolveLut });
+  const states = steps.map((st) => ({
+    ...newStep(st.filter),
+    params: { ...defaultParams(st.filter.params), ...st.params },
+    enabled: st.enabled !== false,
+    ...(st.mask ? { mask: st.mask } : {}),
+  }));
+  // A mask-aware step from a document without a mask keeps the empty brush newStep gave it.
+  return { chain: { steps: states, selected: states[0]?.uid }, geometry: g ?? IDENTITY_GEOMETRY };
+}
+
 async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } | undefined> {
   const hash = new URLSearchParams(location.hash.slice(1));
   const text = hash.get('s');
@@ -1198,18 +1239,7 @@ async function readShareLink(): Promise<{ snapshot: Snapshot; sample?: string } 
   if (!text && !short) return undefined;
   try {
     const state = (short ? await expand(short) : await decodeState(text!)) as { chain?: unknown; sample?: unknown };
-    const { steps, geometry: g } = parseChain(state.chain, { filters, resolveLut });
-    const states = steps.map((st) => ({
-      ...newStep(st.filter),
-      params: { ...defaultParams(st.filter.params), ...st.params },
-      enabled: st.enabled !== false,
-      ...(st.mask ? { mask: st.mask } : {}),
-    }));
-    // A mask-aware step from a link without a mask keeps the empty brush newStep gave it.
-    return {
-      snapshot: { chain: { steps: states, selected: states[0]?.uid }, geometry: g ?? IDENTITY_GEOMETRY },
-      ...(typeof state.sample === 'string' ? { sample: state.sample } : {}),
-    };
+    return { snapshot: snapshotOf(state.chain), ...(typeof state.sample === 'string' ? { sample: state.sample } : {}) };
   } catch (e) {
     announce(`Invalid link: ${(e as Error).message}`);
     console.error(e);
