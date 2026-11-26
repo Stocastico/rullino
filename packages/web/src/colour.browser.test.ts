@@ -84,4 +84,19 @@ describe('@rullino/web render and colour management', { timeout: 120_000 }, () =
     expect((await firstPixel(out))[0]).toBeGreaterThan(100);
     renderer.destroy();
   });
+
+  it('reads an OpenEXR file as linear HDR light: values far above 1 survive until the exposure cut', async () => {
+    const get = async (name: string) => new Uint8Array(await (await fetch(new URL(`../../codecs/test/hdr/${name}`, import.meta.url))).arrayBuffer());
+    const ref = new Float32Array((await get('block-none-half.f32')).buffer.slice(0));
+    const renderer = await createRenderer();
+    const file = new Blob([(await get('block-none-half.exr')) as Uint8Array<ArrayBuffer>]);
+    const out = await renderer.render(file, { version: 3, inputs: { main: {} }, nodes: [{ id: 'edit', from: 'main', steps: [{ filter: 'exposure', params: { ev: -5 } }] }], output: { format: 'png', metadata: 'strip' } });
+    const png = await decodePng(await bytesOf(out));
+    const i = 2 * 64 + 3; // the 900-bright pixel
+    for (let c = 0; c < 3; c++) {
+      const want = Math.round(linearToSrgb(Math.min(1, ref[i * 4 + c]! * 2 ** -5)) * 255);
+      expect(Math.abs((png.data as Uint8Array)[i * 4 + c]! - want), `channel ${c}`).toBeLessThanOrEqual(2);
+    }
+    renderer.destroy();
+  });
 });

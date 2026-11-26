@@ -144,6 +144,22 @@
   "reference": "one-zip-half.f32",
   "width": 1
  },
+ "ramp-piz-float16.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 128,
+  "lossless": true,
+  "reference": "ramp-piz-float16.f32",
+  "width": 256
+ },
+ "ramp-piz-float32.exr": {
+  "compression": 4,
+  "format": "exr",
+  "height": 128,
+  "lossless": true,
+  "reference": "ramp-piz-float32.f32",
+  "width": 256
+ },
  "rgb-none-float.exr": {
   "compression": 0,
   "format": "exr",

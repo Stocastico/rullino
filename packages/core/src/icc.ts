@@ -393,13 +393,20 @@ export interface ManagedSource {
 }
 
 /** A decoded image with the ICC profile it came with (`@rullino/codecs`' `DecodedImage` fits). */
-export type ProfiledImage = ProfiledSamples & { readonly icc?: Uint8Array | undefined };
+export type ProfiledImage = ProfiledSamples & {
+  readonly icc?: Uint8Array | undefined;
+  /** HDR formats (OpenEXR, Radiance): linear scene light, no transfer curve. */
+  readonly linear?: true | undefined;
+  /** The chromaticities the colour values are in, when the file says; absent means sRGB's. */
+  readonly primaries?: Primaries | undefined;
+};
 
 /**
  * Brings a decoded image into the pipeline. Without a profile, or with an sRGB one, 8-bit stays plain
- * 8-bit sRGB (the old path, bit for bit) and 16-bit / float samples go through the sRGB curve to linear
- * light. A matrix/TRC or grey profile converts to extended linear sRGB. A profile that cannot be used
- * (LUT-based, CMYK, broken) is treated as sRGB and reported in `warning`.
+ * 8-bit sRGB (the old path, bit for bit) and 16-bit samples go through the sRGB curve to linear light.
+ * Float samples are linear light already (TIFF, OpenEXR, Radiance): they are only premultiplied, and
+ * converted from the `primaries` a file names. A matrix/TRC or grey profile converts to extended linear
+ * sRGB. A profile that cannot be used (LUT-based, CMYK, broken) is treated as sRGB and reported in `warning`.
  */
 export function manageSource(img: ProfiledImage): ManagedSource {
   let profile: IccProfile | undefined;
@@ -411,13 +418,35 @@ export function manageSource(img: ProfiledImage): ManagedSource {
   }
   if (profile) return { image: profileImage(img, profile), wide: profile.kind === 'matrix-trc', converted: true };
   const base = warning === undefined ? {} : { warning };
+  if (img.bitDepth === 32) return linearFloats(img, img.primaries, base);
   if (img.bitDepth === 8) return { image: { data: new Uint8ClampedArray(img.data.buffer as ArrayBuffer, img.data.byteOffset, img.data.length), width: img.width, height: img.height }, wide: false, converted: false, ...base };
   const out = createImage(img.width, img.height);
-  const max = img.bitDepth === 16 ? 65535 : 1;
+  const max = 65535;
   for (let i = 0; i < out.data.length; i += 4) {
     const a = img.data[i + 3]! / max;
     for (let c = 0; c < 3; c++) out.data[i + c] = srgbToLinear(img.data[i + c]! / max) * a;
     out.data[i + 3] = a;
   }
   return { image: out, wide: false, converted: false, ...base };
+}
+
+/** Float samples are linear light: premultiply, and move them from `primaries` to sRGB's when they differ. */
+function linearFloats(img: ProfiledImage, primaries: Primaries | undefined, base: { warning?: string }): ManagedSource {
+  const out = createImage(img.width, img.height);
+  const src = img.data;
+  const dst = out.data;
+  const m = primaries ? mul3(XYZ_D50_TO_LINEAR_SRGB, rgbToXyzD50(primaries)) : undefined;
+  // Within rounding of the identity (sRGB's own primaries): leave the values untouched.
+  const wide = m !== undefined && m.some((v, i) => Math.abs(v - (i % 4 === 0 ? 1 : 0)) > 1e-3);
+  for (let i = 0; i < dst.length; i += 4) {
+    const a = src[i + 3]!;
+    const r = src[i]!;
+    const g = src[i + 1]!;
+    const b = src[i + 2]!;
+    dst[i] = (wide ? m![0]! * r + m![1]! * g + m![2]! * b : r) * a;
+    dst[i + 1] = (wide ? m![3]! * r + m![4]! * g + m![5]! * b : g) * a;
+    dst[i + 2] = (wide ? m![6]! * r + m![7]! * g + m![8]! * b : b) * a;
+    dst[i + 3] = a;
+  }
+  return { image: out, wide, converted: wide, ...base };
 }

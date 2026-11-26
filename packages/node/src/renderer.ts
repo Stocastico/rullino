@@ -111,7 +111,7 @@ function loadSharp(why: string): Promise<Sharp> {
 async function loadSource(file: Uint8Array, warn: ((message: string) => void) | undefined): Promise<Source> {
   const codecs = await import('@rullino/codecs');
   const format = codecs.detectFormat(file);
-  if (format === 'png' || format === 'jpeg' || format === 'tiff') {
+  if (format === 'png' || format === 'jpeg' || format === 'tiff' || format === 'hdr' || format === 'exr') {
     try {
       const m = manageSource(await codecs.decodeOriented(file));
       if (m.warning) warn?.(m.warning);

@@ -160,7 +160,7 @@ interface Source {
 async function loadSource(file: Blob, bytes: Uint8Array, warn: ((message: string) => void) | undefined): Promise<Source> {
   const codecs = await import('@rullino/codecs'); // loaded only here: pages that never render a file do not pay for it
   const format = codecs.detectFormat(bytes);
-  if (format === 'png' || format === 'jpeg' || format === 'tiff') {
+  if (format === 'png' || format === 'jpeg' || format === 'tiff' || format === 'hdr' || format === 'exr') {
     try {
       const m = manageSource(await codecs.decodeOriented(bytes));
       if (m.warning) warn?.(m.warning);

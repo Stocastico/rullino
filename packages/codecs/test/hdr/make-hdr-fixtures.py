@@ -35,6 +35,7 @@ def image(w, h, alpha=True):
     img[min(2, h - 1), min(3, w - 1)] = [900.0, 30.0, 0.5]
     if alpha:
         a = np.clip(1 - 0.5 * x / max(w - 1, 1), 0, 1)
+        a[h - 1, w - 1] = 0  # fully transparent, with colour: straight alpha has none to give
         img = np.concatenate([img, a[..., None]], -1)
     return img.astype(np.float32)
 
@@ -64,23 +65,47 @@ def exr_compression(b):
             return b[j2 + 5]
         i = j2 + 5 + size
 
+def straight(a):
+    """EXR stores premultiplied colour; the decoder divides alpha out (float32 division; colour is 0 where alpha is 0)."""
+    a = a.astype(np.float32)
+    if a.ndim == 3 and a.shape[-1] == 4:
+        alpha = a[..., 3:4]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rgb = np.where(alpha > 0, a[..., :3] / alpha, np.float32(0)).astype(np.float32)
+        a = np.concatenate([rgb, alpha], -1)
+    return a
+
 CODES = {'none': 0, 'rle': 1, 'zips': 2, 'zip': 3, 'piz': 4, 'pxr24': 5, 'b44': 6, 'dwaa': 8}
 for comp in CODES:
     for dt in (np.float16, np.float32):
         img = image(37, 53).astype(dt)
         data = imagecodecs.exr_encode(img, compression=comp)
         assert exr_compression(data) == CODES[comp], comp
-        save(f'rgba-{comp}-{np.dtype(dt).name}.exr', data, 37, 53, img.astype(np.float32), {'format': 'exr', 'compression': CODES[comp], 'lossless': comp in ('none', 'rle', 'zips', 'zip', 'piz')})
+        save(f'rgba-{comp}-{np.dtype(dt).name}.exr', data, 37, 53, straight(img), {'format': 'exr', 'compression': CODES[comp], 'lossless': comp in ('none', 'rle', 'zips', 'zip', 'piz')})
 
 for comp in ('none', 'zip', 'piz'):
     for name, w, h in (('one', 1, 1), ('wide', 300, 3), ('tall', 5, 70), ('block', 64, 64)):
         img = image(w, h).astype(np.float16)
         data = imagecodecs.exr_encode(img, compression=comp)
-        save(f'{name}-{comp}-half.exr', data, w, h, img.astype(np.float32), {'format': 'exr', 'compression': CODES[comp], 'lossless': True})
+        save(f'{name}-{comp}-half.exr', data, w, h, straight(img), {'format': 'exr', 'compression': CODES[comp], 'lossless': True})
     rgb = image(40, 35, alpha=False).astype(np.float32)
     save(f'rgb-{comp}-float.exr', imagecodecs.exr_encode(rgb, compression=comp), 40, 35, rgb, {'format': 'exr', 'compression': CODES[comp], 'lossless': True})
     grey = image(20, 20, alpha=False)[..., 0].astype(np.float16)
     save(f'grey-{comp}-half.exr', imagecodecs.exr_encode(grey, compression=comp), 20, 20, grey.astype(np.float32), {'format': 'exr', 'compression': CODES[comp], 'lossless': True})
+
+# A smooth ramp over the whole half range with a little noise: more than 2^14 distinct values (PIZ's
+# 16-bit wavelet path) that still compress (blocks that do not are stored raw, which tests nothing),
+# and Huffman codes longer than 14 bits.
+ramp = np.exp(np.linspace(np.log(6e-8), np.log(6e4), 128 * 256 * 3)).reshape(128, 256, 3)
+ramp = ramp * (1 + 0.001 * rng.standard_normal(ramp.shape))
+ramp[::2] *= -1
+for comp in ('piz',):
+    for dt in (np.float16, np.float32):
+        data = ramp.astype(dt)
+        file = imagecodecs.exr_encode(data, compression=comp)
+        distinct = len(np.unique(ramp.astype(np.float16)))
+        assert distinct > 16384 and len(file) < data.nbytes, (comp, dt, distinct, len(file), data.nbytes)
+        save(f'ramp-{comp}-{np.dtype(dt).name}.exr', file, 256, 128, data.astype(np.float32), {'format': 'exr', 'compression': CODES[comp], 'lossless': True})
 
 # ---- Radiance ------------------------------------------------------------------------------
 def rgbe(rgb):

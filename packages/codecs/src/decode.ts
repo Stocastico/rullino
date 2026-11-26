@@ -3,6 +3,7 @@
 // (AVIF, HEIC, JPEG XL, WebP, GIF, BMP), e.g. a WASM build. What an injected decoder returns is
 // checked like a built-in result, so a wrong one fails here and not later in a renderer.
 
+import { decodeExr, isExr } from './exr';
 import { decodeHdr, isHdr } from './hdr';
 import { decodeJpeg } from './jpeg';
 import { decodePng } from './png';
@@ -19,7 +20,7 @@ export interface DecodeAnyOptions extends DecodeOptions {
   readonly decoders?: Partial<Record<ImageFormat, Decoder>>;
 }
 
-const BUILT_IN: Partial<Record<ImageFormat, Decoder>> = { png: decodePng, jpeg: decodeJpeg, tiff: decodeTiff, hdr: decodeHdr };
+const BUILT_IN: Partial<Record<ImageFormat, Decoder>> = { png: decodePng, jpeg: decodeJpeg, tiff: decodeTiff, hdr: decodeHdr, exr: decodeExr };
 
 const ascii = (b: Uint8Array, at: number, n: number) => String.fromCharCode(...b.subarray(at, at + n));
 const starts = (b: Uint8Array, sig: readonly number[], at = 0) => b.length >= at + sig.length && sig.every((v, i) => b[at + i] === v);
@@ -34,6 +35,7 @@ export function detectFormat(bytes: Uint8Array): ImageFormat | undefined {
   if (bytes.length >= 6 && (ascii(bytes, 0, 6) === 'GIF87a' || ascii(bytes, 0, 6) === 'GIF89a')) return 'gif';
   if (bytes.length >= 14 && ascii(bytes, 0, 2) === 'BM') return 'bmp';
   if (isHdr(bytes)) return 'hdr';
+  if (isExr(bytes)) return 'exr';
   // ISO base media files (AVIF, HEIC): an ftyp box with a major brand and compatible brands.
   if (bytes.length >= 16 && ascii(bytes, 4, 4) === 'ftyp') {
     const size = ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0;

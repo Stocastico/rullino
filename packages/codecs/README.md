@@ -29,11 +29,11 @@ import { decode, detectFormat, type Decoder } from '@rullino/codecs';
 declare const bytes: Uint8Array;
 declare const myAvifDecoder: Decoder; // e.g. a WASM build: (bytes, { maxPixels }) => DecodedImage
 
-detectFormat(bytes); // 'png' | 'jpeg' | 'tiff' | 'webp' | 'avif' | 'heic' | 'jxl' | 'gif' | 'bmp' | undefined
+detectFormat(bytes); // 'png' | 'jpeg' | 'tiff' | 'hdr' | 'exr' | 'webp' | 'avif' | 'heic' | 'jxl' | 'gif' | 'bmp' | undefined
 const image = await decode(bytes, { decoders: { avif: myAvifDecoder } }); // image.format says which
 ```
 
-`decode` reads the format from the file's first bytes and uses the built-in decoder for PNG, JPEG and TIFF, or the one you pass in `decoders` (which can also replace a built-in one). There is no decoder of our own for AVIF, HEIC, JPEG XL, WebP, GIF or BMP: without one in `decoders` they are a `CodecError` that says so. What a decoder returns is checked like a built-in result (size, `maxPixels`, sample type and count), so a wrong one fails here, not later in a renderer.
+`decode` reads the format from the file's first bytes and uses the built-in decoder for PNG, JPEG, TIFF, Radiance and OpenEXR, or the one you pass in `decoders` (which can also replace a built-in one). There is no decoder of our own for AVIF, HEIC, JPEG XL, WebP, GIF or BMP: without one in `decoders` they are a `CodecError` that says so. What a decoder returns is checked like a built-in result (size, `maxPixels`, sample type and count), so a wrong one fails here, not later in a renderer.
 
 ## PNG
 
@@ -68,6 +68,14 @@ Baseline JPEG in YCbCr, with 4:4:4, 4:2:2 or 4:2:0 subsampling (default 4:2:0), 
 The first image of a TIFF file: strips or tiles, chunky or planar samples, no compression, LZW, Deflate or PackBits, the horizontal and floating-point predictors, 1 / 2 / 4 / 8 / 16-bit integer and 32-bit float samples, grey (black or white is zero), RGB, palette and CMYK, associated (premultiplied) or unassociated alpha, both byte orders, an ICC profile. Up to 8 bits and palettes come back as 8-bit RGBA, 16-bit samples as 16-bit, float samples as `Float32Array` with the values as stored (HDR values above 1 are kept). Associated alpha is divided out. CMYK goes through the same naive formula as JPEG. A tile may cover at most four times the image or 1 MP (and `maxPixels`), so a file cannot make the decoder allocate more than its image warrants. JPEG-in-TIFF, CCITT fax, BigTIFF and signed or 16-bit float samples are refused with a `CodecError`.
 
 Tested on 36 files written by libtiff (through Pillow), ImageMagick and tifffile from known sources (every combination above): the decoded pixels must be the sources exactly. Fuzzed like the other decoders, including changes aimed at the IFD's types, counts and offsets.
+
+## HDR: Radiance and OpenEXR
+
+`decodeHdr` reads Radiance RGBE files (`.hdr`): new and old run-length coding or flat pixels, every orientation of the standard size line (`-Y h +X w` and its flips), `PRIMARIES` reported as `primaries`; XYZE files and the transposed size lines are refused. `decodeExr` reads OpenEXR scanline files: half, float and uint channels, compressions none, RLE, ZIPS, ZIP and PIZ (PXR24, B44 and DWA are refused by name), `R G B (A)` or `Y`, the `chromaticities` attribute as `primaries`; tiled, deep and multi-part files are refused.
+
+Both give `bitDepth: 32` float RGBA with `linear: true`: scene-referred light, not encoded with a transfer curve, values far above 1 kept. OpenEXR stores colour premultiplied, so it is divided by alpha (straight alpha like everywhere else; colour under zero alpha is 0), grey is replicated and a missing alpha is 1. A `linear` image's colour is in its `primaries` (Rec. 709 / sRGB when there are none): `manageSource` in `@rullino/core` brings it into rullino's working space.
+
+Tested on files written by OpenCV (Radiance) and OpenEXR (through imagecodecs: every lossless compression, half and float, RGBA / RGB / grey, odd sizes, a ramp over the whole half range that reaches PIZ's 16-bit wavelet path and Huffman codes longer than 14 bits): the decoded pixels must be the written ones bit for bit. Fuzzed like the other decoders.
 
 ## TIFF encoding
 

@@ -151,15 +151,30 @@ describe('manageSource', () => {
     expect(m.image.data[0]).toBeGreaterThan(1);
   });
 
-  it('turns 16-bit and float samples without a profile into linear light through the sRGB curve', () => {
+  it('turns 16-bit samples without a profile into linear light through the sRGB curve; float samples are linear already', () => {
     const m = manageSource({ data: Uint16Array.of(65535, 0, 32896, 65535), width: 1, height: 1, bitDepth: 16 });
     expect(m.wide).toBe(false);
     expect(Array.from(m.image.data)).toEqual([1, 0, Math.fround(srgbToLinear(32896 / 65535)), 1]);
+    // Float images (TIFF, EXR, Radiance) hold linear light: the values are used as they are, premultiplied, HDR and negatives kept.
     const f = manageSource({ data: Float32Array.of(0.5, 2, -0.1, 0.5), width: 1, height: 1, bitDepth: 32 });
-    expect(f.image.data[0]).toBeCloseTo(srgbToLinear(0.5) * 0.5, 6);
-    expect(f.image.data[1]).toBeCloseTo(srgbToLinear(2) * 0.5, 5); // HDR survives
-    expect(f.image.data[2]).toBeLessThan(0);
-    expect(f.image.data[3]).toBe(0.5);
+    expect(Array.from(f.image.data)).toEqual([0.25, 1, Math.fround(-0.1 * 0.5), 0.5]);
+    expect(f.converted).toBe(false);
+  });
+
+  it('converts linear HDR pixels from the primaries the file names into sRGB, and says it was wide', () => {
+    const rec2020 = { red: [0.708, 0.292], green: [0.17, 0.797], blue: [0.131, 0.046], white: [0.3127, 0.329] } as const;
+    const px = (rgb: number[]) => manageSource({ data: Float32Array.of(...rgb, 1), width: 1, height: 1, bitDepth: 32, linear: true, primaries: rec2020 });
+    const red = px([1, 0, 0]);
+    // littleCMS's value for Rec. 2020 red in linear sRGB (reference.json, rec2020-table-v2.icc).
+    [1.66053307, -0.12458041, -0.018145].forEach((v, i) => expect(red.image.data[i]).toBeCloseTo(v, 3));
+    expect(red.wide).toBe(true);
+    expect(red.converted).toBe(true);
+    // The white point is the same, so white stays white at any level, HDR included.
+    [8, 8, 8].forEach((v, i) => expect(px([8, 8, 8]).image.data[i]).toBeCloseTo(v, 4));
+    // sRGB's own primaries are left alone, bit for bit.
+    const srgb = manageSource({ data: Float32Array.of(0.3, 4, 0.1, 1), width: 1, height: 1, bitDepth: 32, linear: true, primaries: { red: [0.64, 0.33], green: [0.3, 0.6], blue: [0.15, 0.06], white: [0.3127, 0.329] } });
+    expect(Array.from(srgb.image.data)).toEqual(Array.from(Float32Array.of(0.3, 4, 0.1, 1)));
+    expect(srgb.wide).toBe(false);
   });
 
   it('applies a wide profile to float samples as well', () => {
