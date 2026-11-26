@@ -5,6 +5,8 @@
   with Adobe RGB (1998)", L*-RGB, the grey profiles, a Lab abstract profile (unsupported).
 - Profiles built here, byte by byte: Display P3 (v4, para type 3), Rec. 2020 (v2, a 1024-entry
   table), ProPhoto-like (v2, gamma 1.8, no chad), one profile per para type 0-4, a gamma 1 profile.
+- rullino-*.icc are not written here: they are rullino's own output profiles (colour-space.test.ts
+  writes them with RULLINO_WRITE_ICC=1); this script only adds littleCMS's reading of them.
 - reference.json: for each profile, a grid of device values and what littleCMS 2 (through ctypes,
   in double precision, relative colorimetric, no black point compensation) makes of them, as XYZ
   (D50, the PCS) and as linear sRGB (a gamma 1 profile on sRGB's primaries: unbounded, so colours
@@ -163,7 +165,9 @@ def main():
     rgb = [[r, g, b] for r in steps for g in steps[::3] for b in steps[::2]] + [[0.3, 0.6, 0.9], [1, 0, 0], [0, 1, 0], [0, 0, 1]]
     grey = [[v] for v in [i / 32 for i in range(33)]]
     ref = {}
-    for name in COPIED + list(BUILT):
+    # rullino's own output profiles (written by colour-space.test.ts with RULLINO_WRITE_ICC=1), read by littleCMS.
+    written = sorted(n for n in os.listdir(HERE) if n.startswith('rullino-') and n.endswith('.icc'))
+    for name in COPIED + list(BUILT) + written:
         data = open(os.path.join(HERE, name), 'rb').read()
         space = data[16:20]
         if space not in (b'RGB ', b'GRAY'):

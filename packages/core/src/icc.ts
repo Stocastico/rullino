@@ -283,3 +283,65 @@ export function profileImage(img: ProfiledSamples, p: IccProfile): LinearImage {
   }
   return out;
 }
+
+/**
+ * Writes a matrix/TRC display profile (ICC v4.3): description, copyright, D50 white, the Bradford
+ * adaptation from the primaries' white, the colorants and one parametric curve for all three
+ * channels. The header's date and profile ID are fixed (zero ID: "not calculated"), so the same
+ * arguments always give the same bytes.
+ */
+export function writeIcc(primaries: Primaries, curve: Extract<IccCurve, { type: 'para' }>, description: string): Uint8Array {
+  const s15 = (v: number) => {
+    const b = new Uint8Array(4);
+    new DataView(b.buffer).setInt32(0, Math.round(v * 65536));
+    return b;
+  };
+  const cat = (...parts: (Uint8Array | number[] | string)[]) => {
+    const bytes = parts.map((p) => (typeof p === 'string' ? Uint8Array.from(p, (c) => c.charCodeAt(0)) : p instanceof Uint8Array ? p : Uint8Array.from(p)));
+    const out = new Uint8Array(bytes.reduce((n, b) => n + b.length, 0));
+    let at = 0;
+    for (const b of bytes) {
+      out.set(b, at);
+      at += b.length;
+    }
+    return out;
+  };
+  const u32 = (v: number) => [v >>> 24, (v >> 16) & 255, (v >> 8) & 255, v & 255];
+  const mluc = (text: string) => {
+    const utf16 = Array.from(text).flatMap((c) => [c.charCodeAt(0) >> 8, c.charCodeAt(0) & 255]);
+    return cat('mluc', [0, 0, 0, 0], u32(1), u32(12), 'enUS', u32(utf16.length), u32(28), utf16);
+  };
+  const xyzTag = (v: readonly number[]) => cat('XYZ ', [0, 0, 0, 0], s15(v[0]!), s15(v[1]!), s15(v[2]!));
+  const m = rgbToXyzD50(primaries);
+  const w = xyz(...primaries.white);
+  const src = apply3(BRADFORD, w);
+  const dst = apply3(BRADFORD, D50);
+  const chad = mul3(inv3(BRADFORD), mul3([dst[0]! / src[0]!, 0, 0, 0, dst[1]! / src[1]!, 0, 0, 0, dst[2]! / src[2]!], BRADFORD));
+  const trc = cat('para', [0, 0, 0, 0], [0, curve.kind, 0, 0], ...curve.params.map(s15));
+  const tags: [string, Uint8Array][] = [
+    ['desc', mluc(description)],
+    ['cprt', mluc('No copyright, use freely')],
+    ['wtpt', xyzTag(D50)],
+    ['chad', cat('sf32', [0, 0, 0, 0], ...chad.map(s15))],
+    ['rXYZ', xyzTag([m[0], m[3], m[6]])],
+    ['gXYZ', xyzTag([m[1], m[4], m[7]])],
+    ['bXYZ', xyzTag([m[2], m[5], m[8]])],
+    ['rTRC', trc],
+  ];
+  const all = [...tags.map(([sig]) => sig), 'gTRC', 'bTRC'];
+  const table: number[] = [];
+  const body: Uint8Array[] = [];
+  let offset = 128 + 4 + 12 * all.length;
+  const placed = new Map<string, [number, number]>();
+  for (const [sig, data] of tags) {
+    placed.set(sig, [offset, data.length]);
+    const padded = cat(data, new Array((4 - (data.length % 4)) % 4).fill(0));
+    body.push(padded);
+    offset += padded.length;
+  }
+  placed.set('gTRC', placed.get('rTRC')!); // the three channels share one curve
+  placed.set('bTRC', placed.get('rTRC')!);
+  for (const sig of all) table.push(...Array.from(sig, (c) => c.charCodeAt(0)), ...u32(placed.get(sig)![0]), ...u32(placed.get(sig)![1]));
+  const header = cat(u32(offset), [0, 0, 0, 0], [4, 0x30, 0, 0], 'mntr', 'RGB ', 'XYZ ', [0x07, 0xea, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0], 'acsp', new Array(24).fill(0), u32(0), s15(D50[0]), s15(D50[1]), s15(D50[2]), 'rlno', new Array(16 + 28).fill(0));
+  return cat(header, u32(all.length), table, ...body);
+}
