@@ -386,6 +386,8 @@ export interface ManagedSource {
   readonly image: Rgba8Image | LinearImage;
   /** The source's profile has a gamut wider than sRGB's (its colours were converted, so some may be outside sRGB). */
   readonly wide: boolean;
+  /** The pixels were converted from a profile (wide or grey): the source's profile no longer describes them. */
+  readonly converted: boolean;
   /** Why the profile was not used (it was treated as sRGB). */
   readonly warning?: string;
 }
@@ -407,9 +409,9 @@ export function manageSource(img: ProfiledImage): ManagedSource {
     if (parsed.kind === 'unsupported') warning = `the embedded colour profile${parsed.description ? ` "${parsed.description}"` : ''} is not supported (${parsed.reason}), so the colours are read as sRGB`;
     else if (!isSrgbProfile(parsed)) profile = parsed;
   }
-  if (profile) return { image: profileImage(img, profile), wide: profile.kind === 'matrix-trc' };
+  if (profile) return { image: profileImage(img, profile), wide: profile.kind === 'matrix-trc', converted: true };
   const base = warning === undefined ? {} : { warning };
-  if (img.bitDepth === 8) return { image: { data: new Uint8ClampedArray(img.data.buffer as ArrayBuffer, img.data.byteOffset, img.data.length), width: img.width, height: img.height }, wide: false, ...base };
+  if (img.bitDepth === 8) return { image: { data: new Uint8ClampedArray(img.data.buffer as ArrayBuffer, img.data.byteOffset, img.data.length), width: img.width, height: img.height }, wide: false, converted: false, ...base };
   const out = createImage(img.width, img.height);
   const max = img.bitDepth === 16 ? 65535 : 1;
   for (let i = 0; i < out.data.length; i += 4) {
@@ -417,5 +419,5 @@ export function manageSource(img: ProfiledImage): ManagedSource {
     for (let c = 0; c < 3; c++) out.data[i + c] = srgbToLinear(img.data[i + c]! / max) * a;
     out.data[i + 3] = a;
   }
-  return { image: out, wide: false, ...base };
+  return { image: out, wide: false, converted: false, ...base };
 }
