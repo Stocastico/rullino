@@ -1,6 +1,8 @@
 # rullino
 
-[![CI](https://github.com/Stocastico/rullino/actions/workflows/ci.yml/badge.svg)](https://github.com/Stocastico/rullino/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE) [![Playground](https://img.shields.io/badge/playground-live-brightgreen.svg)](https://stefanomasneri.com/rullino/) [![GPU ↔ CPU parity: per-filter tolerances](https://img.shields.io/badge/GPU%20%E2%86%94%20CPU-parity%20table-blue.svg)](./docs/parity.md)
+[![CI](https://github.com/Stocastico/rullino/actions/workflows/ci.yml/badge.svg)](https://github.com/Stocastico/rullino/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/@rullino/web.svg?label=npm)](https://www.npmjs.com/org/rullino) [![npm downloads](https://img.shields.io/npm/dm/@rullino/web.svg)](https://www.npmjs.com/package/@rullino/web) [![types: TypeScript](https://img.shields.io/badge/types-TypeScript-3178c6.svg)](https://www.typescriptlang.org/) [![runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](./size-budget.json) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE) [![Playground](https://img.shields.io/badge/playground-live-brightgreen.svg)](https://stefanomasneri.com/rullino/) [![GPU ↔ CPU parity: per-filter tolerances](https://img.shields.io/badge/GPU%20%E2%86%94%20CPU-parity%20table-blue.svg)](./docs/parity.md)
+
+**WebGPU image filters, photo editing and colour grading for the browser and Node.** TypeScript, zero dependencies, with a CPU fallback where there is no GPU.
 
 Describe a photo edit once, as JSON. **Preview it live on the GPU** in the browser, **render the final file on a server**, or **replay it on the CPU** wherever there is no GPU, with output that agrees within a [published per-filter tolerance](./docs/parity.md). TypeScript, WebGPU, MIT, no runtime dependencies.
 
@@ -71,6 +73,20 @@ const result = await applyEdit(image, edit, { filters }); // on the CPU; pass { 
 ```
 
 GPU and CPU agree within a tolerance each filter declares: see the [parity table](./docs/parity.md). The [Getting started guide](./docs/getting-started.md) has the details for each path, the `Pipeline` API for custom GPU work is in the [core README](./packages/core/README.md), and [`@rullino/konva`](./packages/konva/README.md) edits a `Konva.Image` in place.
+
+## Browser support
+
+The GPU path needs **WebGPU**. Without it, `@rullino/web` renders the same edit on the CPU in a Web Worker: slower (seconds, not milliseconds, for a 12 MP photo; see the [benchmarks](./docs/benchmarks.md#cpu-the-backend-without-a-gpu)), but the page works and the result stays within the [parity tolerance](./docs/parity.md). `renderer.backend` tells you which one you got (`'gpu'` or `'cpu'`).
+
+| Environment | What you get |
+|---|---|
+| Chrome and Edge 113+ (desktop), Chrome on Android 121+ | GPU |
+| Safari (recent versions with WebGPU, macOS and iOS) | GPU where the browser ships WebGPU, else CPU |
+| Firefox | GPU where the browser ships WebGPU (not on every platform yet), else CPU |
+| Any other browser with module Web Workers | CPU |
+| Node.js ≥ 22.12 (`@rullino/node`) | GPU through Dawn (`webgpu` package; Linux needs a Vulkan driver, `mesa-vulkan-drivers` without a GPU), else CPU on worker threads |
+
+WebGPU availability changes with each browser release: check [caniuse.com/webgpu](https://caniuse.com/webgpu) for the current state. WebGPU also needs a secure context (HTTPS or `localhost`). The CPU path is tested in CI in Chromium with WebGPU switched off, and in Firefox and WebKit; the GPU path in Chromium (SwiftShader) and on Dawn, plus real-hardware runs by the maintainer ([hardware check page](https://stefanomasneri.com/rullino/check/): run it in your browser and tell us the result). If something fails, see [Troubleshooting](./docs/troubleshooting.md).
 
 ## Packages
 

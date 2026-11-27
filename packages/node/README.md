@@ -1,6 +1,6 @@
 # @rullino/node
 
-[![npm](https://img.shields.io/npm/v/@rullino/node.svg)](https://www.npmjs.com/package/@rullino/node) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@rullino/node.svg)](https://www.npmjs.com/package/@rullino/node) [![npm downloads](https://img.shields.io/npm/dm/@rullino/node.svg)](https://www.npmjs.com/package/@rullino/node) [![types: TypeScript](https://img.shields.io/badge/types-TypeScript-3178c6.svg)](https://www.typescriptlang.org/) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
 
 Render [rullino](https://github.com/Stocastico/rullino) edit documents in Node: the **same WebGPU shaders** as the browser preview, through [Dawn](https://dawn.googlesource.com/dawn) (the `webgpu` package), with the CPU reference as fallback. Preview an edit live in the browser, render the final file on the server; GPU and CPU agree within the [published per-filter tolerance](https://github.com/Stocastico/rullino/blob/main/docs/parity.md).
 

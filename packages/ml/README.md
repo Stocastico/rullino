@@ -1,6 +1,6 @@
 # @rullino/ml
 
-[![npm](https://img.shields.io/npm/v/@rullino/ml.svg)](https://www.npmjs.com/package/@rullino/ml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@rullino/ml.svg)](https://www.npmjs.com/package/@rullino/ml) [![npm downloads](https://img.shields.io/npm/dm/@rullino/ml.svg)](https://www.npmjs.com/package/@rullino/ml) [![types: TypeScript](https://img.shields.io/badge/types-TypeScript-3178c6.svg)](https://www.typescriptlang.org/) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
 
 [![rullino playground: a photo with a look applied](https://raw.githubusercontent.com/Stocastico/rullino/main/docs/playground.jpg)](https://stefanomasneri.com/rullino/)
 

@@ -1,6 +1,6 @@
 # @rullino/konva
 
-[![npm](https://img.shields.io/npm/v/@rullino/konva.svg)](https://www.npmjs.com/package/@rullino/konva) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@rullino/konva.svg)](https://www.npmjs.com/package/@rullino/konva) [![npm downloads](https://img.shields.io/npm/dm/@rullino/konva.svg)](https://www.npmjs.com/package/@rullino/konva) [![types: TypeScript](https://img.shields.io/badge/types-TypeScript-3178c6.svg)](https://www.typescriptlang.org/) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Stocastico/rullino/blob/main/LICENSE)
 
 Edit a [Konva](https://konvajs.org) `Konva.Image` with a [rullino](https://github.com/Stocastico/rullino) edit document: previews rendered on **WebGPU** (or the CPU in a Web Worker, through [`@rullino/web`](https://www.npmjs.com/package/@rullino/web)) at the size the node has on screen, and exports at full resolution.
 
