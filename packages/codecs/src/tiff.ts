@@ -157,6 +157,52 @@ function packBits(src: Uint8Array, size: number): Uint8Array {
   return out;
 }
 
+/** Undoes the horizontal predictor on one row of 16-bit values: each adds the one a pixel to its left. */
+function predict16(data: Uint8Array, row: number, values: number, perPixel: number, little: boolean): void {
+  const lo = little ? 0 : 1;
+  const hi = 1 - lo;
+  for (let i = perPixel; i < values; i++) {
+    const j = row + 2 * i;
+    const k = j - 2 * perPixel;
+    const v = (data[j + lo]! | (data[j + hi]! << 8)) + (data[k + lo]! | (data[k + hi]! << 8));
+    data[j + lo] = v & 255;
+    data[j + hi] = (v >> 8) & 255;
+  }
+}
+
+/** Reads `count` 16-bit values in the file's byte order from `data` at `row` into `samples` at `o`. */
+function place16(data: Uint8Array, row: number, count: number, samples: Uint16Array, o: number, little: boolean): void {
+  const lo = little ? 0 : 1;
+  const hi = 1 - lo;
+  for (let k = 0, j = row; k < count; k++, j += 2) samples[o + k] = data[j + lo]! | (data[j + hi]! << 8);
+}
+
+/** One row of `cols` chunky 8-bit RGB(A) pixels, `spp` samples each, into RGBA `out` at `o` (alpha from the fourth sample, or opaque). */
+function rgbaFrom8(data: Uint8Array, row: number, cols: number, spp: number, out: Uint8Array, o: number, alpha: boolean): void {
+  if (spp === 4 && alpha) {
+    out.set(data.subarray(row, row + 4 * cols), o);
+    return;
+  }
+  for (let x = 0, j = row; x < cols; x++, j += spp, o += 4) {
+    out[o] = data[j]!;
+    out[o + 1] = data[j + 1]!;
+    out[o + 2] = data[j + 2]!;
+    out[o + 3] = alpha ? data[j + 3]! : 255;
+  }
+}
+
+/** The same for 16-bit samples in the file's byte order. */
+function rgbaFrom16(data: Uint8Array, row: number, cols: number, spp: number, out: Uint16Array, o: number, alpha: boolean, little: boolean): void {
+  const lo = little ? 0 : 1;
+  const hi = 1 - lo;
+  for (let x = 0, j = row; x < cols; x++, j += 2 * spp, o += 4) {
+    out[o] = data[j + lo]! | (data[j + hi]! << 8);
+    out[o + 1] = data[j + 2 + lo]! | (data[j + 2 + hi]! << 8);
+    out[o + 2] = data[j + 4 + lo]! | (data[j + 4 + hi]! << 8);
+    out[o + 3] = alpha ? data[j + 6 + lo]! | (data[j + 6 + hi]! << 8) : 65535;
+  }
+}
+
 /**
  * Decodes the first image of a TIFF file to RGBA: 8-bit for samples of up to 8 bits and palettes,
  * 16-bit for 16-bit samples, 32-bit float for float samples; straight alpha (associated alpha is
@@ -264,9 +310,13 @@ export async function decodeTiff(input: Uint8Array, options: DecodeOptions = {})
   const depth = isFloat ? 32 : bps === 16 ? 16 : 8;
   const max = isFloat ? 1 : depth === 16 ? 65535 : 255;
   // Decoded samples of all channels at the file's depth, chunky, before colour conversion.
-  const samples = isFloat ? new Float32Array(n * spp) : depth === 16 ? new Uint16Array(n * spp) : new Uint8Array(n * spp);
+  const out = isFloat ? new Float32Array(n * 4) : depth === 16 ? new Uint16Array(n * 4) : new Uint8Array(n * 4);
+  // Chunky RGB with no alpha or unassociated alpha goes straight into the output; everything else
+  // through the samples first, then the colour conversion below.
+  const direct = !planar && photometric === 2 && alpha !== 1 && bps >= 8;
+  const samples = direct ? out : isFloat ? new Float32Array(n * spp) : depth === 16 ? new Uint16Array(n * spp) : new Uint8Array(n * spp);
 
-  for (let c = 0; c < chunks; c++) {
+  const decodeChunk = async (c: number) => {
     const plane = Math.floor(c / (across * down));
     const index = c % (across * down);
     const x0 = (index % across) * cw;
@@ -304,13 +354,7 @@ export async function decodeTiff(input: Uint8Array, options: DecodeOptions = {})
       const row = y * rowBytes;
       if (predictor === 2 && bps === 8) for (let i = perPixel; i < values; i++) data[row + i] = (data[row + i]! + data[row + i - perPixel]!) & 255;
       else if (predictor === 2) {
-        const view = new DataView(data.buffer, data.byteOffset + row, rowBytes);
-        const prev = new Array<number>(perPixel).fill(0);
-        for (let i = 0; i < values; i++) {
-          const v = (view.getUint16(2 * i, r.little) + prev[i % perPixel]!) & 0xffff;
-          view.setUint16(2 * i, v, r.little);
-          prev[i % perPixel] = v;
-        }
+        predict16(data, row, values, perPixel, r.little);
       } else if (predictor === 3) {
         // libtiff's fpAcc: undo byte differencing over the row (stride = samples per pixel), then the
         // bytes of each value come from its byte planes, most significant first.
@@ -325,57 +369,89 @@ export async function decodeTiff(input: Uint8Array, options: DecodeOptions = {})
       }
     }
 
-    // Into the image.
+    // Into the image: a row of a chunk is contiguous in `samples` when the file is chunky.
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const lo = r.little ? 0 : 1;
+    const hi = 1 - lo;
+    const cols = Math.min(cw, width - x0);
     for (let y = 0; y < rows && y0 + y < height; y++) {
       const row = y * rowBytes;
-      for (let x = 0; x < cw && x0 + x < width; x++) {
-        const o = ((y0 + y) * width + x0 + x) * spp;
-        for (let s = 0; s < perPixel; s++) {
-          const k = x * perPixel + s;
-          let v: number;
-          if (bps === 8) v = data[row + k]!;
-          else if (bps === 16) v = view.getUint16(row + 2 * k, r.little);
-          else if (bps === 32) v = view.getFloat32(row + 4 * k, r.little);
-          else {
-            const bit = k * bps;
-            v = (data[row + (bit >> 3)]! >> (8 - bps - (bit & 7))) & ((1 << bps) - 1);
+      if (direct) {
+        const o = ((y0 + y) * width + x0) * 4;
+        if (bps === 8) rgbaFrom8(data, row, cols, spp, out as Uint8Array, o, alpha !== 0);
+        else if (bps === 16) rgbaFrom16(data, row, cols, spp, out as Uint16Array, o, alpha !== 0, r.little);
+        else for (let x = 0; x < cols; x++) for (let c = 0; c < 4; c++) out[o + 4 * x + c] = c < 3 || alpha ? view.getFloat32(row + 4 * (x * spp + c), r.little) : 1;
+        continue;
+      }
+      const o = ((y0 + y) * width + x0) * spp;
+      if (!planar && bps === 8) samples.set(data.subarray(row, row + cols * perPixel), o);
+      else if (!planar && bps === 16) {
+        place16(data, row, cols * perPixel, samples as Uint16Array, o, r.little);
+      } else if (!planar && bps === 32) {
+        for (let k = 0; k < cols * perPixel; k++) samples[o + k] = view.getFloat32(row + 4 * k, r.little);
+      } else
+        for (let x = 0; x < cols; x++)
+          for (let s = 0; s < perPixel; s++) {
+            const k = x * perPixel + s;
+            let v: number;
+            if (bps === 8) v = data[row + k]!;
+            else if (bps === 16) v = data[row + 2 * k + lo]! | (data[row + 2 * k + hi]! << 8);
+            else if (bps === 32) v = view.getFloat32(row + 4 * k, r.little);
+            else {
+              const bit = k * bps;
+              v = (data[row + (bit >> 3)]! >> (8 - bps - (bit & 7))) & ((1 << bps) - 1);
+            }
+            samples[o + x * spp + (planar ? plane : s)] = v;
           }
-          samples[o + (planar ? plane : s)] = v;
-        }
+    }
+  };
+  // Several chunks are in flight at once: where the runtime inflates on other threads (Node), they
+  // inflate in parallel while this thread restores and places the ones that are done. Chunks cover
+  // disjoint pixels (or planes), so the order they finish in does not matter.
+  let next = 0;
+  let failed = false;
+  const worker = async () => {
+    while (next < chunks && !failed) {
+      try {
+        await decodeChunk(next++);
+      } catch (e) {
+        failed = true;
+        throw e;
       }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(8, chunks) }, worker));
 
   // Colour conversion to RGBA.
-  const out = isFloat ? new Float32Array(n * 4) : depth === 16 ? new Uint16Array(n * 4) : new Uint8Array(n * 4);
   const low = bps < 8 ? 255 / ((1 << bps) - 1) : 1;
-  for (let i = 0; i < n; i++) {
-    const s = i * spp;
-    const o = i * 4;
-    const a = alpha ? samples[s + colours]! : max;
-    if (photometric <= 1) {
-      let g = samples[s]!;
-      if (photometric === 0) g = (bps < 8 ? (1 << bps) - 1 : max) - g;
-      out[o] = out[o + 1] = out[o + 2] = g * low;
-    } else if (photometric === 3) {
-      const p = samples[s]!;
-      const entries = 1 << bps;
-      out[o] = palette![p]! >> 8;
-      out[o + 1] = palette![entries + p]! >> 8;
-      out[o + 2] = palette![2 * entries + p]! >> 8;
-    } else if (photometric === 2) {
-      out[o] = samples[s]!;
-      out[o + 1] = samples[s + 1]!;
-      out[o + 2] = samples[s + 2]!;
-    } else {
-      const k = max - samples[s + 3]!;
-      for (let c = 0; c < 3; c++) out[o + c] = Math.round(((max - samples[s + c]!) * k) / max);
-    }
-    out[o + 3] = a;
-    if (alpha === 1) {
-      // Associated alpha: divide it out (a colour over zero alpha is zero).
-      for (let c = 0; c < 3; c++) out[o + c] = a === 0 ? 0 : isFloat ? out[o + c]! / a : Math.min(max, Math.round((out[o + c]! * max) / a));
+  if (!direct) {
+    for (let i = 0; i < n; i++) {
+      const s = i * spp;
+      const o = i * 4;
+      const a = alpha ? samples[s + colours]! : max;
+      if (photometric <= 1) {
+        let g = samples[s]!;
+        if (photometric === 0) g = (bps < 8 ? (1 << bps) - 1 : max) - g;
+        out[o] = out[o + 1] = out[o + 2] = g * low;
+      } else if (photometric === 3) {
+        const p = samples[s]!;
+        const entries = 1 << bps;
+        out[o] = palette![p]! >> 8;
+        out[o + 1] = palette![entries + p]! >> 8;
+        out[o + 2] = palette![2 * entries + p]! >> 8;
+      } else if (photometric === 2) {
+        out[o] = samples[s]!;
+        out[o + 1] = samples[s + 1]!;
+        out[o + 2] = samples[s + 2]!;
+      } else {
+        const k = max - samples[s + 3]!;
+        for (let c = 0; c < 3; c++) out[o + c] = Math.round(((max - samples[s + c]!) * k) / max);
+      }
+      out[o + 3] = a;
+      if (alpha === 1) {
+        // Associated alpha: divide it out (a colour over zero alpha is zero).
+        for (let c = 0; c < 3; c++) out[o + c] = a === 0 ? 0 : isFloat ? out[o + c]! / a : Math.min(max, Math.round((out[o + c]! * max) / a));
+      }
     }
   }
 

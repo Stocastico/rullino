@@ -66,7 +66,7 @@ describe('decodePng on images that inflate in many chunks', () => {
       pixels.set([(x * 255) / W + n, (y * 255) / H, ((x + y) * 127) / (W + H) + 2 * n, 128 + ((x * y) & 127)], i);
     }
   const base = () => sharp(pixels, { raw: { width: W, height: H, channels: 4 } });
-  const cases: [string, () => sharp.Sharp][] = [
+  const cases: [string, () => ReturnType<typeof sharp>][] = [
     ['RGBA 8', () => base()],
     ['RGB 8', () => base().removeAlpha()],
     ['grey 8', () => base().removeAlpha().toColourspace('b-w')],
