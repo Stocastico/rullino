@@ -6,9 +6,11 @@ import { CodecError } from './types';
 
 /**
  * Inflates zlib data: exactly `size` bytes (more is ignored, fewer is an error), or up to `limit`
- * bytes when the size is not known. Errors are CodecErrors of `format` naming `what`.
+ * bytes when the size is not known. Errors are CodecErrors of `format` naming `what`. With a known
+ * size, `onData(out, n)` is called each time the first `n` bytes of `out` are ready (n grows), so a
+ * caller can work on them while the rest inflates; what it throws rejects the call.
  */
-export async function inflate(data: Uint8Array, format: string, what: string, size: number | { limit: number }): Promise<Uint8Array> {
+export async function inflate(data: Uint8Array, format: string, what: string, size: number | { limit: number }, onData?: (out: Uint8Array, n: number) => void): Promise<Uint8Array> {
   const fail = (message: string, cause?: unknown): never => {
     throw new CodecError(format, message, cause === undefined ? undefined : { cause });
   };
@@ -30,6 +32,14 @@ export async function inflate(data: Uint8Array, format: string, what: string, si
       const take = Math.min(value.length, out.length - n);
       out.set(value.subarray(0, take), n);
       n += take;
+      if (known && onData) {
+        try {
+          onData(out, n);
+        } catch (e) {
+          reader.cancel().catch(() => {});
+          throw e;
+        }
+      }
       if (known && n === size) {
         reader.cancel().catch(() => {});
         return out;

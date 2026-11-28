@@ -245,35 +245,22 @@ export function encodeJpeg(image: Rgba8, options: JpegEncodeOptions = {}): Uint8
   const hmax = sub === '4:4:4' ? 1 : 2;
   const vmax = sub === '4:2:0' ? 2 : 1;
 
-  // Colour conversion at full resolution, rows padded to a multiple of vmax and columns to the
-  // downsampler's input width by repeating the last ones (jcprepct.c, expand_right_edge).
+  // Colour conversion, rows padded to a multiple of vmax and columns to the downsampler's input
+  // width by repeating the last ones (jcprepct.c, expand_right_edge); then Cb and Cr downsampled
+  // (jcsample.c, no smoothing). Each component is padded to whole MCUs vertically by repeating its
+  // last row (pre_process_data). Y goes straight into its samples (its stride is the padded width);
+  // Cb and Cr pass through line buffers of `vmax` rows.
   const mcusX = Math.ceil(width / (8 * hmax));
   const mcusY = Math.ceil(height / (8 * vmax));
   const fullW = mcusX * 8 * hmax;
   const fullH = Math.ceil(height / vmax) * vmax;
-  const planes = [new Uint8Array(fullW * fullH), new Uint8Array(fullW * fullH), new Uint8Array(fullW * fullH)];
-  for (let y = 0; y < fullH; y++) {
-    const sy = Math.min(y, height - 1);
-    for (let x = 0; x < fullW; x++) {
-      const s = (sy * width + Math.min(x, width - 1)) * 4;
-      const r = data[s]!;
-      const g = data[s + 1]!;
-      const b = data[s + 2]!;
-      const o = y * fullW + x;
-      planes[0]![o] = (T[r]! + T[256 + g]! + T[512 + b]!) >> SCALEBITS;
-      planes[1]![o] = (T[768 + r]! + T[1024 + g]! + T[1280 + b]!) >> SCALEBITS;
-      planes[2]![o] = (T[1280 + r]! + T[1536 + g]! + T[1792 + b]!) >> SCALEBITS;
-    }
-  }
-
-  // Components: Y at full resolution, Cb and Cr downsampled (jcsample.c, no smoothing), each padded
-  // to whole MCUs vertically by repeating its last row (pre_process_data).
   interface Comp {
     readonly h: number;
     readonly v: number;
     readonly bw: number;
     readonly bh: number;
     readonly stride: number;
+    readonly rows: number;
     readonly samples: Uint8Array;
     readonly q: Uint8Array;
     readonly dc: ReturnType<typeof codes>;
@@ -289,33 +276,54 @@ export function encodeJpeg(image: Rgba8, options: JpegEncodeOptions = {}): Uint8
   const comps: Comp[] = (grey ? [0] : [0, 1, 2]).map((ci) => {
     const h = ci === 0 ? hmax : 1;
     const v = ci === 0 ? vmax : 1;
-    const cw = Math.ceil((width * h) / hmax);
-    const ch = Math.ceil((height * v) / vmax);
-    const bw = Math.ceil(cw / 8);
-    const bh = Math.ceil(ch / 8);
+    const bw = Math.ceil(Math.ceil((width * h) / hmax) / 8);
+    const bh = Math.ceil(Math.ceil((height * v) / vmax) / 8);
     const stride = mcusX * h * 8;
     const rows = mcusY * v * 8;
-    const outCols = bw * 8;
-    const samples = new Uint8Array(stride * rows);
-    const src = planes[ci]!;
-    const fx = hmax / h;
-    const fy = vmax / v;
-    const realRows = fullH / fy;
-    for (let y = 0; y < realRows; y++) {
-      if (fx === 1 && fy === 1) samples.set(src.subarray(y * fullW, y * fullW + outCols), y * stride);
-      else if (fy === 1) {
-        let bias = 0;
-        for (let x = 0; x < outCols; x++, bias ^= 1) samples[y * stride + x] = (src[y * fullW + 2 * x]! + src[y * fullW + 2 * x + 1]! + bias) >> 1;
-      } else {
-        let bias = 1;
-        const r0 = 2 * y * fullW;
-        const r1 = r0 + fullW;
-        for (let x = 0; x < outCols; x++, bias ^= 3) samples[y * stride + x] = (src[r0 + 2 * x]! + src[r0 + 2 * x + 1]! + src[r1 + 2 * x]! + src[r1 + 2 * x + 1]! + bias) >> 2;
+    return { h, v, bw, bh, stride, rows, samples: new Uint8Array(stride * rows), q: ci === 0 ? lumQ : chromQ, dc: ci === 0 ? dcL : dcC, ac: ci === 0 ? acL : acC, pred: 0 };
+  });
+  const lum = comps[0]!.samples;
+  const cb = grey ? undefined : new Uint8Array(fullW * vmax);
+  const cr = grey ? undefined : new Uint8Array(fullW * vmax);
+  for (let y = 0; y < fullH; y++) {
+    const sy = Math.min(y, height - 1);
+    const line = (y % vmax) * fullW;
+    for (let x = 0, o = y * fullW; x < fullW; x++, o++) {
+      const s = (sy * width + (x < width ? x : width - 1)) * 4;
+      const r = data[s]!;
+      const g = data[s + 1]!;
+      const b = data[s + 2]!;
+      lum[o] = (T[r]! + T[256 + g]! + T[512 + b]!) >> SCALEBITS;
+      if (cb) {
+        cb[line + x] = (T[768 + r]! + T[1024 + g]! + T[1280 + b]!) >> SCALEBITS;
+        cr![line + x] = (T[1280 + r]! + T[1536 + g]! + T[1792 + b]!) >> SCALEBITS;
       }
     }
-    for (let y = realRows; y < rows; y++) samples.copyWithin(y * stride, (realRows - 1) * stride, (realRows - 1) * stride + stride);
-    return { h, v, bw, bh, stride, samples, q: ci === 0 ? lumQ : chromQ, dc: ci === 0 ? dcL : dcC, ac: ci === 0 ? acL : acC, pred: 0 };
-  });
+    if (!cb || y % vmax !== vmax - 1) continue;
+    // A full group of vmax rows: Cb and Cr's row y / vmax.
+    const cy = (y - vmax + 1) / vmax;
+    for (const [ci, src] of [
+      [1, cb],
+      [2, cr!],
+    ] as const) {
+      const c = comps[ci]!;
+      const out = c.samples;
+      const at = cy * c.stride;
+      const cols = c.bw * 8;
+      if (hmax === 1) out.set(src.subarray(0, cols), at);
+      else if (vmax === 1) {
+        let bias = 0;
+        for (let x = 0; x < cols; x++, bias ^= 1) out[at + x] = (src[2 * x]! + src[2 * x + 1]! + bias) >> 1;
+      } else {
+        let bias = 1;
+        for (let x = 0; x < cols; x++, bias ^= 3) out[at + x] = (src[2 * x]! + src[2 * x + 1]! + src[fullW + 2 * x]! + src[fullW + 2 * x + 1]! + bias) >> 2;
+      }
+    }
+  }
+  for (const c of comps) {
+    const real = fullH / (vmax / c.v);
+    for (let y = real; y < c.rows; y++) c.samples.copyWithin(y * c.stride, (real - 1) * c.stride, real * c.stride);
+  }
 
   const w = new Writer();
   w.bytes([0xff, 0xd8]);
@@ -395,7 +403,10 @@ export function encodeJpeg(image: Rgba8, options: JpegEncodeOptions = {}): Uint8
             for (let i = 0; i < 64; i++) {
               const qv = c.q[i]! << 3;
               const t = block[i]!;
-              quantised[i] = t < 0 ? -Math.floor((-t + (qv >> 1)) / qv) : Math.floor((t + (qv >> 1)) / qv);
+              // Round half away from zero on |t| (jcdctmgr.c), without a branch on the sign.
+              const sign = t >> 31;
+              const m = (((t ^ sign) - sign + (qv >> 1)) / qv) | 0;
+              quantised[i] = (m ^ sign) - sign;
             }
             encodeBlock(c, quantised[0]!);
           }

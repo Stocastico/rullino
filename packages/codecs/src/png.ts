@@ -30,19 +30,29 @@ const ADAM7 = [
 /** The largest ICC profile accepted (they are a few KB, rarely a few hundred). */
 const MAX_ICC = 16 * 1024 * 1024;
 
-let table: Uint32Array | undefined;
-/** CRC-32 (ISO 3309, as PNG and zip use it). */
+let tables: Uint32Array | undefined;
+/**
+ * CRC-32 (ISO 3309, as PNG and zip use it), four bytes per step ("slicing by 4": table k holds the
+ * CRC of a byte followed by k zero bytes).
+ */
 export function crc32(bytes: Uint8Array, from = 0, to = bytes.length): number {
-  if (!table) {
-    table = new Uint32Array(256);
+  if (!tables) {
+    tables = new Uint32Array(1024);
     for (let n = 0; n < 256; n++) {
       let c = n;
       for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      table[n] = c >>> 0;
+      tables[n] = c >>> 0;
     }
+    for (let n = 0; n < 256; n++) for (let k = 1; k < 4; k++) tables[256 * k + n] = (tables[256 * (k - 1) + n]! >>> 8) ^ tables[tables[256 * (k - 1) + n]! & 255]!;
   }
+  const t = tables;
   let c = 0xffffffff;
-  for (let i = from; i < to; i++) c = table[(c ^ bytes[i]!) & 255]! ^ (c >>> 8);
+  let i = from;
+  for (const end4 = to - 3; i < end4; i += 4) {
+    c ^= bytes[i]! | (bytes[i + 1]! << 8) | (bytes[i + 2]! << 16) | (bytes[i + 3]! << 24);
+    c = t[768 + (c & 255)]! ^ t[512 + ((c >>> 8) & 255)]! ^ t[256 + ((c >>> 16) & 255)]! ^ t[c >>> 24]!;
+  }
+  for (; i < to; i++) c = t[(c ^ bytes[i]!) & 255]! ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
 
@@ -64,44 +74,169 @@ function passes(h: Header) {
     .filter((p) => p.w > 0 && p.h > 0);
 }
 
-/** Reverses the scanline filters of one pass in place; `raw` holds (1 + rowBytes) bytes per row. */
-function unfilter(raw: Uint8Array, rows: number, rowBytes: number, bpp: number): void {
+/**
+ * Reverses the scanline filters of rows [from, to) of one pass in place (rows before `from` already
+ * unfiltered); `raw` holds (1 + rowBytes) bytes per row. The
+ * first row (no row above) and the first `bpp` bytes of a row (no byte to the left) are their own
+ * loops, so the inner loops carry no bounds tests: with a = left, b = up and c = upper left read as
+ * 0 where they do not exist, Average is (b >> 1) at the start of a row and (a >> 1) on the first row,
+ * and Paeth picks b at the start of a row and a on the first row.
+ */
+function unfilter(raw: Uint8Array, from: number, to: number, rowBytes: number, bpp: number): void {
   const stride = rowBytes + 1;
-  for (let y = 0; y < rows; y++) {
+  for (let y = from; y < to; y++) {
     const at = y * stride;
     const type = raw[at]!;
     const cur = at + 1;
-    const prev = cur - stride; // only read when y > 0
+    const end = cur + rowBytes;
+    const first = cur + Math.min(bpp, rowBytes);
     switch (type) {
       case 0:
         break;
       case 1:
-        for (let i = bpp; i < rowBytes; i++) raw[cur + i] = (raw[cur + i]! + raw[cur + i - bpp]!) & 255;
+        for (let i = first; i < end; i++) raw[i] = (raw[i]! + raw[i - bpp]!) & 255;
         break;
       case 2:
-        if (y > 0) for (let i = 0; i < rowBytes; i++) raw[cur + i] = (raw[cur + i]! + raw[prev + i]!) & 255;
+        if (y > 0) for (let i = cur; i < end; i++) raw[i] = (raw[i]! + raw[i - stride]!) & 255;
         break;
       case 3:
-        for (let i = 0; i < rowBytes; i++) {
-          const left = i >= bpp ? raw[cur + i - bpp]! : 0;
-          const up = y > 0 ? raw[prev + i]! : 0;
-          raw[cur + i] = (raw[cur + i]! + ((left + up) >> 1)) & 255;
+        if (y === 0) {
+          for (let i = first; i < end; i++) raw[i] = (raw[i]! + (raw[i - bpp]! >> 1)) & 255;
+        } else {
+          for (let i = cur; i < first; i++) raw[i] = (raw[i]! + (raw[i - stride]! >> 1)) & 255;
+          for (let i = first; i < end; i++) raw[i] = (raw[i]! + ((raw[i - bpp]! + raw[i - stride]!) >> 1)) & 255;
         }
         break;
       case 4:
-        for (let i = 0; i < rowBytes; i++) {
-          const a = i >= bpp ? raw[cur + i - bpp]! : 0;
-          const b = y > 0 ? raw[prev + i]! : 0;
-          const c = i >= bpp && y > 0 ? raw[prev + i - bpp]! : 0;
-          const p = a + b - c;
-          const pa = Math.abs(p - a);
-          const pb = Math.abs(p - b);
-          const pc = Math.abs(p - c);
-          raw[cur + i] = (raw[cur + i]! + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255;
+        if (y === 0) {
+          for (let i = first; i < end; i++) raw[i] = (raw[i]! + raw[i - bpp]!) & 255;
+        } else {
+          for (let i = cur; i < first; i++) raw[i] = (raw[i]! + raw[i - stride]!) & 255;
+          for (let i = first; i < end; i++) {
+            const a = raw[i - bpp]!;
+            const b = raw[i - stride]!;
+            const c = raw[i - stride - bpp]!;
+            // p = a + b - c, so |p - a| = |b - c|, |p - b| = |a - c|, |p - c| = |a + b - 2c|.
+            let pa = b - c;
+            let pb = a - c;
+            let pc = pa + pb;
+            if (pa < 0) pa = -pa;
+            if (pb < 0) pb = -pb;
+            if (pc < 0) pc = -pc;
+            raw[i] = (raw[i]! + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255;
+          }
         }
         break;
       default:
         fail(`unknown filter type ${type} on row ${y}`);
+    }
+  }
+}
+
+interface Pass {
+  readonly x0: number;
+  readonly y0: number;
+  readonly dx: number;
+  readonly dy: number;
+  readonly w: number;
+  readonly h: number;
+  readonly rowBytes: number;
+}
+
+/** Writes rows [from, to) of an unfiltered 8-bit pass of grey, RGB, grey + alpha or RGBA samples into RGBA `out`. */
+function write8(pass: Uint8Array, p: Pass, width: number, colour: number, out: Uint8Array, key: readonly number[] | undefined, from: number, to: number): void {
+  const stride = p.rowBytes + 1;
+  const step = 4 * p.dx;
+  for (let py = from; py < to; py++) {
+    let i = py * stride + 1;
+    const end = i + p.rowBytes;
+    let o = ((p.y0 + py * p.dy) * width + p.x0) * 4;
+    switch (colour) {
+      case 6:
+        if (step === 4) out.set(pass.subarray(i, end), o);
+        else
+          for (; i < end; i += 4, o += step) {
+            out[o] = pass[i]!;
+            out[o + 1] = pass[i + 1]!;
+            out[o + 2] = pass[i + 2]!;
+            out[o + 3] = pass[i + 3]!;
+          }
+        break;
+      case 2:
+        if (key) {
+          const [kr, kg, kb] = key as [number, number, number];
+          for (; i < end; i += 3, o += step) {
+            const r = (out[o] = pass[i]!);
+            const g = (out[o + 1] = pass[i + 1]!);
+            const b = (out[o + 2] = pass[i + 2]!);
+            out[o + 3] = r === kr && g === kg && b === kb ? 0 : 255;
+          }
+        } else
+          for (; i < end; i += 3, o += step) {
+            out[o] = pass[i]!;
+            out[o + 1] = pass[i + 1]!;
+            out[o + 2] = pass[i + 2]!;
+            out[o + 3] = 255;
+          }
+        break;
+      case 4:
+        for (; i < end; i += 2, o += step) {
+          out[o] = out[o + 1] = out[o + 2] = pass[i]!;
+          out[o + 3] = pass[i + 1]!;
+        }
+        break;
+      default: {
+        const k = key ? key[0]! : -1;
+        for (; i < end; i++, o += step) {
+          const g = (out[o] = out[o + 1] = out[o + 2] = pass[i]!);
+          out[o + 3] = g === k ? 0 : 255;
+        }
+      }
+    }
+  }
+}
+
+/** Writes rows [from, to) of an unfiltered 16-bit (big-endian) pass of grey, RGB, grey + alpha or RGBA samples into RGBA `out`. */
+function write16(pass: Uint8Array, p: Pass, width: number, colour: number, out: Uint16Array, key: readonly number[] | undefined, from: number, to: number): void {
+  const stride = p.rowBytes + 1;
+  const step = 4 * p.dx;
+  const be = (i: number) => (pass[i]! << 8) | pass[i + 1]!;
+  for (let py = from; py < to; py++) {
+    let i = py * stride + 1;
+    const end = i + p.rowBytes;
+    let o = ((p.y0 + py * p.dy) * width + p.x0) * 4;
+    switch (colour) {
+      case 6:
+        for (; i < end; i += 8, o += step) {
+          out[o] = be(i);
+          out[o + 1] = be(i + 2);
+          out[o + 2] = be(i + 4);
+          out[o + 3] = be(i + 6);
+        }
+        break;
+      case 2: {
+        const [kr, kg, kb] = key ? (key as [number, number, number]) : [-1, -1, -1];
+        for (; i < end; i += 6, o += step) {
+          const r = (out[o] = be(i));
+          const g = (out[o + 1] = be(i + 2));
+          const b = (out[o + 2] = be(i + 4));
+          out[o + 3] = r === kr && g === kg && b === kb ? 0 : 65535;
+        }
+        break;
+      }
+      case 4:
+        for (; i < end; i += 4, o += step) {
+          out[o] = out[o + 1] = out[o + 2] = be(i);
+          out[o + 3] = be(i + 2);
+        }
+        break;
+      default: {
+        const k = key ? key[0]! : -1;
+        for (; i < end; i += 2, o += step) {
+          const g = (out[o] = out[o + 1] = out[o + 2] = be(i));
+          out[o + 3] = g === k ? 0 : 65535;
+        }
+      }
     }
   }
 }
@@ -213,8 +348,6 @@ export async function decodePng(input: Uint8Array, options: DecodeOptions = {}):
       o += d.length;
     }
   }
-  const raw = await inflate(compressed, 'png', 'image data', total);
-
   const sixteen = h.depth === 16;
   const max = sixteen ? 65535 : 255;
   const n = h.width * h.height;
@@ -226,60 +359,62 @@ export async function decodePng(input: Uint8Array, options: DecodeOptions = {}):
   const entries = palette ? palette.length / 3 : 0;
   const s = new Array<number>(channels);
 
-  let offset = 0;
-  for (const p of sizes) {
-    const pass = raw.subarray(offset, offset + p.h * (p.rowBytes + 1));
-    offset += pass.length;
-    unfilter(pass, p.h, p.rowBytes, bpp);
-    for (let py = 0; py < p.h; py++) {
+  /** Bit depths below 8 and palettes: one sample at a time. */
+  const writeOther = (pass: Uint8Array, p: Pass, from: number, to: number) => {
+    for (let py = from; py < to; py++) {
       const row = py * (p.rowBytes + 1) + 1;
       const y = p.y0 + py * p.dy;
       for (let px = 0; px < p.w; px++) {
         for (let c = 0; c < channels; c++) {
           const k = px * channels + c;
           if (h.depth === 8) s[c] = pass[row + k]!;
-          else if (sixteen) s[c] = (pass[row + 2 * k]! << 8) | pass[row + 2 * k + 1]!;
           else {
             const bit = k * h.depth;
             s[c] = (pass[row + (bit >> 3)]! >> (8 - h.depth - (bit & 7))) & mask;
           }
         }
         const o = ((y * h.width) + p.x0 + px * p.dx) * 4;
-        switch (h.colour) {
-          case 0: {
-            const g = s[0]! * scale;
-            out[o] = out[o + 1] = out[o + 2] = g;
-            out[o + 3] = key && s[0] === key[0] ? 0 : max;
-            break;
-          }
-          case 2:
-            out[o] = s[0]!;
-            out[o + 1] = s[1]!;
-            out[o + 2] = s[2]!;
-            out[o + 3] = key && s[0] === key[0] && s[1] === key[1] && s[2] === key[2] ? 0 : max;
-            break;
-          case 3: {
-            const i = s[0]!;
-            if (i >= entries) fail(`palette index ${i} past the palette's ${entries} entries`);
-            out[o] = palette![3 * i]!;
-            out[o + 1] = palette![3 * i + 1]!;
-            out[o + 2] = palette![3 * i + 2]!;
-            out[o + 3] = trns && i < trns.length ? trns[i]! : 255;
-            break;
-          }
-          case 4:
-            out[o] = out[o + 1] = out[o + 2] = s[0]!;
-            out[o + 3] = s[1]!;
-            break;
-          default:
-            out[o] = s[0]!;
-            out[o + 1] = s[1]!;
-            out[o + 2] = s[2]!;
-            out[o + 3] = s[3]!;
+        if (h.colour === 0) {
+          const g = s[0]! * scale;
+          out[o] = out[o + 1] = out[o + 2] = g;
+          out[o + 3] = key && s[0] === key[0] ? 0 : max;
+        } else {
+          const i = s[0]!;
+          if (i >= entries) fail(`palette index ${i} past the palette's ${entries} entries`);
+          out[o] = palette![3 * i]!;
+          out[o + 1] = palette![3 * i + 1]!;
+          out[o + 2] = palette![3 * i + 2]!;
+          out[o + 3] = trns && i < trns.length ? trns[i]! : 255;
         }
       }
     }
-  }
+  };
+
+  // Rows are unfiltered and written as soon as they are inflated: where the runtime inflates on
+  // another thread (Node), this work overlaps with inflating the rest.
+  let passIndex = 0;
+  let passStart = 0;
+  let rowsDone = 0;
+  const consume = (raw: Uint8Array, available: number) => {
+    while (passIndex < sizes.length) {
+      const p = sizes[passIndex]!;
+      const stride = p.rowBytes + 1;
+      const rows = Math.min(p.h, Math.floor((available - passStart) / stride));
+      if (rows > rowsDone) {
+        const pass = raw.subarray(passStart, passStart + p.h * stride);
+        unfilter(pass, rowsDone, rows, p.rowBytes, bpp);
+        if (h.depth === 8 && h.colour !== 3) write8(pass, p, h.width, h.colour, out as Uint8Array, key, rowsDone, rows);
+        else if (sixteen) write16(pass, p, h.width, h.colour, out as Uint16Array, key, rowsDone, rows);
+        else writeOther(pass, p, rowsDone, rows);
+        rowsDone = rows;
+      }
+      if (rowsDone < p.h) return;
+      passIndex++;
+      passStart += p.h * stride;
+      rowsDone = 0;
+    }
+  };
+  await inflate(compressed, 'png', 'image data', total, consume);
   const image = sixteen ? { width: h.width, height: h.height, bitDepth: 16 as const, data: out as Uint16Array } : { width: h.width, height: h.height, bitDepth: 8 as const, data: out as Uint8Array };
   return icc ? { ...image, icc } : image;
 }

@@ -70,6 +70,16 @@ describe('decodeTiff', () => {
     expect(Array.from((await decodeTiff(file)).data)).toEqual([1, 1, 1, 255, 2, 2, 2, 255, 9, 9, 9, 255, 9, 9, 9, 255]);
   });
 
+  it('RGB with an unspecified extra sample is opaque, at 8 and 16 bits', async () => {
+    // ExtraSamples 0 (or absent) means the fourth sample is not alpha.
+    for (const extra of [undefined, [0]]) {
+      const tags8 = { 256: [2], 257: [1], 258: [8, 8, 8, 8], 259: [1], 262: [2], 277: [4], 278: [1], ...(extra ? { 338: extra } : {}) };
+      expect(Array.from((await decodeTiff(tiff(tags8, [Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8])]))).data)).toEqual([1, 2, 3, 255, 5, 6, 7, 255]);
+      const tags16 = { ...tags8, 258: [16, 16, 16, 16] };
+      expect(Array.from((await decodeTiff(tiff(tags16, [Uint8Array.from([1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0])]))).data)).toEqual([1, 2, 3, 65535, 5, 6, 7, 65535]);
+    }
+  });
+
   it('a tile must hold the whole tile, also past the image\'s edge', async () => {
     const tags = { 256: [20], 257: [3], 258: [8], 259: [1], 262: [1], 277: [1], 322: [16], 323: [16] };
     const whole = [new Uint8Array(256).fill(7), new Uint8Array(256).fill(9)];

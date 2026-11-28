@@ -54,6 +54,42 @@ describe('decodePng on PngSuite', () => {
   });
 });
 
+describe('decodePng on images that inflate in many chunks', () => {
+  // Rows are unfiltered as the inflated data arrives; PngSuite's files arrive in one piece. A smooth
+  // picture with noise, so every filter type is picked somewhere (adaptive filtering).
+  const W = 601;
+  const H = 403;
+  const pixels = new Uint8Array(W * H * 4);
+  for (let y = 0, i = 0; y < H; y++)
+    for (let x = 0; x < W; x++, i += 4) {
+      const n = (Math.imul(x * 7919 + y * 104729, 2654435761) >>> 24) & 31;
+      pixels.set([(x * 255) / W + n, (y * 255) / H, ((x + y) * 127) / (W + H) + 2 * n, 128 + ((x * y) & 127)], i);
+    }
+  const base = () => sharp(pixels, { raw: { width: W, height: H, channels: 4 } });
+  const cases: [string, () => ReturnType<typeof sharp>][] = [
+    ['RGBA 8', () => base()],
+    ['RGB 8', () => base().removeAlpha()],
+    ['grey 8', () => base().removeAlpha().toColourspace('b-w')],
+    ['grey + alpha 8', () => base().toColourspace('b-w')],
+    ['RGBA 16', () => base().toColourspace('rgb16')],
+    ['RGB 16', () => base().removeAlpha().toColourspace('rgb16')],
+    ['grey 16', () => base().removeAlpha().toColourspace('grey16')],
+    ['palette 4-bit', () => base().removeAlpha()],
+  ];
+  for (const interlaced of [false, true])
+    it.each(cases)(`%s${interlaced ? ', interlaced' : ''} decodes to the same RGBA as sharp`, async (name, make) => {
+      const palette = name.startsWith('palette');
+      const bytes = new Uint8Array(await make().png({ adaptiveFiltering: true, progressive: interlaced, compressionLevel: 9, ...(palette ? { palette: true, colours: 16, bitdepth: 4 } : {}) }).toBuffer());
+      const img = await decodePng(bytes);
+      expect([img.width, img.height]).toEqual([W, H]);
+      const ref = await reference(bytes, img.bitDepth as 8 | 16);
+      expect(img.data.length).toBe(ref.length);
+      let wrong = 0;
+      for (let i = 0; i < ref.length; i++) if (img.data[i] !== ref[i]) wrong++;
+      expect(wrong).toBe(0);
+    });
+});
+
 describe('decodePng', () => {
   it('keeps an embedded ICC profile (iCCP) as bytes', async () => {
     const profile = Array.from({ length: 300 }, (_, i) => (i * 7) & 255);
@@ -115,10 +151,10 @@ describe('decodePng', () => {
   });
 
   it('the RGB tRNS key must match all three samples, at 8 and 16 bits', async () => {
-    const rgb8 = png([['IHDR', ihdr(3, 1, 8, 2)], ['tRNS', [0, 1, 0, 2, 0, 3]], ['IDAT', await zlib([0, 1, 2, 3, 1, 9, 3, 9, 2, 3])], ['IEND', []]]);
-    expect(Array.from((await decodePng(rgb8)).data)).toEqual([1, 2, 3, 0, 1, 9, 3, 255, 9, 2, 3, 255]);
-    const rgb16 = png([['IHDR', ihdr(2, 1, 16, 2)], ['tRNS', [1, 0, 2, 0, 3, 0]], ['IDAT', await zlib([0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 1])], ['IEND', []]]);
-    expect(Array.from((await decodePng(rgb16)).data)).toEqual([256, 512, 768, 0, 256, 512, 769, 65535]);
+    const rgb8 = png([['IHDR', ihdr(4, 1, 8, 2)], ['tRNS', [0, 1, 0, 2, 0, 3]], ['IDAT', await zlib([0, 1, 2, 3, 1, 9, 3, 9, 2, 3, 1, 2, 9])], ['IEND', []]]);
+    expect(Array.from((await decodePng(rgb8)).data)).toEqual([1, 2, 3, 0, 1, 9, 3, 255, 9, 2, 3, 255, 1, 2, 9, 255]);
+    const rgb16 = png([['IHDR', ihdr(4, 1, 16, 2)], ['tRNS', [1, 0, 2, 0, 3, 0]], ['IDAT', await zlib([0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 1, 1, 0, 2, 1, 3, 0, 1, 1, 2, 0, 3, 0])], ['IEND', []]]);
+    expect(Array.from((await decodePng(rgb16)).data)).toEqual([256, 512, 768, 0, 256, 512, 769, 65535, 256, 513, 768, 65535, 257, 512, 768, 65535]);
   });
 
   it('skips an unknown ancillary chunk and refuses an unknown critical one', async () => {
@@ -139,5 +175,19 @@ describe('decodePng', () => {
 
   it('crc32 matches the standard check value', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926);
+  });
+
+  it('crc32 equals the bitwise definition on every length and offset up to 40 bytes', () => {
+    const bitwise = (b: Uint8Array, from: number, to: number) => {
+      let c = 0xffffffff;
+      for (let i = from; i < to; i++) {
+        c ^= b[i]!;
+        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      }
+      return (c ^ 0xffffffff) >>> 0;
+    };
+    const bytes = Uint8Array.from({ length: 48 }, (_, i) => (i * 167 + 13) & 255);
+    for (let from = 0; from < 8; from++) for (let to = from; to <= from + 40; to++) expect(crc32(bytes, from, to)).toBe(bitwise(bytes, from, to));
+    expect(crc32(bytes.subarray(3))).toBe(bitwise(bytes, 3, 48));
   });
 });
