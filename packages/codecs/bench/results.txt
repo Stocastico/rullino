@@ -1,15 +1,15 @@
-@rullino/codecs, 4000×3000 (12.0 MP), median of 3 (2026-11-28, linux x64)
+@rullino/codecs, 4000×3000 (12.0 MP), median of 5 (2026-11-28, linux x64)
 
 Node v22.23.5: ours vs sharp (native, SIMD)
-  decode jpeg-420-q90.jpg           383 ms   sharp     69 ms   5.5×
-  decode jpeg-progressive.jpg       583 ms   sharp    125 ms   4.7×
-  decode png-8.png                  551 ms   sharp    141 ms   3.9×
-  decode png-16.png                 796 ms   sharp    236 ms   3.4×
-  decode tiff-16-deflate.tif       1029 ms   sharp    163 ms   6.3×
-  encode JPEG q90 4:2:0             620 ms   sharp    134 ms   4.6×
-  encode TIFF 8-bit deflate        2505 ms   sharp   1258 ms   2.0×
+  decode jpeg-420-q90.jpg           301 ms   sharp     53 ms   5.7×
+  decode jpeg-progressive.jpg       477 ms   sharp    127 ms   3.8×
+  decode png-8.png                  260 ms   sharp    143 ms   1.8×
+  decode png-16.png                 444 ms   sharp    210 ms   2.1×
+  decode tiff-16-deflate.tif        458 ms   sharp    176 ms   2.6×
+  encode JPEG q90 4:2:0             525 ms   sharp    122 ms   4.3×
+  encode TIFF 8-bit deflate        2464 ms   sharp   1245 ms   2.0×
 
 Chromium: ours vs createImageBitmap + getImageData
-  decode jpeg-420-q90.jpg           270 ms   browser    142 ms   1.9×
-  decode jpeg-progressive.jpg       525 ms   browser    230 ms   2.3×
-  decode png-8.png                  433 ms   browser    215 ms   2.0×
+  decode jpeg-420-q90.jpg           271 ms   browser    124 ms   2.2×
+  decode jpeg-progressive.jpg       453 ms   browser    206 ms   2.2×
+  decode png-8.png                  252 ms   browser    227 ms   1.1×
