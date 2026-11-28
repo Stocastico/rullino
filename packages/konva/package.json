@@ -8,7 +8,10 @@
     "webgpu",
     "image-processing",
     "photo-editing",
-    "typescript"
+    "typescript",
+    "lut",
+    "cube",
+    "color-grading"
   ],
   "license": "MIT",
   "repository": {

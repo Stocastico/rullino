@@ -8,7 +8,14 @@
     "photo-editing",
     "browser",
     "web-worker",
-    "typescript"
+    "typescript",
+    "canvas",
+    "image-resize",
+    "exif",
+    "icc",
+    "color-management",
+    "ultra-hdr",
+    "sharp-alternative"
   ],
   "license": "MIT",
   "repository": {

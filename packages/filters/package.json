@@ -18,7 +18,9 @@
     "lens-blur",
     "kuwahara",
     "bloom",
-    "edge-detection"
+    "edge-detection",
+    "tone-mapping",
+    "cube"
   ],
   "license": "MIT",
   "repository": {
