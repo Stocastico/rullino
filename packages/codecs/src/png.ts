@@ -75,15 +75,16 @@ function passes(h: Header) {
 }
 
 /**
- * Reverses the scanline filters of one pass in place; `raw` holds (1 + rowBytes) bytes per row. The
+ * Reverses the scanline filters of rows [from, to) of one pass in place (rows before `from` already
+ * unfiltered); `raw` holds (1 + rowBytes) bytes per row. The
  * first row (no row above) and the first `bpp` bytes of a row (no byte to the left) are their own
  * loops, so the inner loops carry no bounds tests: with a = left, b = up and c = upper left read as
  * 0 where they do not exist, Average is (b >> 1) at the start of a row and (a >> 1) on the first row,
  * and Paeth picks b at the start of a row and a on the first row.
  */
-function unfilter(raw: Uint8Array, rows: number, rowBytes: number, bpp: number): void {
+function unfilter(raw: Uint8Array, from: number, to: number, rowBytes: number, bpp: number): void {
   const stride = rowBytes + 1;
-  for (let y = 0; y < rows; y++) {
+  for (let y = from; y < to; y++) {
     const at = y * stride;
     const type = raw[at]!;
     const cur = at + 1;
@@ -142,11 +143,11 @@ interface Pass {
   readonly rowBytes: number;
 }
 
-/** Writes an unfiltered 8-bit pass of grey, RGB, grey + alpha or RGBA samples into RGBA `out`. */
-function write8(pass: Uint8Array, p: Pass, width: number, colour: number, out: Uint8Array, key: readonly number[] | undefined): void {
+/** Writes rows [from, to) of an unfiltered 8-bit pass of grey, RGB, grey + alpha or RGBA samples into RGBA `out`. */
+function write8(pass: Uint8Array, p: Pass, width: number, colour: number, out: Uint8Array, key: readonly number[] | undefined, from: number, to: number): void {
   const stride = p.rowBytes + 1;
   const step = 4 * p.dx;
-  for (let py = 0; py < p.h; py++) {
+  for (let py = from; py < to; py++) {
     let i = py * stride + 1;
     const end = i + p.rowBytes;
     let o = ((p.y0 + py * p.dy) * width + p.x0) * 4;
@@ -195,12 +196,12 @@ function write8(pass: Uint8Array, p: Pass, width: number, colour: number, out: U
   }
 }
 
-/** Writes an unfiltered 16-bit (big-endian) pass of grey, RGB, grey + alpha or RGBA samples into RGBA `out`. */
-function write16(pass: Uint8Array, p: Pass, width: number, colour: number, out: Uint16Array, key: readonly number[] | undefined): void {
+/** Writes rows [from, to) of an unfiltered 16-bit (big-endian) pass of grey, RGB, grey + alpha or RGBA samples into RGBA `out`. */
+function write16(pass: Uint8Array, p: Pass, width: number, colour: number, out: Uint16Array, key: readonly number[] | undefined, from: number, to: number): void {
   const stride = p.rowBytes + 1;
   const step = 4 * p.dx;
   const be = (i: number) => (pass[i]! << 8) | pass[i + 1]!;
-  for (let py = 0; py < p.h; py++) {
+  for (let py = from; py < to; py++) {
     let i = py * stride + 1;
     const end = i + p.rowBytes;
     let o = ((p.y0 + py * p.dy) * width + p.x0) * 4;
@@ -347,8 +348,6 @@ export async function decodePng(input: Uint8Array, options: DecodeOptions = {}):
       o += d.length;
     }
   }
-  const raw = await inflate(compressed, 'png', 'image data', total);
-
   const sixteen = h.depth === 16;
   const max = sixteen ? 65535 : 255;
   const n = h.width * h.height;
@@ -360,20 +359,9 @@ export async function decodePng(input: Uint8Array, options: DecodeOptions = {}):
   const entries = palette ? palette.length / 3 : 0;
   const s = new Array<number>(channels);
 
-  let offset = 0;
-  for (const p of sizes) {
-    const pass = raw.subarray(offset, offset + p.h * (p.rowBytes + 1));
-    offset += pass.length;
-    unfilter(pass, p.h, p.rowBytes, bpp);
-    if (h.depth === 8 && h.colour !== 3) {
-      write8(pass, p, h.width, h.colour, out as Uint8Array, key);
-      continue;
-    }
-    if (sixteen) {
-      write16(pass, p, h.width, h.colour, out as Uint16Array, key);
-      continue;
-    }
-    for (let py = 0; py < p.h; py++) {
+  /** Bit depths below 8 and palettes: one sample at a time. */
+  const writeOther = (pass: Uint8Array, p: Pass, from: number, to: number) => {
+    for (let py = from; py < to; py++) {
       const row = py * (p.rowBytes + 1) + 1;
       const y = p.y0 + py * p.dy;
       for (let px = 0; px < p.w; px++) {
@@ -400,7 +388,33 @@ export async function decodePng(input: Uint8Array, options: DecodeOptions = {}):
         }
       }
     }
-  }
+  };
+
+  // Rows are unfiltered and written as soon as they are inflated: where the runtime inflates on
+  // another thread (Node), this work overlaps with inflating the rest.
+  let passIndex = 0;
+  let passStart = 0;
+  let rowsDone = 0;
+  const consume = (raw: Uint8Array, available: number) => {
+    while (passIndex < sizes.length) {
+      const p = sizes[passIndex]!;
+      const stride = p.rowBytes + 1;
+      const rows = Math.min(p.h, Math.floor((available - passStart) / stride));
+      if (rows > rowsDone) {
+        const pass = raw.subarray(passStart, passStart + p.h * stride);
+        unfilter(pass, rowsDone, rows, p.rowBytes, bpp);
+        if (h.depth === 8 && h.colour !== 3) write8(pass, p, h.width, h.colour, out as Uint8Array, key, rowsDone, rows);
+        else if (sixteen) write16(pass, p, h.width, h.colour, out as Uint16Array, key, rowsDone, rows);
+        else writeOther(pass, p, rowsDone, rows);
+        rowsDone = rows;
+      }
+      if (rowsDone < p.h) return;
+      passIndex++;
+      passStart += p.h * stride;
+      rowsDone = 0;
+    }
+  };
+  await inflate(compressed, 'png', 'image data', total, consume);
   const image = sixteen ? { width: h.width, height: h.height, bitDepth: 16 as const, data: out as Uint16Array } : { width: h.width, height: h.height, bitDepth: 8 as const, data: out as Uint8Array };
   return icc ? { ...image, icc } : image;
 }

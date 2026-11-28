@@ -54,6 +54,42 @@ describe('decodePng on PngSuite', () => {
   });
 });
 
+describe('decodePng on images that inflate in many chunks', () => {
+  // Rows are unfiltered as the inflated data arrives; PngSuite's files arrive in one piece. A smooth
+  // picture with noise, so every filter type is picked somewhere (adaptive filtering).
+  const W = 601;
+  const H = 403;
+  const pixels = new Uint8Array(W * H * 4);
+  for (let y = 0, i = 0; y < H; y++)
+    for (let x = 0; x < W; x++, i += 4) {
+      const n = (Math.imul(x * 7919 + y * 104729, 2654435761) >>> 24) & 31;
+      pixels.set([(x * 255) / W + n, (y * 255) / H, ((x + y) * 127) / (W + H) + 2 * n, 128 + ((x * y) & 127)], i);
+    }
+  const base = () => sharp(pixels, { raw: { width: W, height: H, channels: 4 } });
+  const cases: [string, () => sharp.Sharp][] = [
+    ['RGBA 8', () => base()],
+    ['RGB 8', () => base().removeAlpha()],
+    ['grey 8', () => base().removeAlpha().toColourspace('b-w')],
+    ['grey + alpha 8', () => base().toColourspace('b-w')],
+    ['RGBA 16', () => base().toColourspace('rgb16')],
+    ['RGB 16', () => base().removeAlpha().toColourspace('rgb16')],
+    ['grey 16', () => base().removeAlpha().toColourspace('grey16')],
+    ['palette 4-bit', () => base().removeAlpha()],
+  ];
+  for (const interlaced of [false, true])
+    it.each(cases)(`%s${interlaced ? ', interlaced' : ''} decodes to the same RGBA as sharp`, async (name, make) => {
+      const palette = name.startsWith('palette');
+      const bytes = new Uint8Array(await make().png({ adaptiveFiltering: true, progressive: interlaced, compressionLevel: 9, ...(palette ? { palette: true, colours: 16, bitdepth: 4 } : {}) }).toBuffer());
+      const img = await decodePng(bytes);
+      expect([img.width, img.height]).toEqual([W, H]);
+      const ref = await reference(bytes, img.bitDepth as 8 | 16);
+      expect(img.data.length).toBe(ref.length);
+      let wrong = 0;
+      for (let i = 0; i < ref.length; i++) if (img.data[i] !== ref[i]) wrong++;
+      expect(wrong).toBe(0);
+    });
+});
+
 describe('decodePng', () => {
   it('keeps an embedded ICC profile (iCCP) as bytes', async () => {
     const profile = Array.from({ length: 300 }, (_, i) => (i * 7) & 255);
