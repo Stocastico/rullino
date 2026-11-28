@@ -472,23 +472,24 @@ function decodeScan(
 // ---------------------------------------------------------------------------------------------------
 // Upsampling to full resolution (jdsample.c) and colour conversion (jdcolor.c).
 
-/** A component's samples at full resolution (`width` × `height`), libjpeg's way. */
-function upsample(c: Component, plane: Uint8Array, frame: Frame): Uint8Array {
-  const { width, height, hmax, vmax } = frame;
+/**
+ * Upsampling to full resolution, a row at a time: returns `row(y)`, which gives row `y` of the
+ * component at the image's width (a view of the plane, or of a line buffer it owns, valid until
+ * the next call). libjpeg-turbo's fancy upsampling (jdsample.c) for h2v1, h1v2 and h2v2 components
+ * wider than 2 samples, replication otherwise.
+ */
+function upsampler(c: Component, plane: Uint8Array, frame: Frame): (y: number) => Uint8Array {
+  const { width, hmax, vmax } = frame;
   const stride = c.pw * 8;
   const rows = c.ph * 8;
-  const out = new Uint8Array(width * height);
   const sw = c.sw;
   const sh = c.sh;
   /** Row `y` of the component, the rows past its last real one replaced by it (jdmainct.c). */
   const row = (y: number) => Math.min(Math.max(y, 0), sh - 1) * stride;
-  if (c.h === hmax && c.v === vmax) {
-    for (let y = 0; y < height; y++) out.set(plane.subarray(y * stride, y * stride + width), y * width);
-    return out;
-  }
-  const line = new Uint8Array(Math.max(stride, sw) * 2 + 16);
-  if (c.h * 2 === hmax && c.v === vmax && sw > 2) {
-    for (let y = 0; y < height; y++) {
+  if (c.h === hmax && c.v === vmax) return (y) => plane.subarray(y * stride, y * stride + width);
+  const line = new Uint8Array(Math.max(stride, sw, width) * 2 + 16);
+  if (c.h * 2 === hmax && c.v === vmax && sw > 2)
+    return (y) => {
       const i = y * stride;
       let o = 0;
       let v = plane[i]!;
@@ -503,21 +504,18 @@ function upsample(c: Component, plane: Uint8Array, frame: Frame): Uint8Array {
       v = plane[p]!;
       line[o++] = (v * 3 + plane[p - 1]! + 1) >> 2;
       line[o++] = v;
-      out.set(line.subarray(0, width), y * width);
-    }
-    return out;
-  }
-  if (c.h === hmax && c.v * 2 === vmax) {
-    for (let y = 0; y < height; y++) {
+      return line;
+    };
+  if (c.h === hmax && c.v * 2 === vmax)
+    return (y) => {
       const i0 = row(y >> 1);
       const i1 = row(y & 1 ? (y >> 1) + 1 : (y >> 1) - 1);
       const bias = y & 1 ? 2 : 1;
-      for (let x = 0; x < width; x++) out[y * width + x] = (plane[i0 + x]! * 3 + plane[i1 + x]! + bias) >> 2;
-    }
-    return out;
-  }
-  if (c.h * 2 === hmax && c.v * 2 === vmax && sw > 2) {
-    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) line[x] = (plane[i0 + x]! * 3 + plane[i1 + x]! + bias) >> 2;
+      return line;
+    };
+  if (c.h * 2 === hmax && c.v * 2 === vmax && sw > 2)
+    return (y) => {
       const i0 = row(y >> 1);
       const i1 = row(y & 1 ? (y >> 1) + 1 : (y >> 1) - 1);
       let o = 0;
@@ -539,19 +537,17 @@ function upsample(c: Component, plane: Uint8Array, frame: Frame): Uint8Array {
       }
       line[o++] = (thiscol * 3 + lastcol + 8) >> 4;
       line[o++] = (thiscol * 4 + 7) >> 4;
-      out.set(line.subarray(0, width), y * width);
-    }
-    return out;
-  }
+      return line;
+    };
   // Any other ratio (or a component two samples wide or less): replication.
   const fx = hmax / c.h;
   const fy = vmax / c.v;
   if (!Number.isInteger(fx) || !Number.isInteger(fy)) fail('unsupported sampling factors');
-  for (let y = 0; y < height; y++) {
+  return (y) => {
     const i = Math.min(Math.floor(y / fy), rows - 1) * stride;
-    for (let x = 0; x < width; x++) out[y * width + x] = plane[i + Math.floor(x / fx)]!;
-  }
-  return out;
+    for (let x = 0; x < width; x++) line[x] = plane[i + Math.floor(x / fx)]!;
+    return line;
+  };
 }
 
 const SCALEBITS = 16;
@@ -747,62 +743,73 @@ export async function decodeJpeg(input: Uint8Array, options: DecodeOptions = {})
     const plane = new Uint8Array(stride * c.ph * 8);
     const q = quant[c.tq]!;
     for (let by = 0; by < c.ph; by++) for (let bx = 0; bx < c.pw; bx++) idct(c.coef, (by * c.pw + bx) * 64, q, plane, by * 8 * stride + bx * 8, stride);
-    return upsample(c, plane, f);
+    return upsampler(c, plane, f);
   });
 
-  const n = f.width * f.height;
-  const out = new Uint8Array(n * 4);
+  const w = f.width;
+  const out = new Uint8Array(w * f.height * 4);
   const ids = f.components.map((c) => c.id);
-  if (planes.length === 1) {
-    const g = planes[0]!;
-    for (let i = 0; i < n; i++) {
-      out[4 * i] = out[4 * i + 1] = out[4 * i + 2] = g[i]!;
-      out[4 * i + 3] = 255;
-    }
-  } else if (planes.length === 3) {
-    const [a, b, c] = planes as [Uint8Array, Uint8Array, Uint8Array];
-    // libjpeg's default_decompress_parms: JFIF or Adobe transform 1 = YCbCr; Adobe 0 or ids 'R' 'G' 'B' = RGB.
-    const rgb = !jfif && (adobe === 0 || (adobe === undefined && ids[0] === 82 && ids[1] === 71 && ids[2] === 66));
-    for (let i = 0; i < n; i++) {
-      if (rgb) {
-        out[4 * i] = a[i]!;
-        out[4 * i + 1] = b[i]!;
-        out[4 * i + 2] = c[i]!;
-      } else {
-        const y = a[i]!;
-        const cb = b[i]!;
-        const cr = c[i]!;
-        out[4 * i] = clamp(y + CR_R[cr]!);
-        out[4 * i + 1] = clamp(y + ((CB_G[cb]! + CR_G[cr]!) >> SCALEBITS));
-        out[4 * i + 2] = clamp(y + CB_B[cb]!);
+  // libjpeg's default_decompress_parms: JFIF or Adobe transform 1 = YCbCr; Adobe 0 or ids 'R' 'G' 'B' = RGB.
+  const rgb = planes.length === 3 && !jfif && (adobe === 0 || (adobe === undefined && ids[0] === 82 && ids[1] === 71 && ids[2] === 66));
+  // libjpeg: with an Adobe marker, transform 0 is CMYK and any other is YCCK; without one, CMYK.
+  const ycck = adobe !== undefined && adobe !== 0;
+  // Adobe (Photoshop) CMYK is stored inverted: 255 is no ink.
+  const inverted = adobe !== undefined;
+  // Upsampling and colour conversion one row at a time: no full-size upsampled planes.
+  for (let y = 0; y < f.height; y++) {
+    let o = y * w * 4;
+    if (planes.length === 1) {
+      const g = planes[0]!(y);
+      for (let x = 0; x < w; x++, o += 4) {
+        out[o] = out[o + 1] = out[o + 2] = g[x]!;
+        out[o + 3] = 255;
       }
-      out[4 * i + 3] = 255;
-    }
-  } else {
-    const [a, b, c, k] = planes as [Uint8Array, Uint8Array, Uint8Array, Uint8Array];
-    // libjpeg: with an Adobe marker, transform 0 is CMYK and any other is YCCK; without one, CMYK.
-    const ycck = adobe !== undefined && adobe !== 0;
-    // Adobe (Photoshop) CMYK is stored inverted: 255 is no ink.
-    const inverted = adobe !== undefined;
-    for (let i = 0; i < n; i++) {
-      let c0 = a[i]!;
-      let c1 = b[i]!;
-      let c2 = c[i]!;
-      if (ycck) {
-        const y = c0;
-        const cb = c1;
-        const cr = c2;
-        c0 = 255 - clamp(y + CR_R[cr]!);
-        c1 = 255 - clamp(y + ((CB_G[cb]! + CR_G[cr]!) >> SCALEBITS));
-        c2 = 255 - clamp(y + CB_B[cb]!);
+    } else if (planes.length === 3) {
+      const a = planes[0]!(y);
+      const b = planes[1]!(y);
+      const c = planes[2]!(y);
+      if (rgb)
+        for (let x = 0; x < w; x++, o += 4) {
+          out[o] = a[x]!;
+          out[o + 1] = b[x]!;
+          out[o + 2] = c[x]!;
+          out[o + 3] = 255;
+        }
+      else
+        for (let x = 0; x < w; x++, o += 4) {
+          const l = a[x]!;
+          const cb = b[x]!;
+          const cr = c[x]!;
+          out[o] = clamp(l + CR_R[cr]!);
+          out[o + 1] = clamp(l + ((CB_G[cb]! + CR_G[cr]!) >> SCALEBITS));
+          out[o + 2] = clamp(l + CB_B[cb]!);
+          out[o + 3] = 255;
+        }
+    } else {
+      const a = planes[0]!(y);
+      const b = planes[1]!(y);
+      const c = planes[2]!(y);
+      const k = planes[3]!(y);
+      for (let x = 0; x < w; x++, o += 4) {
+        let c0 = a[x]!;
+        let c1 = b[x]!;
+        let c2 = c[x]!;
+        if (ycck) {
+          const l = c0;
+          const cb = c1;
+          const cr = c2;
+          c0 = 255 - clamp(l + CR_R[cr]!);
+          c1 = 255 - clamp(l + ((CB_G[cb]! + CR_G[cr]!) >> SCALEBITS));
+          c2 = 255 - clamp(l + CB_B[cb]!);
+        }
+        // Ink amounts 0..255 (0 = none).
+        const ink = (v: number) => (inverted ? 255 - v : v);
+        const kk = 255 - ink(k[x]!);
+        out[o] = Math.round(((255 - ink(c0)) * kk) / 255);
+        out[o + 1] = Math.round(((255 - ink(c1)) * kk) / 255);
+        out[o + 2] = Math.round(((255 - ink(c2)) * kk) / 255);
+        out[o + 3] = 255;
       }
-      // Ink amounts 0..255 (0 = none).
-      const ink = (v: number) => (inverted ? 255 - v : v);
-      const kk = 255 - ink(k[i]!);
-      out[4 * i] = Math.round(((255 - ink(c0)) * kk) / 255);
-      out[4 * i + 1] = Math.round(((255 - ink(c1)) * kk) / 255);
-      out[4 * i + 2] = Math.round(((255 - ink(c2)) * kk) / 255);
-      out[4 * i + 3] = 255;
     }
   }
 
