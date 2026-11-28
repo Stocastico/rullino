@@ -10,7 +10,13 @@
     "node",
     "dawn",
     "typescript",
-    "cli"
+    "cli",
+    "image-resize",
+    "exif",
+    "icc",
+    "color-management",
+    "ultra-hdr",
+    "sharp-alternative"
   ],
   "license": "MIT",
   "repository": {

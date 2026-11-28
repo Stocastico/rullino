@@ -11,7 +11,13 @@
     "image",
     "16-bit",
     "typescript",
-    "zero-dependency"
+    "zero-dependency",
+    "exif",
+    "icc",
+    "ultra-hdr",
+    "openexr",
+    "metadata",
+    "color-management"
   ],
   "license": "MIT",
   "repository": {

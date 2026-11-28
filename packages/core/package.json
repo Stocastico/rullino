@@ -13,7 +13,12 @@
     "filter-chain",
     "lut",
     "color-grading",
-    "masks"
+    "masks",
+    "cube",
+    "icc",
+    "color-management",
+    "image-resize",
+    "ultra-hdr"
   ],
   "license": "MIT",
   "repository": {

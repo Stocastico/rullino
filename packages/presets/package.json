@@ -14,7 +14,9 @@
     "film-look",
     "lut",
     "vignette",
-    "film-grain"
+    "film-grain",
+    "cube",
+    "color-grading"
   ],
   "license": "MIT",
   "repository": {
