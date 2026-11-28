@@ -73,11 +73,12 @@ npm install @rullino/node sharp            # sharp reads the photos; add webgpu 
 npx rullino render --edit edit.json photos/ -o out/              # a document from the playground's Code button
 npx rullino render --look golden photo.jpg -o out/ --format jpeg --quality 0.9 --long-side 2048
 npx rullino render --look golden photos/ -o web/ --strip-metadata=gps,personal   # no location, no names
+npx rullino validate edit.json other.json                         # check documents without rendering: "edit.json: ok", or what is wrong
 npx rullino looks                                                 # the built-in looks
 npx rullino info out/photo.jpg                                    # camera, date, GPS, profiles, and the edit it was rendered with
 ```
 
-`--format`, `--quality`, `--long-side` and `--strip-metadata` (alone: all of it but the colour profile; `=gps`, `=personal` or both: only those) override the document's `output`; `--backend auto|gpu|cpu` and `--threads <n|auto>` choose where it runs. Folders are read without descending into sub-folders. It never overwrites an input, and a bad document is reported once, before any photo is read. Exit code 0 when every photo rendered, 1 when one failed, 2 for a usage error.
+`--format`, `--quality`, `--long-side` and `--strip-metadata` (alone: all of it but the colour profile; `=gps`, `=personal` or both: only those) override the document's `output`; `--backend auto|gpu|cpu` and `--threads <n|auto>` choose where it runs. Folders are read without descending into sub-folders. It never overwrites an input, and a bad document is reported once, before any photo is read. Exit code 0 when every photo rendered, 1 when one failed, 2 for a usage error. `validate` reads no photo: it parses each document the way `render` does (the built-in filters and looks), prints `<file>: ok` or the problem, checks every file even after a bad one, and exits 1 if any was invalid. A number outside a parameter's range is not a problem: the parser clamps it, as `render` does.
 
 ### A folder of photos
 
