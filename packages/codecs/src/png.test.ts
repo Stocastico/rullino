@@ -115,10 +115,10 @@ describe('decodePng', () => {
   });
 
   it('the RGB tRNS key must match all three samples, at 8 and 16 bits', async () => {
-    const rgb8 = png([['IHDR', ihdr(3, 1, 8, 2)], ['tRNS', [0, 1, 0, 2, 0, 3]], ['IDAT', await zlib([0, 1, 2, 3, 1, 9, 3, 9, 2, 3])], ['IEND', []]]);
-    expect(Array.from((await decodePng(rgb8)).data)).toEqual([1, 2, 3, 0, 1, 9, 3, 255, 9, 2, 3, 255]);
-    const rgb16 = png([['IHDR', ihdr(2, 1, 16, 2)], ['tRNS', [1, 0, 2, 0, 3, 0]], ['IDAT', await zlib([0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 1])], ['IEND', []]]);
-    expect(Array.from((await decodePng(rgb16)).data)).toEqual([256, 512, 768, 0, 256, 512, 769, 65535]);
+    const rgb8 = png([['IHDR', ihdr(4, 1, 8, 2)], ['tRNS', [0, 1, 0, 2, 0, 3]], ['IDAT', await zlib([0, 1, 2, 3, 1, 9, 3, 9, 2, 3, 1, 2, 9])], ['IEND', []]]);
+    expect(Array.from((await decodePng(rgb8)).data)).toEqual([1, 2, 3, 0, 1, 9, 3, 255, 9, 2, 3, 255, 1, 2, 9, 255]);
+    const rgb16 = png([['IHDR', ihdr(4, 1, 16, 2)], ['tRNS', [1, 0, 2, 0, 3, 0]], ['IDAT', await zlib([0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 1, 1, 0, 2, 1, 3, 0, 1, 1, 2, 0, 3, 0])], ['IEND', []]]);
+    expect(Array.from((await decodePng(rgb16)).data)).toEqual([256, 512, 768, 0, 256, 512, 769, 65535, 256, 513, 768, 65535, 257, 512, 768, 65535]);
   });
 
   it('skips an unknown ancillary chunk and refuses an unknown critical one', async () => {
@@ -139,5 +139,19 @@ describe('decodePng', () => {
 
   it('crc32 matches the standard check value', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926);
+  });
+
+  it('crc32 equals the bitwise definition on every length and offset up to 40 bytes', () => {
+    const bitwise = (b: Uint8Array, from: number, to: number) => {
+      let c = 0xffffffff;
+      for (let i = from; i < to; i++) {
+        c ^= b[i]!;
+        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      }
+      return (c ^ 0xffffffff) >>> 0;
+    };
+    const bytes = Uint8Array.from({ length: 48 }, (_, i) => (i * 167 + 13) & 255);
+    for (let from = 0; from < 8; from++) for (let to = from; to <= from + 40; to++) expect(crc32(bytes, from, to)).toBe(bitwise(bytes, from, to));
+    expect(crc32(bytes.subarray(3))).toBe(bitwise(bytes, 3, 48));
   });
 });
