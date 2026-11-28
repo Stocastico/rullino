@@ -17,6 +17,7 @@ const USAGE = `rullino: render an edit document onto photos (the server half of 
 
 usage:
   rullino render (--edit <edit.json> | --look <id>) <photo or folder>... [options]
+  rullino validate <edit.json>...    check edit documents without rendering anything (exit 1 if one is invalid)
   rullino looks                      list the built-in looks
   rullino info <photo>               what a photo carries: camera, date, GPS, profiles, and the edit it was rendered with
 
@@ -58,7 +59,7 @@ const parse = (args: string[]) =>
     },
   });
 
-/** Runs the CLI; the return value is the process exit code (0 ok, 1 a render failed, 2 bad usage). */
+/** Runs the CLI; the return value is the process exit code (0 ok, 1 a render failed or a document is invalid, 2 bad usage). */
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   try {
     const { values, positionals } = parse(argv);
@@ -72,6 +73,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       return 0;
     }
     if (command === 'info') return await info(inputs, io);
+    if (command === 'validate') return await validate(inputs, io);
     if (command !== 'render') throw new UsageError(`unknown command "${command}"`);
     return await render(values, inputs, io);
   } catch (e) {
@@ -89,6 +91,34 @@ function number(name: string, text: string | undefined, min: number, max: number
   const n = Number(text);
   if (!Number.isFinite(n) || n < min || n > max) throw new UsageError(`--${name} must be a number from ${min} to ${max}, got "${text}"`);
   return n;
+}
+
+/** `rullino validate <edit.json>...`: parses each document as `render` would, with the built-in filters and looks, and reads no photo. */
+async function validate(files: string[], io: CliIo): Promise<number> {
+  if (files.length === 0) throw new UsageError('give at least one edit document: rullino validate <edit.json>...');
+  let failed = 0;
+  for (const file of files) {
+    try {
+      let text: string;
+      try {
+        text = await readFile(file, 'utf8');
+      } catch (e) {
+        throw new Error(`cannot read the file (${(e as Error).message})`);
+      }
+      let doc: unknown;
+      try {
+        doc = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`not valid JSON (${(e as Error).message})`);
+      }
+      parseEdit(doc, { filters, resolveLut: resolveLookLut });
+      io.out(`${file}: ok`);
+    } catch (e) {
+      failed++;
+      io.err(`${file}: ${(e as Error).message}`);
+    }
+  }
+  return failed === 0 ? 0 : 1;
 }
 
 async function render(values: ReturnType<typeof parse>['values'], inputs: string[], io: CliIo): Promise<number> {

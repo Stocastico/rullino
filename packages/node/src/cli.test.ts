@@ -165,6 +165,79 @@ describe('rullino CLI', { timeout: 60_000 }, () => {
     expect(await readdir(dir)).not.toContain('out');
   });
 
+  describe('validate', () => {
+    const doc = (d: unknown) => JSON.stringify(d);
+
+    it('says ok for each valid document (a look, a version 2 chain, a version 3 graph) and exits 0', async () => {
+      const dir = await workspace();
+      await writeFile(join(dir, 'look.json'), doc({ version: 2, steps: [{ filter: 'exposure', params: { ev: 0.5 } }, { filter: 'vignette', params: {} }] }));
+      await writeFile(join(dir, 'graph.json'), doc({ version: 3, inputs: { photo: {} }, nodes: [{ id: 'small', kind: 'resize', from: 'photo', longSide: 20 }] }));
+      const r = await run(['validate', join(dir, 'edit.json'), join(dir, 'look.json'), join(dir, 'graph.json')]);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+      expect(r.out.split('\n')).toEqual([`${join(dir, 'edit.json')}: ok`, `${join(dir, 'look.json')}: ok`, `${join(dir, 'graph.json')}: ok`]);
+    });
+
+    it('accepts a document that names a built-in look LUT', async () => {
+      const dir = await workspace();
+      await writeFile(join(dir, 'lut.json'), doc({ version: 2, steps: [{ filter: 'applyLut', params: { look: { ref: 'look:golden' } } }] }));
+      expect(await run(['validate', join(dir, 'lut.json')])).toMatchObject({ code: 0, err: '' });
+      await writeFile(join(dir, 'nolut.json'), doc({ version: 2, steps: [{ filter: 'applyLut', params: { look: { ref: 'my-own.cube' } } }] }));
+      expect(await run(['validate', join(dir, 'nolut.json')])).toMatchObject({ code: 1, err: expect.stringMatching(/unknown LUT "my-own\.cube"/) });
+    });
+
+    it('agrees with render on numbers outside a parameter\'s range: they are clamped, so the document is valid', async () => {
+      const dir = await workspace();
+      await writeFile(join(dir, 'range.json'), doc({ version: 2, steps: [{ filter: 'exposure', params: { ev: 99 } }] }));
+      expect(await run(['validate', join(dir, 'range.json')])).toMatchObject({ code: 0, out: `${join(dir, 'range.json')}: ok` });
+    });
+
+    it('names the problem for an unknown filter, an unknown parameter and a wrong type, and exits 1', async () => {
+      const dir = await workspace();
+      await writeFile(join(dir, 'unknown.json'), doc({ version: 2, steps: [{ filter: 'doesNotExist', params: {} }] }));
+      await writeFile(join(dir, 'param.json'), doc({ version: 2, steps: [{ filter: 'exposure', params: { nope: 1 } }] }));
+      await writeFile(join(dir, 'type.json'), doc({ version: 2, steps: [{ filter: 'exposure', params: { ev: 'bright' } }] }));
+      for (const [file, what] of [['unknown.json', /doesNotExist/], ['param.json', /unknown parameter "nope"/], ['type.json', /parameter "ev".*"bright"/]] as const) {
+        const r = await run(['validate', join(dir, file)]);
+        expect(r.code).toBe(1);
+        expect(r.out).toBe('');
+        expect(r.err).toMatch(what);
+        expect(r.err.startsWith(`${join(dir, file)}: `)).toBe(true);
+        expect(r.err).not.toMatch(/\n\s+at /); // no stack trace
+      }
+    });
+
+    it('says what is wrong with a file that is missing or is not JSON, and still checks the rest', async () => {
+      const dir = await workspace();
+      await writeFile(join(dir, 'broken.json'), '{ "version": 2, ');
+      const r = await run(['validate', join(dir, 'missing.json'), join(dir, 'broken.json'), join(dir, 'edit.json')]);
+      expect(r.code).toBe(1);
+      expect(r.err).toMatch(/missing\.json: cannot read/);
+      expect(r.err).toMatch(/broken\.json: .*JSON/i);
+      expect(r.out).toBe(`${join(dir, 'edit.json')}: ok`); // the valid one is still reported
+    });
+
+    it('refuses a document that is not an object, and an empty one', async () => {
+      const dir = await workspace();
+      await writeFile(join(dir, 'array.json'), '[]');
+      await writeFile(join(dir, 'empty.json'), '{}');
+      expect((await run(['validate', join(dir, 'array.json')])).code).toBe(1);
+      expect((await run(['validate', join(dir, 'empty.json')])).code).toBe(1);
+    });
+
+    it('is a usage error (2) without a file, and a folder of photos is not a document', async () => {
+      expect(await run(['validate'])).toMatchObject({ code: 2, err: expect.stringMatching(/give at least one edit document/) });
+      const dir = await workspace();
+      // Photos never matter: a folder of images is not a document.
+      expect((await run(['validate', join(dir, 'in')])).code).toBe(1);
+      expect(await readdir(dir)).not.toContain('rullino-out');
+    });
+
+    it('is listed in --help', async () => {
+      expect((await run(['--help'])).out).toMatch(/rullino validate/);
+    });
+  });
+
   it('prints what render could not use in a file (an unsupported colour profile) and still renders it (#181)', async () => {
     const dir = await workspace();
     const icc = new Uint8Array(await readFile(fileURLToPath(new URL('../../core/test/icc/ITULab.icc', import.meta.url))));
